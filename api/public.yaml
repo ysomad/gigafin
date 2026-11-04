@@ -1,0 +1,755 @@
+openapi: 3.2.0
+info:
+  title: gigafin public API
+  version: 1.0.0
+  description: |
+    Personal finance API. Authenticate with an API key created in the web UI:
+    `Authorization: Bearer gf_...`. Read-scoped keys may only call GET and QUERY endpoints.
+    Amounts are decimal strings in the account currency, e.g. "1040.50".
+servers:
+  - url: /api
+tags:
+  - name: Accounts
+    description: Accounts and their balances
+  - name: Categories
+    description: Income and expense categories
+  - name: Operations
+    description: Operations; an expense or income can be split into several operations
+  - name: Plans
+    description: Monthly category plans
+  - name: Rules
+    description: >-
+      Rules that categorize operations. They run on import and fill empty fields of new operations; changing the category of a payee's operations by hand teaches rules when learning is on.
+security:
+  - bearerAuth: []
+paths:
+  /accounts:
+    get:
+      operationId: listAccounts
+      tags: [Accounts]
+      summary: List accounts with balances
+      responses:
+        "200":
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createAccount
+      tags: [Accounts]
+      summary: Create an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountCreate"
+      responses:
+        "201":
+          description: Created account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        default:
+          $ref: "#/components/responses/Error"
+  /accounts/{id}:
+    get:
+      operationId: getAccount
+      tags: [Accounts]
+      summary: Get an account with its balance
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        default:
+          $ref: "#/components/responses/Error"
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [Categories]
+      summary: List the category tree
+      responses:
+        "200":
+          description: Root categories with their nested categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createCategory
+      tags: [Categories]
+      summary: Create a category
+      description: Without parent_id creates a root category of kind. With parent_id creates a category nested in it that takes the parent kind.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreate"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        default:
+          $ref: "#/components/responses/Error"
+  /operations:
+    query:
+      operationId: listOperations
+      tags: [Operations]
+      summary: List operations, newest first
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationQuery"
+      responses:
+        "200":
+          description: A page of operations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createOperation
+      tags: [Operations]
+      summary: Create an operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationInput"
+      responses:
+        "201":
+          description: Created operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        default:
+          $ref: "#/components/responses/Error"
+  /operations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getOperation
+      tags: [Operations]
+      summary: Get an operation
+      responses:
+        "200":
+          description: Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateOperation
+      tags: [Operations]
+      summary: Replace an operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationInput"
+      responses:
+        "200":
+          description: Updated operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteOperation
+      tags: [Operations]
+      summary: Delete an operation
+      description: Other parts of its split are kept.
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/Error"
+  /operations/{id}/split:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: splitOperation
+      tags: [Operations]
+      summary: Split an expense or income into parts
+      description: >
+        Divides the operation between categories. The parts add up to its amount; the first one replaces the operation, the others become new operations. All parts share origin_id and are independent operations afterwards.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SplitInput"
+      responses:
+        "200":
+          description: The parts, the split operation first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SplitResult"
+        default:
+          $ref: "#/components/responses/Error"
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [Plans]
+      summary: List plans of a month
+      parameters:
+        - $ref: "#/components/parameters/Month"
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanList"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: setPlan
+      tags: [Plans]
+      summary: Set a plan of a category for a month
+      description: >-
+        The latest repeating plan before a month is copied into it when the month starts. Amount "0" with repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Plan"
+      responses:
+        "204":
+          description: Saved
+        default:
+          $ref: "#/components/responses/Error"
+  /rules:
+    get:
+      operationId: listRules
+      tags: [Rules]
+      summary: List rules, oldest first
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleList"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createRule
+      tags: [Rules]
+      summary: Create a rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleInput"
+      responses:
+        "201":
+          description: Created rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        default:
+          $ref: "#/components/responses/Error"
+  /rules/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getRule
+      tags: [Rules]
+      summary: Get a rule
+      responses:
+        "200":
+          description: Rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: updateRule
+      tags: [Rules]
+      summary: Replace a rule
+      description: An edited rule becomes the user's, even when it was learned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleInput"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteRule
+      tags: [Rules]
+      summary: Delete a rule
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/Error"
+  /rules/{id}/apply:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: applyRule
+      tags: [Rules]
+      summary: Apply a rule to all operations it matches
+      description: Parts of splits are left alone.
+      responses:
+        "200":
+          description: Number of operations changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulesRunResult"
+        default:
+          $ref: "#/components/responses/Error"
+  /rules/run:
+    post:
+      operationId: runRules
+      tags: [Rules]
+      summary: Run all rules on the operations matching a filter
+      description: Parts of splits are left alone. cursor and page_size of the filter are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationQuery"
+      responses:
+        "200":
+          description: Number of operations changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulesRunResult"
+        default:
+          $ref: "#/components/responses/Error"
+  /rules/settings:
+    get:
+      operationId: getRuleSettings
+      tags: [Rules]
+      summary: Get rule settings
+      responses:
+        "200":
+          description: Rule settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSettings"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: setRuleSettings
+      tags: [Rules]
+      summary: Set rule settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleSettings"
+      responses:
+        "204":
+          description: Saved
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer, format: int64}
+    Month:
+      name: month
+      in: query
+      required: true
+      schema: {type: string, pattern: '^\d{4}-\d{2}$', example: "2026-10"}
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [bad_request, unauthorized, forbidden, not_found, conflict, internal]
+        message:
+          type: string
+    Amount:
+      type: string
+      pattern: '^-?\d+(\.\d+)?$'
+      example: "1040.50"
+    Currency:
+      type: string
+      pattern: '^[A-Z]{3}$'
+      example: RUB
+    AccountKind:
+      type: string
+      description: credit and loan are liabilities, cash, debit and savings (deposits and savings accounts) are assets.
+      enum: [cash, debit, savings, credit, loan]
+    Account:
+      type: object
+      required: [id, name, currency, kind, archived, balance]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        currency: {$ref: "#/components/schemas/Currency"}
+        kind: {$ref: "#/components/schemas/AccountKind"}
+        credit_limit: {$ref: "#/components/schemas/Amount"}
+        archived: {type: boolean}
+        balance:
+          $ref: "#/components/schemas/Amount"
+          description: Signed for every kind, a credit card owing 500 has balance "-500".
+    AccountList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Account"}
+    AccountCreate:
+      type: object
+      required: [name, currency]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        currency: {$ref: "#/components/schemas/Currency"}
+        kind:
+          $ref: "#/components/schemas/AccountKind"
+          description: Defaults to debit.
+        credit_limit:
+          $ref: "#/components/schemas/Amount"
+          description: Credit accounts only.
+    CategoryKind:
+      type: string
+      enum: [expense, income]
+    Category:
+      type: object
+      required: [id, kind, name, archived]
+      properties:
+        id: {type: integer, format: int64}
+        parent_id: {type: integer, format: int64}
+        kind: {$ref: "#/components/schemas/CategoryKind"}
+        name: {type: string}
+        archived: {type: boolean}
+        children:
+          type: array
+          items: {$ref: "#/components/schemas/Category"}
+    CategoryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Category"}
+    CategoryCreate:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        kind: {$ref: "#/components/schemas/CategoryKind"}
+        parent_id: {type: integer, format: int64}
+    OperationType:
+      type: string
+      enum: [expense, income, transfer, adjustment]
+    SplitPart:
+      type: object
+      required: [category_id, amount]
+      properties:
+        category_id:
+          type: integer
+          format: int64
+          description: A category of the operation kind, root or nested.
+        amount: {$ref: "#/components/schemas/Amount"}
+        note:
+          type: string
+          maxLength: 500
+          description: Note of the part; empty keeps the note of the operation.
+    SplitInput:
+      type: object
+      required: [parts]
+      properties:
+        parts:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items: {$ref: "#/components/schemas/SplitPart"}
+    SplitResult:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Operation"}
+    OperationInput:
+      type: object
+      required: [type, account_id, amount, date]
+      properties:
+        type: {$ref: "#/components/schemas/OperationType"}
+        account_id: {type: integer, format: int64}
+        to_account_id:
+          type: integer
+          format: int64
+          description: Destination of a transfer, same currency as account_id.
+        category_id:
+          type: integer
+          format: int64
+          description: Category of an expense or income, root or nested; not set for transfers and adjustments.
+        amount:
+          allOf: [{$ref: "#/components/schemas/Amount"}]
+          description: Positive, except for adjustments where the sign is the balance change.
+        date: {type: string, format: date}
+        time: {type: string, pattern: '^\d{2}:\d{2}$', example: "18:45"}
+        payee: {type: string, maxLength: 500}
+        note: {type: string, maxLength: 500}
+        tags:
+          type: array
+          maxItems: 10
+          items: {type: string, maxLength: 50}
+          description: Tag names; a new name creates the tag, one matching a tag ignoring case takes its spelling.
+    Operation:
+      type: object
+      required: [id, type, account_id, currency, amount, date, payee, note, tags, created_at]
+      properties:
+        id: {type: integer, format: int64}
+        type: {$ref: "#/components/schemas/OperationType"}
+        account_id: {type: integer, format: int64}
+        to_account_id: {type: integer, format: int64}
+        category_id:
+          type: integer
+          format: int64
+          description: Category of an expense or income.
+        origin_id:
+          type: integer
+          format: int64
+          description: Id of the operation a split started from, shared by all its parts; unset when never split.
+        currency: {$ref: "#/components/schemas/Currency"}
+        amount: {$ref: "#/components/schemas/Amount"}
+        date: {type: string, format: date}
+        time: {type: string}
+        payee: {type: string}
+        source_payee:
+          type: string
+          description: Payee as the bank sent it; set on import only and kept when the payee changes.
+        note: {type: string}
+        mcc:
+          type: string
+          description: Merchant Category Code of an imported card payment; set on import only.
+        tags:
+          type: array
+          items: {type: string}
+          description: Tag names, sorted.
+        import_id: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
+        updated_at:
+          type: string
+          format: date-time
+          description: Unset until the operation is first changed.
+    OperationQuery:
+      type: object
+      properties:
+        account_id: {type: integer, format: int64}
+        category_id:
+          type: integer
+          format: int64
+          description: A root category also matches its nested categories.
+        type: {$ref: "#/components/schemas/OperationType"}
+        date_from: {type: string, format: date}
+        date_to: {type: string, format: date}
+        query:
+          type: string
+          maxLength: 200
+          description: Substring of payee or note.
+        tag:
+          type: string
+          maxLength: 50
+          description: Tag name, matched exactly.
+        amount_min:
+          allOf: [{$ref: "#/components/schemas/Amount"}]
+          description: Least absolute amount, inclusive, in the currency of each operation.
+        amount_max:
+          allOf: [{$ref: "#/components/schemas/Amount"}]
+          description: Greatest absolute amount, inclusive, in the currency of each operation.
+        cursor:
+          type: string
+          maxLength: 64
+          description: next_cursor of the previous page.
+        page_size: {type: integer, minimum: 1, maximum: 500, default: 50}
+    OperationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Operation"}
+        next_cursor: {type: string}
+    Plan:
+      type: object
+      required: [category_id, month, currency, amount]
+      properties:
+        category_id: {type: integer, format: int64}
+        month: {type: string, pattern: '^\d{4}-\d{2}$', example: "2026-10"}
+        currency: {$ref: "#/components/schemas/Currency"}
+        amount: {$ref: "#/components/schemas/Amount"}
+        repeating:
+          type: boolean
+          default: false
+          description: Copy the plan into following months.
+    PlanList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Plan"}
+    RuleStage:
+      type: string
+      description: Pre rules run first, then default, then post; within a stage the most specific rules run last and win.
+      enum: [pre, default, post]
+    RuleField:
+      type: string
+      description: >-
+        source_payee is the payee as the bank sent it. Text fields take is, is_not, contains, not_contains, one_of, not_one_of and matches; amount takes is, approx (within 7.5%), between, gt, gte, lt and lte; account, category and type take is, is_not, one_of and not_one_of.
+      enum: [source_payee, payee, note, mcc, amount, account, category, type]
+    RuleOp:
+      type: string
+      enum: [is, is_not, contains, not_contains, one_of, not_one_of, matches, approx, between, gt, gte, lt, lte]
+    RuleCondition:
+      type: object
+      required: [field, op, values]
+      properties:
+        field: {$ref: "#/components/schemas/RuleField"}
+        op: {$ref: "#/components/schemas/RuleOp"}
+        values:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {type: string, minLength: 1, maxLength: 500}
+          description: >-
+            One value; one or more for one_of and not_one_of, two for between. Text matches ignoring case, matches takes an RE2 regular expression. Amounts are decimals, accounts and categories ids, types operation types.
+    RuleActionType:
+      type: string
+      description: set_category takes a category id and changes only expenses and income of its kind; set_note with an empty value clears the note.
+      enum: [set_category, set_payee, set_note, append_note, prepend_note, add_tag]
+    RuleAction:
+      type: object
+      required: [type]
+      properties:
+        type: {$ref: "#/components/schemas/RuleActionType"}
+        value: {type: string, maxLength: 500}
+    RuleInput:
+      type: object
+      required: [conditions, actions]
+      properties:
+        stage:
+          $ref: "#/components/schemas/RuleStage"
+          description: Defaults to default.
+        match:
+          type: string
+          enum: [all, any]
+          description: Whether all conditions must hold or any of them; defaults to all.
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: "#/components/schemas/RuleCondition"}
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: {$ref: "#/components/schemas/RuleAction"}
+    Rule:
+      type: object
+      required: [id, stage, match, conditions, actions, origin, created_at]
+      properties:
+        id: {type: integer, format: int64}
+        stage: {$ref: "#/components/schemas/RuleStage"}
+        match:
+          type: string
+          enum: [all, any]
+        conditions:
+          type: array
+          items: {$ref: "#/components/schemas/RuleCondition"}
+        actions:
+          type: array
+          items: {$ref: "#/components/schemas/RuleAction"}
+        origin:
+          type: string
+          enum: [user, learned]
+          description: learned rules were made from the user's categorization.
+        created_at: {type: string, format: date-time}
+        updated_at:
+          type: string
+          format: date-time
+          description: Unset until the rule is first changed.
+    RuleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Rule"}
+    RuleSettings:
+      type: object
+      required: [learning]
+      properties:
+        learning:
+          type: boolean
+          description: Changing the category of a payee's operations by hand creates or updates a rule for the payee.
+    RulesRunResult:
+      type: object
+      required: [changed]
+      properties:
+        changed:
+          type: integer
+          description: Number of operations changed.

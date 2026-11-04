@@ -1,0 +1,21 @@
+version: "2"
+sql:
+  - engine: sqlite
+    schema: migrations
+    queries: queries
+    strict_function_checks: true
+    gen:
+      go:
+        package: sqlc
+        out: internal/gen/sqlc
+        rename:
+          mcc: MCC
+        overrides:
+          - column: plans.is_repeating
+            go_type: bool
+          - column: user_settings.show_minor_units
+            go_type: bool
+          - column: exchange_rates.is_manual
+            go_type: bool
+          - column: rule_settings.is_learning
+            go_type: bool

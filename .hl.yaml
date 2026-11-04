@@ -1,0 +1,50 @@
+---
+# hl (github.com/pamburus/hl) settings for the JSON logs of log/slog, used by make run and dev.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/pamburus/hl/master/schema/json/config.schema.json
+$schema: https://raw.githubusercontent.com/pamburus/hl/master/schema/json/config.schema.json
+
+# Time format, see https://man7.org/linux/man-pages/man1/date.1.html for details.
+time-format: '%b %d %T.%3N'
+time-zone: Asia/Novosibirsk
+fields:
+  predefined:
+    time:
+      show: auto
+      names: [time]
+    level:
+      show: auto
+      variants:
+        - names: [level]
+          values:
+            debug: [DEBUG]
+            info: [INFO]
+            warning: [WARN]
+            error: [ERROR]
+    message:
+      names: [msg]
+    caller-file:
+      names: [source.file]
+    caller-line:
+      names: [source.line]
+  ignore: [_*]
+  hide: [source.function]
+formatting:
+  flatten: always
+  punctuation:
+    logger-name-separator: ':'
+    field-key-value-separator: '='
+    string-opening-quote: "'"
+    string-closing-quote: "'"
+    source-location-separator: '→ '
+    hidden-fields-indicator: ' ...'
+    level-left-separator: │
+    level-right-separator: │
+    input-number-prefix: '#'
+    input-number-left-separator: ''
+    input-number-right-separator: ' │ '
+    input-name-left-separator: ''
+    input-name-right-separator: ' │ '
+    input-name-clipping: ··
+    input-name-common-part: ··
+    array-separator: ' '
+theme: universal

@@ -1,0 +1,6 @@
+generator:
+  initialisms: [inherit, MCC]
+  features:
+    disable:
+      - "paths/client"
+      - "ogen/otel"

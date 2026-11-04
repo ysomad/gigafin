@@ -1,0 +1,28 @@
+{{define "content"}}
+{{$c := .Data.Category}}
+<h1>{{if .Data.ParentName}}{{.Data.ParentName}} / {{end}}{{$c.Name}} <span class="muted">{{t (print $c.Kind)}}{{if $c.Archived}} · {{t "archived"}}{{end}}</span></h1>
+<p><a href="/operations?category={{$c.ID}}">{{t "Operations"}}</a></p>
+<form method="post" action="/categories/{{$c.ID}}">
+  <div class="row">
+    <label class="grow">{{t "Name"}} <input name="name" value="{{$c.Name}}" required></label>
+    {{if $c.ParentID}}
+    <label>{{t "Inside"}}
+      <select name="parent">
+        {{range .Data.Parents}}<option value="{{.ID}}"{{if eq .ID $c.ParentID}} selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
+    <button type="submit" class="shrink">{{t "Save"}}</button>
+  </div>
+</form>
+<div class="actions">
+  <form method="post" action="/categories/{{$c.ID}}/archive">
+    <input type="hidden" name="archived" value="{{if $c.Archived}}0{{else}}1{{end}}">
+    <button type="submit" class="secondary">{{if $c.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
+  </form>
+  <form method="post" action="/categories/{{$c.ID}}/delete" hx-confirm="{{t "Delete category %s?" $c.Name}}">
+    <button type="submit" class="secondary outline">{{t "Delete"}}</button>
+  </form>
+</div>
+<p class="muted">{{t "Categories that contain other categories or have operations can only be archived."}}</p>
+{{end}}

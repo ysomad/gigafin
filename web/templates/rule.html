@@ -1,0 +1,54 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{if $d.ID}}{{t "Rule"}}{{if eq $d.Origin "learned"}} <span class="muted">{{t "learned"}}</span>{{end}}{{else}}{{t "New rule"}}{{end}}</h1>
+{{if ge $d.Applied 0}}<p role="status">{{t "Changed %d operations." $d.Applied}}</p>{{end}}
+<form method="post" action="{{if $d.ID}}/rules/{{$d.ID}}{{else}}/rules{{end}}">
+  <div class="row">
+    <label>{{t "Runs"}}
+      <select name="stage">
+        {{range $s := ruleStages}}<option value="{{$s}}"{{if eq $s $d.Stage}} selected{{end}}>{{template "rule-stage" $s}}</option>{{end}}
+      </select>
+    </label>
+    <label>{{t "Match"}}
+      <select name="match">
+        <option value="all"{{if eq $d.Match "all"}} selected{{end}}>{{t "all conditions"}}</option>
+        <option value="any"{{if eq $d.Match "any"}} selected{{end}}>{{t "any condition"}}</option>
+      </select>
+    </label>
+  </div>
+
+  <h2>{{t "If"}}</h2>
+  <div id="conditions">
+    {{range $d.Conditions}}{{template "rule-condition" (dict "Row" . "Fields" $d.Fields "Categories" $d.Categories "Accounts" $d.Accounts)}}{{end}}
+  </div>
+  <div class="actions">
+    <button type="button" class="secondary outline small" hx-get="/rules/condition" hx-target="#conditions" hx-swap="beforeend">+ {{t "Add condition"}}</button>
+  </div>
+
+  <h2>{{t "Then"}}</h2>
+  <div id="rule-actions">
+    {{range $d.Actions}}{{template "rule-action" (dict "Row" . "Categories" $d.Categories)}}{{end}}
+  </div>
+  <div class="actions">
+    <button type="button" class="secondary outline small" hx-get="/rules/action" hx-target="#rule-actions" hx-swap="beforeend">+ {{t "Add action"}}</button>
+  </div>
+
+  <div class="actions">
+    <button type="submit">{{t "Save"}}</button>
+    <button type="button" class="secondary outline" hx-post="/rules/preview" hx-target="#preview">{{t "Show matches"}}</button>
+    <a role="button" class="secondary outline" href="/rules">{{t "Cancel"}}</a>
+  </div>
+</form>
+<div id="preview"></div>
+
+{{if $d.ID}}
+<div class="actions">
+  <form method="post" action="/rules/{{$d.ID}}/apply" hx-confirm="{{t "Apply the saved rule to all operations it matches?"}}">
+    <button type="submit" class="secondary">{{t "Apply to matching operations"}}</button>
+  </form>
+  <form method="post" action="/rules/{{$d.ID}}/delete" hx-confirm="{{t "Delete this rule?"}}">
+    <button type="submit" class="secondary outline">{{t "Delete rule"}}</button>
+  </form>
+</div>
+{{end}}
+{{end}}

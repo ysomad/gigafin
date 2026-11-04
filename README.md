@@ -1,0 +1,53 @@
+# TODO
+## Core feats
+- [x] basic features
+    - [x] operations
+    - [x] accounts (remove not needed account types)
+    - [x] categories
+    - [x] tbank import
+    - [x] zenmoney import
+    - [x] gigafin CSV import format
+    - [x] credit cards
+    - [x] debts
+- [x]  simple ui for categories
+- [x] code architecture
+- [x] mcp server
+- [x] tbank whole history + zenmoney import
+- [x] tbank integration sync operations
+- [x] api
+- [x] dashboard
+- [x] export
+- [x] move import to its own package from domain and tbank/gigacsv/zenmoney packages
+- [x] better import documentation on first step
+- [x] up button
+- [x] more compact operation tables and wider
+- [x] loading indicators
+- [x] missing reports
+- [x] backup button
+- [x] auto-repeating monthly plans
+- [x] config
+- [x] tags
+- [x] scheduler for background tasks (https://github.com/go-co-op/gocron)
+- [x] money.Amount type
+- [x] auto planning better ui/ux  && tests
+- [x] month picker on dashboard
+- [x] consistent buttons (height vs input height)
+- [x] rename budget to plan (better for both income and expense)
+- [x] centralize currency (currency per account or how?)
+- [x] logging
+- [x] replace / remove deprecated picocss (https://github.com/picocss/pico). Reduce amount of custom css / js
+- [x] i18n + russian
+- [x] Auto-categorisation rules. Payee is free text, and the only mapping is the bank's own category name. Other apps let you write rules like "payee contains X → category Y, rename payee."
+
+## Extra feats
+- [ ] alerts: when a plan is overspent or a bill is due (telegram?)
+- [ ] shared household plan (between multiple users)
+- [ ] 2fa
+- [ ] No Cross-currency transfers. An operation has one amount, so a RUB→USD transfer can't record both sides. It needs a to_amount.
+- [ ] No exchange rates or base currency. Totals stay split by currency, so there is no single net worth or "total spent this month."
+- [ ] Recurring and scheduled operations. No bills, subscriptions or planned future operations, and no "upcoming" view.
+- [ ] AI integration for categorization rules
+- [ ] zero-based "ready to assign" pool from income, carryover of unspent or overspent amounts, and moving money between categories. This is the main feature of YNAB and Actual.
+- [ ] custom themes per user
+- [ ] mobile web
+- [ ] Rules history

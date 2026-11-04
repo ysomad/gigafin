@@ -1,0 +1,128 @@
+version: '2'
+run:
+  build-tags: [integration]
+linters:
+  enable:
+    - unused
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - cyclop
+    - dogsled
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gocritic
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - grouper
+    - importas
+    - interfacebloat
+    - intrange
+    - ireturn
+    - makezero
+    - mirror
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - testifylint
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - lll
+  settings:
+    depguard:
+      # layering: transport (ui, api) -> service -> repository -> sqlc; domain is pure
+      rules:
+        no-stdlib-errors:
+          files:
+            - $all
+            - "!**/internal/errors/**"
+          deny:
+            - pkg: errors
+              desc: use internal/errors, it adds the error kinds
+        no-sqlc-outside-repo:
+          files:
+            - $all
+            - "!**/internal/repository/**"
+          deny:
+            - pkg: github.com/ysomad/gigafin/internal/gen/sqlc
+              desc: sqlc is wrapped by internal/repository
+            - pkg: modernc.org/sqlite
+              desc: the database is owned by internal/repository
+        no-repo-in-transport:
+          files:
+            - "**/internal/ui/**"
+            - "**/internal/api/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/ysomad/gigafin/internal/repository
+              desc: handlers call internal/service only
+        pure-domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: github.com/ysomad/gigafin/internal/repository
+              desc: domain has no I/O
+            - pkg: github.com/ysomad/gigafin/internal/service
+              desc: domain has no I/O
+            - pkg: github.com/ysomad/gigafin/internal/gen
+              desc: domain has no I/O
+            - pkg: database/sql
+              desc: domain has no I/O
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    ireturn:
+      allow: [stdlib, error, Res$, generic]
+    nakedret:
+      max-func-lines: 1
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    cyclop:
+      max-complexity: 20
+    lll:
+      line-length: 120
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, promlinter]
+      # an ogen handler answers a failed call with a typed error response and a nil
+      # error; returning the error instead would route it to the error handler and
+      # answer 400 invalid_data
+      - path: internal/api/
+        linters: [nilerr]
+      - linters: [errcheck]
+        text: (?i)Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*print(f|ln)?|os\.(Un)?Setenv). is not checked
+formatters:
+  enable: [gofumpt]

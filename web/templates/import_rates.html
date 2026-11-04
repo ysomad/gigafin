@@ -1,0 +1,40 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{t "Import exchange rates"}}</h1>
+{{if $d.Done}}
+{{template "import-steps" (dict "Step" "done" "Rates" true)}}
+<p>{{t "Imported %d daily rates." $d.Imported}}</p>
+<div class="actions">
+  <a role="button" class="secondary outline" href="/imports/new?source=rates">{{t "Import more"}}</a>
+  <a role="button" href="/settings">{{t "Settings"}}</a>
+</div>
+{{else}}
+{{template "import-steps" (dict "Step" "preview" "Rates" true)}}
+<p>{{t "%d daily rates" (len $d.Changes)}} · {{t "%d new" $d.New}} · {{t "%d change a stored rate" $d.Changed}}</p>
+<div class="actions">
+  <a role="button" class="secondary outline" href="/imports/new?source=rates">{{t "Back"}}</a>
+  <form method="post" action="/imports/rates/commit">
+    <textarea name="content" hidden>{{$d.Content}}</textarea>
+    <button type="submit">{{t "Import %d rates" (len $d.Changes)}}</button>
+  </form>
+</div>
+<div class="table-wrap">
+<table class="cards">
+  <thead><tr><th>{{t "Date"}}</th><th>{{t "Currency"}}</th><th class="num">{{t "Rate"}}</th><th class="num">{{t "Stored"}}</th><th>{{t "Status"}}</th></tr></thead>
+  <tbody>
+  {{range $d.Changes}}
+    <tr>
+      <td data-label="{{t "Date"}}" class="nowrap">{{date .Rate.Date}}</td>
+      <td data-label="{{t "Currency"}}">{{.Rate.Currency}}</td>
+      <td data-label="{{t "Rate"}}" class="num">{{.Rate.Rate}}</td>
+      <td data-label="{{t "Stored"}}" class="num">{{with .Old}}{{.Rate}}{{if .Manual}} <span class="muted">{{t "manual"}}</span>{{end}}{{else}}—{{end}}</td>
+      <td data-label="{{t "Status"}}">{{with $s := .Status}}{{if eq $s "new"}}{{t "new"}}{{else if eq $s "changed"}}<strong>{{t "changed"}}</strong>{{else}}<span class="muted">{{t "unchanged"}}</span>{{end}}{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+{{end}}
+
+{{define "to-top"}}{{if not .Data.Done}}<a href="#top" class="to-top" role="button" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}

@@ -1,0 +1,34 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="actions">
+  <a role="button" href="/rules/new">+ {{t "New rule"}}</a>
+</div>
+<p class="muted">{{t "Rules run when importing or creating operations."}}</p>
+
+<form method="post" action="/rules/learning">
+  <div class="row">
+    <label class="grow"><input type="checkbox" role="switch" name="learning"{{if $d.Settings.Learning}} checked{{end}}> {{t "Learn from my categories"}}</label>
+    <button type="submit" class="shrink">{{t "Save"}}</button>
+  </div>
+  <p class="muted">{{t "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee."}}</p>
+</form>
+
+{{range $d.Stages}}
+<h2>{{template "rule-stage" .Stage}}</h2>
+<ul class="rules">
+  {{range .Rules}}
+  <li>
+    <a href="/rules/{{.ID}}">
+      {{t "If"}}
+      {{range $i, $c := .Conds}}{{if $i}} {{if $c.Any}}{{t "or"}}{{else}}{{t "and"}}{{end}} {{end}}{{template "rule-field" $c.Field}} {{template "rule-op" $c.Op}} <strong>{{$c.Values}}</strong>{{end}}
+      →
+      {{range $i, $a := .Actions}}{{if $i}}, {{end}}{{template "rule-action-type" $a.Type}}{{with $a.Value}} <strong>{{.}}</strong>{{end}}{{end}}
+    </a>
+    {{if eq .Origin "learned"}} <span class="muted">{{t "learned"}}</span>{{end}}
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="muted">{{t "No rules yet."}}</p>
+{{end}}
+{{end}}

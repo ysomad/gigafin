@@ -1,0 +1,44 @@
+{{define "content"}}
+{{$a := .Data.Account}}
+<h1>{{$a.Name}} <span class="muted">{{t (print $a.Kind)}} · {{$a.Currency}}{{if $a.Archived}} · {{t "archived"}}{{end}}</span></h1>
+<p>{{t "Balance:"}} <strong class="num {{if $a.Balance.IsNegative}}expense{{end}}">{{money $a.Balance $a.Currency}} {{$a.Currency}}</strong>
+  {{if $a.Kind.Liability}}· {{t "owed %s" (money $a.Owed $a.Currency)}}{{end}}
+  {{if not $a.CreditLimit.IsZero}}· {{t "available %s of %s" (money $a.Available $a.Currency) (money $a.CreditLimit $a.Currency)}}{{end}}
+  · <a href="/operations?account={{$a.ID}}">{{t "Operations"}}</a></p>
+
+<h2>{{t "Set balance"}}</h2>
+<p class="muted">{{t "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank."}}</p>
+<form method="post" action="/accounts/{{$a.ID}}/balance">
+  <div class="row">
+    <label>{{t "New balance"}} <input name="balance" inputmode="decimal" value="{{amountInput .Data.Target}}" required></label>
+    <label>{{t "As of"}} <input type="date" name="date" value="{{.Data.Today}}" required></label>
+    <button type="submit" class="shrink">{{t "Set"}}</button>
+  </div>
+</form>
+
+<h2>{{t "Edit"}}</h2>
+<form method="post" action="/accounts/{{$a.ID}}">
+  <div class="row">
+    <label class="grow">{{t "Name"}} <input name="name" value="{{$a.Name}}" required></label>
+    <label>{{t "Kind"}}
+      <select name="kind">
+        {{range .Data.Kinds}}<option value="{{.}}"{{if eq . $a.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
+      </select>
+    </label>
+    <label>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}"
+      value="{{if not $a.CreditLimit.IsZero}}{{amountInput ($a.CreditLimit.Fixed $a.Currency)}}{{end}}"></label>
+    <button type="submit" class="shrink">{{t "Save"}}</button>
+  </div>
+</form>
+
+<div class="actions">
+  <form method="post" action="/accounts/{{$a.ID}}/archive">
+    <input type="hidden" name="archived" value="{{if $a.Archived}}0{{else}}1{{end}}">
+    <button type="submit" class="secondary">{{if $a.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
+  </form>
+  <form method="post" action="/accounts/{{$a.ID}}/delete" hx-confirm="{{t "Delete account %s?" $a.Name}}">
+    <button type="submit" class="secondary outline">{{t "Delete"}}</button>
+  </form>
+</div>
+<p class="muted">{{t "Accounts with operations can only be archived."}}</p>
+{{end}}

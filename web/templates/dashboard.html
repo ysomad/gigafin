@@ -1,0 +1,104 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="page-head">
+  {{template "month-nav" (dict "Month" $d.Dash.Month "Months" $d.Months "Action" "/" "PrevURL" (print "/?month=" $d.Prev) "NextURL" (print "/?month=" $d.Next))}}
+</div>
+
+<div class="stats">
+  {{range $d.Dash.Totals}}
+  <article>
+    <span class="label">{{t "Net worth"}} · {{.Currency}}</span>
+    <strong class="value {{if .Net.IsNegative}}expense{{end}}">{{money .Net .Currency}}</strong>
+    <dl>
+      <dt>{{t "Assets"}}</dt><dd>{{money .Assets .Currency}}</dd>
+      {{if not .Liabilities.IsZero}}<dt>{{t "Debts"}}</dt><dd>{{money .Liabilities .Currency}}</dd>{{end}}
+    </dl>
+  </article>
+  {{end}}
+  {{range $d.Dash.Trends}}{{$m := .Last}}
+  <article>
+    <span class="label">{{t ($d.Dash.Month.First.Format "January")}} {{$d.Dash.Month.First.Format "2006"}} · {{.Currency}}</span>
+    <strong class="value {{if $m.Net.IsNegative}}expense{{else}}income{{end}}">{{money $m.Net .Currency}}</strong>
+    <dl>
+      <dt>{{t "Income"}}</dt><dd class="income">+{{money $m.Income .Currency}}</dd>
+      <dt>{{t "Expense"}}</dt><dd class="expense">−{{money $m.Expense .Currency}}</dd>
+    </dl>
+  </article>
+  {{end}}
+</div>
+
+{{if not $d.Dash.Trends}}
+<p class="muted">{{t "No operations yet."}} <a href="/operations/new?type=expense">{{t "Add one"}}</a> {{t "or"}} <a href="/imports/new">{{t "import"}}</a>.</p>
+{{end}}
+
+{{/* expenses are ordered by currency: a table per currency */}}
+{{if $d.Dash.Expenses}}
+<form method="get" action="/" class="compare">
+  <input type="hidden" name="month" value="{{$d.Dash.Month}}">
+  <label for="compare">{{t "Compare with"}}</label>
+  <select id="compare" name="compare">
+    {{range $d.Months}}<option value="{{.}}"{{if eq .String $d.Dash.CompareMonth.String}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
+  </select>
+</form>
+{{end}}
+{{$cur := ""}}
+{{range $d.Dash.Expenses}}
+{{if ne .Currency $cur}}{{if $cur}}</tbody></table>{{end}}
+<h2>{{t "Expenses by category"}} <span class="muted">{{.Currency}}</span></h2>
+<table class="shares">
+  <thead><tr><th></th><th></th><th class="num">{{t ($d.Dash.Month.First.Format "Jan")}} {{$d.Dash.Month.First.Format "2006"}}</th><th></th><th class="num">{{t ($d.Dash.CompareMonth.First.Format "Jan")}} {{$d.Dash.CompareMonth.First.Format "2006"}}</th><th class="num">Δ</th></tr></thead>
+  <tbody>
+{{$cur = .Currency}}{{end}}
+    <tr>
+      <td><a href="/operations?category={{.Category.ID}}&from={{$d.From}}&to={{$d.To}}">{{.Category.Name}}</a></td>
+      <td class="bar"><progress value="{{.Percent}}" max="100" title="{{.Percent}}%"></progress></td>
+      <td class="num">{{money .Spent .Currency}}</td>
+      <td class="num muted">{{.Percent}}%</td>
+      <td class="num muted">{{if .Prev.IsPositive}}{{money .Prev .Currency}}{{else}}—{{end}}</td>
+      <td class="num {{if gt .Change 0}}expense{{else if lt .Change 0}}income{{end}}">{{if .Prev.IsPositive}}{{if gt .Change 0}}+{{end}}{{.Change}}%{{else}}{{t "new"}}{{end}}</td>
+    </tr>
+{{end}}
+{{if $cur}}</tbody></table>{{end}}
+
+{{range $d.Charts}}
+<h2>{{t "Income vs expense"}} <span class="muted">{{.Currency}}</span></h2>
+<figure class="trend" data-currency="{{.Currency}}">
+  <script type="application/json" data-label-income="{{t "Income"}}" data-label-expense="{{t "Expense"}}" data-label-balance="{{t "Net worth"}}">{{.}}</script>
+</figure>
+{{end}}
+
+{{/* category trends are ordered by currency: a table per currency */}}
+{{$cur = ""}}
+{{range $d.Dash.CategoryTrends}}
+{{if ne .Currency $cur}}{{if $cur}}</tbody></table></div>{{end}}
+<h2>{{t "Expenses by month"}} <span class="muted">{{.Currency}}</span></h2>
+<div class="table-wrap">
+<table class="cat-trend">
+  <thead><tr><th></th>{{range $d.Dash.TrendMonths}}<th class="num">{{t (.First.Format "Jan")}}</th>{{end}}<th class="num">{{t "Avg"}}</th></tr></thead>
+  <tbody>
+{{$cur = .Currency}}{{end}}
+    {{$t := .}}
+    <tr>
+      <td>{{.Category.Name}}</td>
+      {{range $i, $v := .Months}}<td class="num">{{if $v.IsZero}}<span class="muted">—</span>{{else}}<a href="/operations?category={{$t.Category.ID}}&from={{date (index $d.Dash.TrendMonths $i).First}}&to={{date (index $d.Dash.TrendMonths $i).Last}}">{{money $v $t.Currency}}</a>{{end}}</td>{{end}}
+      <td class="num muted">{{money .Average .Currency}}</td>
+    </tr>
+{{end}}
+{{if $cur}}</tbody></table></div>{{end}}
+
+{{if $d.Dash.Payees}}
+{{$cur = ""}}
+{{range $d.Dash.Payees}}
+{{if ne .Currency $cur}}{{if $cur}}</tbody></table>{{end}}
+<h2>{{t "Top payees"}} <span class="muted">{{.Currency}}</span></h2>
+<table class="payees"><tbody>
+{{$cur = .Currency}}{{end}}
+    <tr>
+      <td><a href="/operations?q={{.Payee}}&from={{$d.From}}&to={{$d.To}}">{{.Payee}}</a></td>
+      <td class="num muted">{{.Count}}×</td>
+      <td class="num">{{money .Total .Currency}}</td>
+    </tr>
+{{end}}
+</tbody></table>
+{{end}}
+{{end}}

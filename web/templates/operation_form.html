@@ -1,0 +1,81 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{if $d.ID}}{{t "Edit %s" (t (print $d.Type))}}{{else}}{{t "New %s" (t (print $d.Type))}}{{end}}</h1>
+{{if not $d.ID}}
+<div class="actions">
+  <a role="button"{{if ne $d.Type "expense"}} class="secondary outline"{{end}} href="/operations/new?type=expense">− {{t "Expense"}}</a>
+  <a role="button"{{if ne $d.Type "income"}} class="secondary outline"{{end}} href="/operations/new?type=income">+ {{t "Income"}}</a>
+  <a role="button"{{if ne $d.Type "transfer"}} class="secondary outline"{{end}} href="/operations/new?type=transfer">⇄ {{t "Transfer"}}</a>
+</div>
+{{end}}
+<form id="op-form" method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
+  <input type="hidden" name="type" value="{{$d.Type}}">
+  {{if $d.ImportID}}<input type="hidden" name="import_id" value="{{$d.ImportID}}">{{end}}
+  {{if $d.OriginID}}<input type="hidden" name="origin_id" value="{{$d.OriginID}}">{{end}}
+  <div class="row">
+    <label>{{if eq $d.Type "transfer"}}{{t "From"}}{{else}}{{t "Account"}}{{end}}
+      <select name="account" required>
+        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.AccountID}} selected{{end}}>{{.Name}} ({{.Currency}})</option>{{end}}
+      </select>
+    </label>
+    {{if eq $d.Type "transfer"}}
+    <label>{{t "To"}}
+      <select name="to_account" required>
+        <option value="">—</option>
+        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.ToAccountID}} selected{{end}}>{{.Name}} ({{.Currency}})</option>{{end}}
+      </select>
+    </label>
+    {{end}}
+    {{if or (eq $d.Type "expense") (eq $d.Type "income")}}
+    <label class="grow">{{t "Category"}}
+      <select name="category"{{if $d.ID}} required{{end}}>
+        <option value="">—</option>
+        {{template "category-options" (dict "Categories" $d.Categories "Selected" $d.CategoryID)}}
+      </select>
+    </label>
+    {{end}}
+    <label>{{t "Amount"}}
+      <input name="amount" inputmode="decimal" autocomplete="off" value="{{amountInput $d.Amount}}" required>
+    </label>
+  </div>
+  <div class="row">
+    <label>{{t "Date"}} <input type="date" name="date" value="{{$d.Date}}" required></label>
+    <label>{{t "Time"}} <input type="time" name="time" value="{{$d.Time}}"></label>
+    <label class="grow">{{t "Payee"}}
+      <input name="payee" value="{{$d.Payee}}" autocomplete="off"{{if not $d.ID}} hx-post="/operations/fill" hx-trigger="change" hx-select="#op-form" hx-target="#op-form" hx-swap="outerHTML"{{end}}>
+    </label>
+  </div>
+  {{if not $d.ID}}<p class="muted">{{t "Rules fill an empty category, note and tags from the payee."}}</p>{{end}}
+  {{if and $d.SourcePayee (ne $d.SourcePayee $d.Payee)}}<p class="muted">{{t "Bank payee"}}: {{$d.SourcePayee}}</p>{{end}}
+  <label>{{t "Note"}} <input name="note" value="{{$d.Note}}"></label>
+  <label>{{t "Tags"}} <input name="tags" value="{{$d.Tags}}" list="all-tags" autocomplete="off" placeholder="{{t "comma separated, e.g. vacation 2026"}}"></label>
+  {{if $d.AllTags}}<datalist id="all-tags">{{range $d.AllTags}}<option value="{{.}}">{{end}}</datalist>{{end}}
+
+  <div class="actions">
+    <button type="submit">{{t "Save"}}</button>
+    <a role="button" class="secondary outline" href="/operations">{{t "Cancel"}}</a>
+  </div>
+</form>
+{{if and $d.ID (or (eq $d.Type "expense") (eq $d.Type "income"))}}
+<h2 id="split">{{t "Split"}}</h2>
+{{if $d.OriginID}}<p class="muted">{{t "Part of a split. Splitting it again adds parts to the same split."}}</p>{{end}}
+{{if $d.SplitError}}<p class="error" role="alert">{{errText $d.SplitError}}</p>{{end}}
+<form method="post" action="/operations/{{$d.ID}}/split">
+  <p class="muted">{{t "Divide the saved amount between categories. Each part becomes an operation of its own."}}</p>
+  <div id="splits">
+    {{range $d.Parts}}{{template "split" (dict "Categories" $d.Categories "Split" .)}}{{end}}
+  </div>
+  <div class="actions">
+    <button type="button" class="secondary outline small" hx-get="/operations/split?type={{$d.Type}}" hx-target="#splits" hx-swap="beforeend">+ {{t "Add part"}}</button>
+    <button type="submit">{{t "Split"}}</button>
+  </div>
+</form>
+{{end}}
+{{if $d.ID}}
+<form method="post" action="/operations/{{$d.ID}}/delete" hx-confirm="{{t "Delete this operation?"}}">
+  <button type="submit" class="secondary outline">{{t "Delete operation"}}</button>
+</form>
+{{if $d.Payee}}<p><a href="{{$d.RuleURL}}">{{t "Create a rule for this payee"}}</a></p>{{end}}
+{{if $d.ImportID}}<p class="muted">{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a>.</p>{{end}}
+{{end}}
+{{end}}

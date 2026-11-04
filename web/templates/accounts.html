@@ -1,0 +1,64 @@
+{{define "content"}}
+{{$d := .Data}}
+<details class="add">
+<summary role="button">+ {{t "New account"}}</summary>
+<form method="post" action="/accounts">
+  <div class="row">
+    <label class="grow">{{t "Name"}} <input name="name" value="{{$d.Name}}" required></label>
+    <label>{{t "Kind"}}
+      <select name="kind">
+        {{range $d.Kinds}}<option value="{{.}}"{{if eq (print .) $d.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
+      </select>
+    </label>
+    <label>{{t "Currency"}}
+      <select name="currency">
+        {{range $d.Currencies}}<option{{if eq . $d.Currency}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label>{{t "Opening balance"}} <input name="balance" inputmode="decimal" placeholder="0" value="{{amountInput $d.Balance}}"></label>
+    <label>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}" value="{{amountInput $d.CreditLimit}}"></label>
+    <button type="submit" class="shrink">{{t "Create"}}</button>
+  </div>
+</form>
+<p class="muted">{{t "Credit card and loan balances are negative when you owe. Pay a card with a transfer to it."}}</p>
+</details>
+<div class="table-wrap">
+<table class="cards">
+  <thead><tr><th>{{t "Name"}}</th><th>{{t "Kind"}}</th><th>{{t "Currency"}}</th><th class="num">{{t "Balance"}}</th></tr></thead>
+  <tbody>
+  {{range $d.Assets}}
+    <tr>
+      <td data-label="{{t "Name"}}"><a href="/accounts/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="muted">{{t "archived"}}</span>{{end}}</td>
+      <td data-label="{{t "Kind"}}">{{t (print .Kind)}}</td>
+      <td data-label="{{t "Currency"}}">{{.Currency}}</td>
+      <td data-label="{{t "Balance"}}" class="num {{if .Balance.IsNegative}}expense{{end}}">{{money .Balance .Currency}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="muted">{{t "No accounts yet."}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+
+{{if $d.Liabilities}}
+<h2>{{t "Credit and loans"}}</h2>
+<div class="table-wrap">
+<table class="cards">
+  <thead><tr><th>{{t "Name"}}</th><th>{{t "Kind"}}</th><th>{{t "Currency"}}</th><th class="num">{{t "Owed"}}</th><th class="num">{{t "Available"}}</th></tr></thead>
+  <tbody>
+  {{range $d.Liabilities}}
+    <tr>
+      <td data-label="{{t "Name"}}"><a href="/accounts/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="muted">{{t "archived"}}</span>{{end}}</td>
+      <td data-label="{{t "Kind"}}">{{t (print .Kind)}}</td>
+      <td data-label="{{t "Currency"}}">{{.Currency}}</td>
+      <td data-label="{{t "Owed"}}" class="num {{if .Owed.IsPositive}}expense{{end}}">{{money .Owed .Currency}}</td>
+      <td data-label="{{t "Available"}}" class="num">{{if not .CreditLimit.IsZero}}{{money .Available .Currency}}{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+{{end}}

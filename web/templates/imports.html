@@ -1,0 +1,27 @@
+{{define "content"}}
+<div class="actions">
+  <a role="button" href="/imports/new">+ {{t "New import"}}</a>
+</div>
+
+<h2>{{t "Recent imports"}}</h2>
+<div class="table-wrap">
+<table class="cards">
+  <thead><tr><th>#</th><th>{{t "File"}}</th><th>{{t "Uploaded"}}</th><th>{{t "Status"}}</th><th class="num">{{t "New"}}</th><th class="num">{{t "Duplicates"}}</th><th class="num">{{t "Skipped"}}</th></tr></thead>
+  <tbody>
+  {{range .Data.Imports}}
+    <tr>
+      <td data-label="#"><a href="/imports/{{.ID}}">#{{.ID}}</a></td>
+      <td data-label="{{t "File"}}">{{.Filename}}</td>
+      <td data-label="{{t "Uploaded"}}">{{datetime .CreatedAt $.User}}</td>
+      <td data-label="{{t "Status"}}">{{t (print .Status)}}</td>
+      <td data-label="{{t "New"}}" class="num">{{.RowsNew}}</td>
+      <td data-label="{{t "Duplicates"}}" class="num">{{.RowsDup}}</td>
+      <td data-label="{{t "Skipped"}}" class="num">{{.RowsSkip}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="7" class="muted">{{t "Nothing imported yet."}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
