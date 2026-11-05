@@ -1,21 +1,21 @@
 {{define "content"}}
 {{$d := .Data}}
-<div class="actions">
-  <a role="button" href="/rules/new">+ {{t "New rule"}}</a>
+<div class="hstack mb-4">
+  <a class="button" href="/rules/new">+ {{t "New rule"}}</a>
 </div>
-<p class="muted">{{t "Rules run when importing or creating operations."}}</p>
+<p class="text-light">{{t "Rules run when importing or creating operations."}}</p>
 
 <form method="post" action="/rules/learning">
-  <div class="row">
-    <label class="grow"><input type="checkbox" role="switch" name="learning"{{if $d.Settings.Learning}} checked{{end}}> {{t "Learn from my categories"}}</label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+  <div class="row mb-4">
+    <label data-field class="col-4"><input type="checkbox" role="switch" name="learning"{{if $d.Settings.Learning}} checked{{end}}> {{t "Learn from my categories"}}</label>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
-  <p class="muted">{{t "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee."}}</p>
+  <p class="text-light">{{t "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee."}}</p>
 </form>
 
 {{range $d.Stages}}
 <h2>{{template "rule-stage" .Stage}}</h2>
-<ul class="rules">
+<ul class="vstack">
   {{range .Rules}}
   <li>
     <a href="/rules/{{.ID}}">
@@ -24,11 +24,11 @@
       →
       {{range $i, $a := .Actions}}{{if $i}}, {{end}}{{template "rule-action-type" $a.Type}}{{with $a.Value}} <strong>{{.}}</strong>{{end}}{{end}}
     </a>
-    {{if eq .Origin "learned"}} <span class="muted">{{t "learned"}}</span>{{end}}
+    {{if eq .Origin "learned"}} <span class="badge" data-variant="secondary">{{t "learned"}}</span>{{end}}
   </li>
   {{end}}
 </ul>
 {{else}}
-<p class="muted">{{t "No rules yet."}}</p>
+<p class="text-light">{{t "No rules yet."}}</p>
 {{end}}
 {{end}}

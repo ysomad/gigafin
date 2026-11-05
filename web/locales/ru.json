@@ -1,4 +1,14 @@
 {
+  "Operation details": "Детали операции",
+  "Date and payee": "Дата и получатель",
+  "Enter a valid date.": "Введите корректную дату.",
+  "Enter a positive amount.": "Введите сумму больше нуля.",
+  "Select a different destination account.": "Выберите другой счёт получателя.",
+  "Select an account.": "Выберите счёт.",
+  "Close": "Закрыть",
+  "Retry": "Повторить",
+  "Loading…": "Загрузка…",
+  "New operation": "Новая операция",
   "%d already imported": "уже импортировано: %d",
   "%d change a stored rate": "меняют сохранённый курс: %d",
   "%d daily rates": "дневных курсов: %d",
@@ -108,7 +118,6 @@
   "Dashboard": "Обзор",
   "Dashboard %s": "Обзор %s",
   "Date": "Дата",
-  "Day %d of %d · the marker shows where spending would be at an even pace": "День %d из %d · метка показывает, сколько было бы потрачено при равномерном темпе",
   "Days missing between rows of a currency carry the previous rate. Imported rates replace stored ones and are kept by updates.": "Для пропущенных дней между строками валюты берётся предыдущий курс. Импортированные курсы заменяют сохранённые и не перезаписываются обновлениями.",
   "Debts": "Долги",
   "Dec": "Дек",
@@ -329,6 +338,7 @@
   "T-Bank operations": "Операции Т-Банка",
   "Tag": "Тег",
   "Tags": "Теги",
+  "Add tags with Enter or comma": "Добавляйте теги клавишей Enter или запятой",
   "The whole database of all users, encrypted with": "Вся база данных всех пользователей, зашифрованная с помощью",
   "Then": "То",
   "Thu": "чт",
@@ -576,5 +586,8 @@
   "values: the first amount must not be above the second": "значения: первая сумма не должна быть больше второй",
   "values: too long": "значения: слишком длинные",
   "write": "запись",
-  "zero amount": "нулевая сумма"
+  "zero amount": "нулевая сумма",
+  "Compare": "Сравнить",
+  "Applies when an exchange-rate source is enabled.": "Применяется, когда включён источник курсов валют.",
+  "Day %d of %d · even pace: %d%% of plan": "День %d из %d · равномерный темп: %d%% плана"
 }

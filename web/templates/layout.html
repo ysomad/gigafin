@@ -6,20 +6,20 @@
   <meta name="color-scheme" content="light dark">
   <meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'>
   <title>{{.Title}} · gigafin</title>
-  <link rel="stylesheet" href="/static/lib/pico.min.css">
+  <link rel="stylesheet" href="/static/lib/oat.min.css">
   <link rel="stylesheet" href="/static/lib/uplot.min.css">
-  <link rel="stylesheet" href="/static/app.css">
   <script src="/static/lib/htmx.min.js" defer></script>
   <script src="/static/lib/uplot.min.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script src="/static/lib/oat.min.js" defer></script>
+  <script src="/static/operation-tags.js" defer></script>
   <script src="/static/dashboard.js" defer></script>
 </head>
-<body hx-boost:inherited="true"{{if showMinorUnits}} data-minor-units{{end}}>
-  <header class="container" id="top">
-    <nav>
-      <ul><li><strong><a href="/">GIGAFIN</a></strong></li></ul>
+<body hx-boost:inherited="true">
+  <header class="container mt-4" id="top">
+    <nav class="hstack justify-between">
+      <ul class="unstyled hstack"><li><strong><a href="/">GIGAFIN</a></strong></li></ul>
       {{if .User}}
-      <ul>
+      <ul class="unstyled hstack">
         <li><a href="/"{{if eq .Nav "dashboard"}} aria-current="page"{{end}}>{{t "Dashboard"}}</a></li>
         <li><a href="/operations"{{if eq .Nav "operations"}} aria-current="page"{{end}}>{{t "Operations"}}</a></li>
         <li><a href="/plans"{{if eq .Nav "plans"}} aria-current="page"{{end}}>{{t "Plans"}}</a></li>
@@ -28,10 +28,10 @@
       {{end}}
     </nav>
   </header>
-  <main class="container">
-    {{if .Error}}<p class="error" role="alert">{{errText .Error}}</p>{{end}}
+  <main class="container mb-8">
+    {{if .Error}}<p role="alert" data-variant="danger">{{errText .Error}}</p>{{end}}
     {{template "content" .}}
+    {{block "to-top" .}}{{end}}
   </main>
-  {{block "to-top" .}}{{end}}
 </body>
 </html>{{end}}

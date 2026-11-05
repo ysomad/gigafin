@@ -1,18 +1,18 @@
 {{define "content"}}
 {{$d := .Data}}
 {{$inc := eq $d.Kind "income"}}
-<div class="actions">
+<div class="hstack mb-4">
   {{template "month-nav" (dict "Month" $d.Month "Months" $d.Months "Action" "/plans" "Kind" $d.Kind "PrevURL" (print "/plans?month=" $d.Prev "&kind=" $d.Kind) "NextURL" (print "/plans?month=" $d.Next "&kind=" $d.Kind))}}
-  <a role="button" class="small{{if ne $d.Kind "expense"}} secondary outline{{end}}" href="/plans?month={{$d.Month}}&kind=expense">{{t "Expenses"}}</a>
-  <a role="button" class="small{{if ne $d.Kind "income"}} secondary outline{{end}}" href="/plans?month={{$d.Month}}&kind=income">{{t "Income"}}</a>
+  <a class="button small{{if ne $d.Kind "expense"}} outline{{end}}" href="/plans?month={{$d.Month}}&kind=expense"{{if eq $d.Kind "expense"}} aria-current="page"{{end}} data-variant="secondary">{{t "Expenses"}}</a>
+  <a class="button small{{if ne $d.Kind "income"}} outline{{end}}" href="/plans?month={{$d.Month}}&kind=income"{{if eq $d.Kind "income"}} aria-current="page"{{end}} data-variant="secondary">{{t "Income"}}</a>
 </div>
-<details class="add">
-<summary role="button">+ {{t "New plan"}}</summary>
+<details class="mb-6">
+<summary>+ {{t "New plan"}}</summary>
 <form method="post" action="/plans">
   <input type="hidden" name="month" value="{{$d.Month}}">
   <input type="hidden" name="kind" value="{{$d.Kind}}">
-  <div class="row">
-    <label class="grow">{{t "Category"}}
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Category"}}
       <select name="category" required>
         {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}
           <option value="{{.ID}}">{{.Name}}</option>
@@ -20,53 +20,55 @@
         {{end}}{{end}}
       </select>
     </label>
-    <label>{{t "Currency"}}
+    <label data-field class="col-4">{{t "Currency"}}
       <select name="currency">{{range $d.Currencies}}<option>{{.}}</option>{{end}}</select>
     </label>
-    <label>{{t "Amount"}} <input name="amount" inputmode="decimal" required></label>
-    <label class="shrink"><input type="checkbox" name="repeating" value="true" checked> {{t "Repeat every month"}}</label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+    <label data-field class="col-4">{{t "Amount"}} <input name="amount" inputmode="decimal" required></label>
+    <label data-field class="col-4"><input type="checkbox" name="repeating" value="true" checked> {{t "Repeat every month"}}</label>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
 </form>
 <form method="post" action="/plans/fill">
   <input type="hidden" name="month" value="{{$d.Month}}">
   <input type="hidden" name="kind" value="{{$d.Kind}}">
-  <button type="submit" class="secondary outline">{{t "Fill repeating plans into %s" $d.Month}}</button>
+  <button type="submit" class="outline" data-variant="secondary">{{t "Fill repeating plans into %s" $d.Month}}</button>
 </form>
 </details>
 
 {{range $d.Totals}}
-<article class="plan-total {{.State}}">
-  <div class="pt-head">
+<article class="card mb-4">
+  <div class="hstack justify-between">
     <div>
-      <div class="label">{{if .Row.Left.IsNegative}}{{if $inc}}{{t "Above plan"}}{{else}}{{t "Over plan"}}{{end}}{{else}}{{if $inc}}{{t "Left to receive"}}{{else}}{{t "Left to spend"}}{{end}}{{end}}</div>
-      <div class="value">{{money .Row.Left.Abs .Row.Currency}} <small class="muted">{{.Row.Currency}}</small></div>
+      <div class="text-light">{{if .Row.Left.IsNegative}}{{if $inc}}{{t "Above plan"}}{{else}}{{t "Over plan"}}{{end}}{{else}}{{if $inc}}{{t "Left to receive"}}{{else}}{{t "Left to spend"}}{{end}}{{end}}</div>
+      <div>{{money .Row.Left.Abs .Row.Currency}} <small class="text-light">{{.Row.Currency}}</small></div>
     </div>
     <dl>
       <dt>{{t "Planned"}}</dt><dd>{{money .Row.Plan .Row.Currency}}</dd>
-      <dt>{{if $inc}}{{t "Received"}}{{else}}{{t "Spent"}}{{end}}</dt><dd>{{money .Row.Spent .Row.Currency}} <span class="muted">{{.Row.Percent}}%</span></dd>
+      <dt>{{if $inc}}{{t "Received"}}{{else}}{{t "Spent"}}{{end}}</dt><dd>{{money .Row.Spent .Row.Currency}} <span class="text-light">{{.Row.Percent}}%</span></dd>
     </dl>
   </div>
-  {{template "plan-meter" (dict "Row" .Row "State" .State "Data" $d)}}
-  {{if and (gt $d.Day 0) (lt $d.Day $d.Days)}}<div class="pt-pace muted">{{t "Day %d of %d · the marker shows where spending would be at an even pace" $d.Day $d.Days}}</div>{{end}}
+  {{template "plan-meter" (dict "Row" .Row)}}
+  {{if and (gt $d.Day 0) (lt $d.Day $d.Days)}}<div class="mt-2 text-light">{{t "Day %d of %d · even pace: %d%% of plan" $d.Day $d.Days $d.Pace}}</div>{{end}}
 </article>
 {{end}}
 
 {{with $d.Planned}}
-<ul class="plans">
+<ul class="unstyled vstack">
   {{range .}}
-  <li class="{{.State}}">
-    <details class="p-edit">
+  <li class="card">
+    <details>
       <summary>
-        <div class="p-head">
-          <span>{{with .Parent}}<span class="muted">{{.}} › </span>{{end}}<span class="p-name">{{.Row.Category.Name}}</span></span>
-          <span class="p-left num">{{money .Row.Left.Abs .Row.Currency}} {{if .Row.Left.IsNegative}}{{if $inc}}{{t "above plan"}}{{else}}{{t "over"}}{{end}}{{else}}{{if $inc}}{{t "to go"}}{{else}}{{t "left"}}{{end}}{{end}}</span>
-        </div>
-        {{template "plan-meter" (dict "Row" .Row "State" .State "Data" $d)}}
-        <div class="p-foot">
-          <span><a href="/operations?category={{.Row.Category.ID}}&from={{$d.From}}&to={{$d.To}}" title="{{t "Operations"}}">{{money .Row.Spent .Row.Currency}}</a> {{t "of"}} {{money .Row.Plan .Row.Currency}} {{.Row.Currency}}{{if .Row.Repeating}} <span class="p-tag" title="{{t "Repeats every month"}}">↻ {{t "monthly"}}</span>{{end}}</span>
+        <span class="vstack w-100">        <span class="hstack justify-between">
+          <span>{{with .Parent}}<span class="text-light">{{.}} › </span>{{end}}<span>{{.Row.Category.Name}}</span></span>
+          <span class="align-right">{{money .Row.Left.Abs .Row.Currency}} {{if .Row.Left.IsNegative}}{{if $inc}}{{t "above plan"}}{{else}}{{t "over"}}{{end}}{{else}}{{if $inc}}{{t "to go"}}{{else}}{{t "left"}}{{end}}{{end}}</span>
+        </span>
+        {{template "plan-meter" (dict "Row" .Row)}}
+        <span class="hstack justify-between text-light mt-2">
+          <span><a href="/operations?category={{.Row.Category.ID}}&from={{$d.From}}&to={{$d.To}}" title="{{t "Operations"}}">{{money .Row.Spent .Row.Currency}}</a> {{t "of"}} {{money .Row.Plan .Row.Currency}} {{.Row.Currency}}{{if .Row.Repeating}} <span class="badge outline" title="{{t "Repeats every month"}}">↻ {{t "monthly"}}</span>{{end}}</span>
           <span>{{t "%d%% left" .Row.LeftPercent}}</span>
-        </div>
+        </span>
+
+        </span>
       </summary>
       {{template "plan-form" (dict "Item" . "Data" $d "Repeating" .Row.Repeating)}}
     </details>
@@ -77,14 +79,16 @@
 {{end}}
 
 {{with $d.Unplanned}}
-<h2>{{t "No plan"}} <span class="muted">· {{if $inc}}{{t "received without a plan"}}{{else}}{{t "spent without a plan"}}{{end}}</span></h2>
-<ul class="plans unplanned">
+<h2>{{t "No plan"}} <span class="text-light">· {{if $inc}}{{t "received without a plan"}}{{else}}{{t "spent without a plan"}}{{end}}</span></h2>
+<ul class="unstyled vstack">
   {{range .}}
   <li>
-    <details class="p-edit">
-      <summary class="p-line">
-        <span>{{with .Parent}}<span class="muted">{{.}} › </span>{{end}}<span class="p-name">{{.Row.Category.Name}}</span></span>
-        <span class="num">{{money .Row.Spent .Row.Currency}} <span class="muted">{{.Row.Currency}}</span></span>
+    <details>
+      <summary>
+        <span class="vstack w-100">        <span>{{with .Parent}}<span class="text-light">{{.}} › </span>{{end}}<span>{{.Row.Category.Name}}</span></span>
+        <span class="align-right">{{money .Row.Spent .Row.Currency}} <span class="text-light">{{.Row.Currency}}</span></span>
+
+        </span>
       </summary>
       {{template "plan-form" (dict "Item" . "Data" $d "Repeating" true)}}
     </details>
@@ -94,16 +98,13 @@
 </ul>
 {{end}}
 
-{{if not (or $d.Planned $d.Unplanned)}}<p class="muted">{{t "No plans or operations this month."}}</p>{{end}}
+{{if not (or $d.Planned $d.Unplanned)}}<p class="text-light">{{t "No plans or operations this month."}}</p>{{end}}
 {{end}}
 
-{{/* plan-meter is a bar of Row spent against its plan, coloured by State, with a
-   marker at the month's pace while the month of Data runs. */}}
+{{/* Clamp only the graphic; the label and text retain the actual percentage. */}}
 {{define "plan-meter"}}
-<div class="meter {{.State}}" role="img" aria-label="{{t "%d%% of plan" .Row.Percent}}"
-  {{- if and (gt .Data.Day 0) (lt .Data.Day .Data.Days)}} style="--pace: {{.Data.Pace}}%"{{end}}>
-  <span style="width: {{min .Row.Percent 100}}%"></span>
-</div>
+<progress value="{{if lt .Row.Percent 0}}0{{else}}{{min .Row.Percent 100}}{{end}}" max="100" aria-label="{{t "%d%% of plan" .Row.Percent}}"></progress>
+<small class="text-light">{{t "%d%% of plan" .Row.Percent}}</small>
 {{end}}
 
 {{/* plan-subs lists unplanned cat2 Rows under their cat1, with a bar of their share
@@ -111,18 +112,21 @@
    month of Data. */}}
 {{define "plan-subs"}}
 {{with .Rows}}
-<ul class="sub">
+<ul class="vstack mt-4">
   {{range $row := .}}
   <li>
-    <details class="p-edit">
+    <details>
       <summary>
-        <div class="p-line">
-          <span class="p-name">{{.Category.Name}}</span>
-          <span class="num">{{money .Spent .Currency}}</span>
-        </div>
-        {{with $.Plan}}{{$share := min ($row.Spent.PercentOf .) 100}}
-        <div class="meter sub-meter" role="img" aria-label="{{t "%d%% of plan" $share}}"><span style="width: {{$share}}%"></span></div>
+        <span class="vstack w-100">        <span class="hstack justify-between">
+          <span>{{.Category.Name}}</span>
+          <span class="align-right">{{money .Spent .Currency}}</span>
+        </span>
+        {{with $.Plan}}{{$share := $row.Spent.PercentOf .}}
+        <progress value="{{if lt $share 0}}0{{else}}{{min $share 100}}{{end}}" max="100" aria-label="{{t "%d%% of plan" $share}}"></progress>
+        <small class="text-light">{{t "%d%% of plan" $share}}</small>
         {{end}}
+
+        </span>
       </summary>
       {{template "plan-form" (dict "Item" (dict "Row" .) "Data" $.Data "Repeating" true)}}
     </details>
@@ -134,14 +138,14 @@
 
 {{/* plan-form sets the plan of Item for the month of Data, saving on change. */}}
 {{define "plan-form"}}
-<form method="post" action="/plans" class="p-form" hx-post="/plans" hx-trigger="change">
+<form method="post" action="/plans" class="vstack mt-4" hx-post="/plans" hx-trigger="change">
   <input type="hidden" name="month" value="{{.Data.Month}}">
   <input type="hidden" name="kind" value="{{.Data.Kind}}">
   <input type="hidden" name="category" value="{{.Item.Row.Category.ID}}">
   <input type="hidden" name="currency" value="{{.Item.Row.Currency}}">
   <input name="amount" inputmode="decimal" value="{{if .Item.Row.HasPlan}}{{amountInput (.Item.Row.Plan.Fixed .Item.Row.Currency)}}{{end}}"
     placeholder="{{t "Amount"}}" aria-label="{{t "Plan for %s" .Item.Row.Category.Name}}">
-  <label><input type="checkbox" name="repeating" value="true"{{if .Repeating}} checked{{end}}> {{t "Repeat every month"}}</label>
-  {{if .Item.Row.HasPlan}}<small class="muted">{{t "Clear the amount to remove it for this month."}}</small>{{end}}
+  <label data-field><input type="checkbox" name="repeating" value="true"{{if .Repeating}} checked{{end}}> {{t "Repeat every month"}}</label>
+  {{if .Item.Row.HasPlan}}<small class="text-light">{{t "Clear the amount to remove it for this month."}}</small>{{end}}
 </form>
 {{end}}

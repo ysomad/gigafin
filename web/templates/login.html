@@ -1,10 +1,10 @@
 {{define "content"}}
-<article style="max-width: 24rem; margin: 2rem auto;">
+<div class="row"><article class="card col-6 offset-3">
   <h1>{{t "Sign in"}}</h1>
   <form method="post" action="/login">
-    <label>{{t "Login"}} <input name="login" autocomplete="username" value="{{.Data.Login}}" required autofocus></label>
-    <label>{{t "Password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+    <label data-field>{{t "Login"}} <input name="login" autocomplete="username" value="{{.Data.Login}}" required autofocus></label>
+    <label data-field>{{t "Password"}} <input type="password" name="password" autocomplete="current-password" required></label>
     <button type="submit">{{t "Sign in"}}</button>
   </form>
-</article>
+</article></div>
 {{end}}

@@ -2,21 +2,21 @@
 {{$d := .Data}}
 {{$p := $d.Preview}}
 {{$base := printf "/imports/%d" $p.Import.ID}}
-<h1>{{t "Import #%d" $p.Import.ID}} <span class="muted">{{$p.Import.Filename}} · {{t (print $p.Import.Status)}}</span></h1>
+<h1>{{t "Import #%d" $p.Import.ID}} <span class="text-light">{{$p.Import.Filename}} · {{t (print $p.Import.Status)}}</span></h1>
 {{template "import-steps" (dict "Step" $d.Step "Preview" $p)}}
 
 {{if eq $d.Step "accounts"}}
 {{if $p.Accounts}}
 <form method="post" action="{{$base}}/accounts">
-  <p class="muted">{{t "Accounts of the file the new rows belong to. Pick an existing account or create one; accounts with the same name are picked already."}}</p>
-  <div class="actions">
+  <p class="text-light">{{t "Accounts of the file the new rows belong to. Pick an existing account or create one; accounts with the same name are picked already."}}</p>
+  <div class="hstack mb-4">
     <button type="submit">{{t "Save and continue"}}</button>
   </div>
   {{range $i, $a := $p.Accounts}}
-  <div class="row">
+  <div class="row mb-4">
     <input type="hidden" name="acc_name" value="{{$a.Name}}">
     <input type="hidden" name="acc_currency" value="{{$a.Currency}}">
-    <label class="grow">{{$a.Name}} <span class="muted">{{$a.Currency}} · {{t "%d rows" $a.Rows}}</span>
+    <label data-field class="col-4">{{$a.Name}} <span class="text-light">{{$a.Currency}} · {{t "%d rows" $a.Rows}}</span>
       <select name="acc_id">
         <option value="0">{{t "Create new account"}} →</option>
         {{range $d.Accounts}}{{if eq .Currency $a.Currency}}
@@ -24,97 +24,97 @@
         {{end}}{{end}}
       </select>
     </label>
-    <label class="grow">{{t "New account name"}} <input name="acc_new" value="{{if not $a.AccountID}}{{$a.Name}}{{end}}"></label>
-    <label>{{t "Kind"}}
+    <label data-field class="col-4">{{t "New account name"}} <input name="acc_new" value="{{if not $a.AccountID}}{{$a.Name}}{{end}}"></label>
+    <label data-field class="col-4">{{t "Kind"}}
       <select name="acc_kind">
         {{range $d.AccountKinds}}<option value="{{.}}"{{if eq . $a.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
       </select>
     </label>
-    <label class="credit-limit">{{t "Credit limit"}} <input name="acc_limit" inputmode="decimal" placeholder="{{t "optional"}}"></label>
+    <label data-field class="col-4">{{t "Credit limit"}} <input name="acc_limit" inputmode="decimal" placeholder="{{t "optional"}}"><small data-hint>{{t "credit only"}}</small></label>
   </div>
   {{end}}
 </form>
 {{else}}
-<p class="muted">{{t "No accounts to map."}}</p>
-<div class="actions">
-  <a role="button" href="{{$base}}/categories">{{t "Next"}}</a>
+<p class="text-light">{{t "No accounts to map."}}</p>
+<div class="hstack mb-4">
+  <a class="button" href="{{$base}}/categories">{{t "Next"}}</a>
 </div>
 {{end}}
 
 {{else if eq $d.Step "categories"}}
 {{if $p.Categories}}
 <form method="post" action="{{$base}}/categories">
-  <p class="muted">{{t `Categories of the file map separately for money out (expense) and money in (income, e.g. refunds). To create a new category inside another one, write "Parent / Child".`}}</p>
-  <div class="actions">
-    <a role="button" class="secondary outline" href="{{$base}}/accounts">{{t "Back"}}</a>
+  <p class="text-light">{{t `Categories of the file map separately for money out (expense) and money in (income, e.g. refunds). To create a new category inside another one, write "Parent / Child".`}}</p>
+  <div class="hstack mb-4">
+    <a class="button outline" href="{{$base}}/accounts" data-variant="secondary">{{t "Back"}}</a>
     <button type="submit">{{t "Save and continue"}}</button>
   </div>
   {{range $p.Categories}}
-  <div class="row">
+  <div class="row mb-4">
     <input type="hidden" name="cat_name" value="{{.Name}}">
     <input type="hidden" name="cat_kind" value="{{.Kind}}">
-    <label class="grow">{{.Name}} <span class="muted {{.Kind}}">{{t (print .Kind)}} · {{t "%d rows" .Rows}}</span>
+    <label data-field class="col-4">{{.Name}} <span class="badge" data-variant="{{if eq .Kind "income"}}success{{else}}danger{{end}}">{{t (print .Kind)}} · {{t "%d rows" .Rows}}</span>
       <select name="cat_id">
         <option value="0">{{t "Create new category"}} →</option>
         {{template "category-options" (dict "Categories" (byKind $d.Categories .Kind) "Selected" .CategoryID)}}
       </select>
     </label>
-    <label class="grow">{{t "New category"}} <input name="cat_new" value="{{if not .CategoryID}}{{.Name}}{{end}}"></label>
+    <label data-field class="col-4">{{t "New category"}} <input name="cat_new" value="{{if not .CategoryID}}{{.Name}}{{end}}"></label>
   </div>
   {{end}}
 </form>
 {{else}}
-<p class="muted">{{t "No categories to map."}}</p>
-<div class="actions">
-  <a role="button" class="secondary outline" href="{{$base}}/accounts">{{t "Back"}}</a>
-  <a role="button" href="{{$base}}/preview">{{t "Next"}}</a>
+<p class="text-light">{{t "No categories to map."}}</p>
+<div class="hstack mb-4">
+  <a class="button outline" href="{{$base}}/accounts" data-variant="secondary">{{t "Back"}}</a>
+  <a class="button" href="{{$base}}/preview">{{t "Next"}}</a>
 </div>
 {{end}}
 
 {{else if eq $d.Step "preview"}}
 <p>{{t "%d new" $p.Import.RowsNew}} · {{t "%d already imported" $p.Import.RowsDup}} · {{if $p.Skipped}}<a href="#skipped">{{t "%d skipped" $p.Import.RowsSkip}}</a>{{else}}{{t "%d skipped" $p.Import.RowsSkip}}{{end}}</p>
 {{if eq $p.Import.Status "staged"}}
-{{if not $p.AccountsMapped}}<p class="over">{{t "Some accounts are not mapped yet."}} <a href="{{$base}}/accounts">{{t "Map accounts"}}</a></p>{{end}}
-{{if not $p.CategoriesMapped}}<p class="over">{{t "Some categories are not mapped yet."}} <a href="{{$base}}/categories">{{t "Map categories"}}</a></p>{{end}}
-<div class="actions">
-  <a role="button" class="secondary outline" href="{{$base}}/categories">{{t "Back"}}</a>
+{{if not $p.AccountsMapped}}<p role="alert" data-variant="warning">{{t "Some accounts are not mapped yet."}} <a href="{{$base}}/accounts">{{t "Map accounts"}}</a></p>{{end}}
+{{if not $p.CategoriesMapped}}<p role="alert" data-variant="warning">{{t "Some categories are not mapped yet."}} <a href="{{$base}}/categories">{{t "Map categories"}}</a></p>{{end}}
+<div class="hstack mb-4">
+  <a class="button outline" href="{{$base}}/categories" data-variant="secondary">{{t "Back"}}</a>
   <form method="post" action="{{$base}}/commit">
     <button type="submit"{{if not $p.Ready}} disabled{{end}}>{{t "Import %d rows" $p.Import.RowsNew}}</button>
   </form>
   <form method="post" action="{{$base}}/discard">
-    <button type="submit" class="secondary outline">{{t "Discard"}}</button>
+    <button type="submit" class="outline" data-variant="secondary">{{t "Discard"}}</button>
   </form>
 </div>
 {{else if eq $p.Import.Status "committed"}}
-<div class="actions">
+<div class="hstack mb-4">
   <form method="post" action="{{$base}}/undo" hx-confirm="{{t "Delete all operations created by this import?"}}">
-    <button type="submit" class="secondary outline">{{t "Undo import"}}</button>
+    <button type="submit" class="outline" data-variant="secondary">{{t "Undo import"}}</button>
   </form>
 </div>
 {{else}}
-<div class="actions">
+<div class="hstack mb-4">
   <form method="post" action="{{$base}}/discard">
-    <button type="submit" class="secondary outline">{{t "Delete from history"}}</button>
+    <button type="submit" class="outline" data-variant="secondary">{{t "Delete from history"}}</button>
   </form>
 </div>
 {{end}}
-<div class="table-wrap">
-<table class="cards">
-  <thead><tr><th>{{t "Time"}}</th><th>{{t "Account"}}</th><th class="num">{{t "Amount"}}</th><th>{{t "Category"}}</th><th>{{t "Description"}}</th><th>{{t "Status"}}</th></tr></thead>
+<div class="table">
+<table>
+  <thead><tr><th>{{t "Time"}}</th><th>{{t "Account"}}</th><th class="align-right">{{t "Amount"}}</th><th>{{t "Category"}}</th><th>{{t "Description"}}</th><th>{{t "Status"}}</th></tr></thead>
   <tbody>
   {{range $p.Rows}}
     <tr>
-      <td data-label="{{t "Time"}}" class="nowrap">{{if .Row.DateOnly}}{{dayTitle .Row.Time}}{{else}}{{datetime .Row.Time $.User}}{{end}}</td>
-      <td data-label="{{t "Account"}}" class="nowrap">{{.Row.Account}}{{if .Row.ToAccount}} → {{.Row.ToAccount}}{{end}}</td>
-      <td data-label="{{t "Amount"}}" class="num {{if .Row.Amount.IsNegative}}expense{{else}}income{{end}}">{{money .Row.Amount .Row.Currency}}</td>
-      <td data-label="{{t "Category"}}">{{if or .PairID .Row.ToAccount}}<em>{{t "transfer"}}</em>{{else}}{{.Row.Category}}{{if .Row.Group}} <span class="muted">{{t "split %s" .Row.Group}}</span>{{end}}{{end}}</td>
-      <td data-label="{{t "Description"}}">{{.Row.Payee}}{{if .Row.Note}} <span class="muted">{{.Row.Note}}</span>{{end}}{{if .Row.MCC}} <span class="muted">MCC {{.Row.MCC}}</span>{{end}}</td>
-      <td data-label="{{t "Status"}}">
-        {{if eq .Status "duplicate"}}<span class="muted">{{t "duplicate"}}</span>
+      <td>{{if .Row.DateOnly}}{{dayTitle .Row.Time}}{{else}}{{datetime .Row.Time $.User}}{{end}}</td>
+      <td>{{.Row.Account}}{{if .Row.ToAccount}} → {{.Row.ToAccount}}{{end}}</td>
+      <td class="align-right"><span class="badge" data-variant="{{if .Row.Amount.IsNegative}}danger{{else}}success{{end}}">{{money .Row.Amount .Row.Currency}}</span></td>
+      <td>{{if or .PairID .Row.ToAccount}}<em>{{t "transfer"}}</em>{{else}}{{.Row.Category}}{{if .Row.Group}} <span class="text-light">{{t "split %s" .Row.Group}}</span>{{end}}{{end}}</td>
+      <td>{{.Row.Payee}}{{if .Row.Note}} <span class="text-light">{{.Row.Note}}</span>{{end}}{{if .Row.MCC}} <span class="text-light">MCC {{.Row.MCC}}</span>{{end}}</td>
+      <td>
+        {{if eq .Status "duplicate"}}<span class="badge" data-variant="secondary">{{t "duplicate"}}</span>
         {{else if .OperationID}}<a href="/operations/{{.OperationID}}/edit">{{t "imported"}}</a>
         {{else if and .PairID (eq $p.Import.Status "staged")}}
-          <form method="post" action="{{$base}}/unpair/{{.ID}}" class="inline">
-            <button type="submit" class="secondary outline small">{{t "Not a transfer"}}</button>
+          <form method="post" action="{{$base}}/unpair/{{.ID}}">
+            <button type="submit" class="outline small" data-variant="secondary">{{t "Not a transfer"}}</button>
           </form>
         {{else}}{{t "new"}}{{end}}
       </td>
@@ -126,20 +126,20 @@
 
 {{if $p.Skipped}}
 <h2 id="skipped">{{t "Skipped"}}</h2>
-<p class="muted">{{t "Not imported: see the reason of each row."}}</p>
-<div class="table-wrap">
-<table class="cards">
-  <thead><tr><th>{{t "Line"}}</th><th>{{t "Time"}}</th><th>{{t "Account"}}</th><th class="num">{{t "Amount"}}</th><th>{{t "Category"}}</th><th>{{t "Description"}}</th><th>{{t "Reason"}}</th></tr></thead>
+<p class="text-light">{{t "Not imported: see the reason of each row."}}</p>
+<div class="table">
+<table>
+  <thead><tr><th>{{t "Line"}}</th><th>{{t "Time"}}</th><th>{{t "Account"}}</th><th class="align-right">{{t "Amount"}}</th><th>{{t "Category"}}</th><th>{{t "Description"}}</th><th>{{t "Reason"}}</th></tr></thead>
   <tbody>
   {{range $p.Skipped}}
     <tr>
-      <td data-label="{{t "Line"}}">{{.Row.Line}}</td>
-      <td data-label="{{t "Time"}}" class="nowrap">{{if .Row.Time.IsZero}}—{{else if .Row.DateOnly}}{{dayTitle .Row.Time}}{{else}}{{datetime .Row.Time $.User}}{{end}}</td>
-      <td data-label="{{t "Account"}}" class="nowrap">{{or .Row.Account "—"}}{{if .Row.ToAccount}} → {{.Row.ToAccount}}{{end}}</td>
-      <td data-label="{{t "Amount"}}" class="num">{{if .Row.Currency}}{{money .Row.Amount .Row.Currency}} {{.Row.Currency}}{{else}}—{{end}}</td>
-      <td data-label="{{t "Category"}}">{{.Row.Category}}</td>
-      <td data-label="{{t "Description"}}">{{.Row.Payee}}{{if .Row.Note}} <span class="muted">{{.Row.Note}}</span>{{end}}</td>
-      <td data-label="{{t "Reason"}}">{{t .Row.SkipReason}}</td>
+      <td>{{.Row.Line}}</td>
+      <td>{{if .Row.Time.IsZero}}—{{else if .Row.DateOnly}}{{dayTitle .Row.Time}}{{else}}{{datetime .Row.Time $.User}}{{end}}</td>
+      <td>{{or .Row.Account "—"}}{{if .Row.ToAccount}} → {{.Row.ToAccount}}{{end}}</td>
+      <td class="align-right">{{if .Row.Currency}}{{money .Row.Amount .Row.Currency}} {{.Row.Currency}}{{else}}—{{end}}</td>
+      <td>{{.Row.Category}}</td>
+      <td>{{.Row.Payee}}{{if .Row.Note}} <span class="text-light">{{.Row.Note}}</span>{{end}}</td>
+      <td>{{t .Row.SkipReason}}</td>
     </tr>
   {{end}}
   </tbody>
@@ -149,4 +149,4 @@
 {{end}}
 {{end}}
 
-{{define "to-top"}}{{if eq .Data.Step "preview"}}<a href="#top" class="to-top" role="button" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}
+{{define "to-top"}}{{if eq .Data.Step "preview"}}<a class="button" href="#top" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}

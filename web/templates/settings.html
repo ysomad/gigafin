@@ -1,39 +1,39 @@
 {{define "content"}}
 {{$d := .Data}}
-<form method="post" action="/logout" class="actions">
+<form method="post" action="/logout" class="hstack mb-4">
   <span>{{t "Signed in as"}} <strong>{{$.User.Login}}</strong></span>
-  <button type="submit" class="secondary outline small">{{t "Sign out"}}</button>
+  <button type="submit" class="outline small" data-variant="secondary">{{t "Sign out"}}</button>
 </form>
 
-<div class="actions">
-  <a role="button" class="secondary outline" href="/accounts">{{t "Accounts"}}</a>
-  <a role="button" class="secondary outline" href="/categories">{{t "Categories"}}</a>
-  <a role="button" class="secondary outline" href="/rules">{{t "Rules"}}</a>
-  <a role="button" class="secondary outline" href="/imports">{{t "Import"}}</a>
+<div class="hstack mb-4">
+  <a class="button outline" href="/accounts" data-variant="secondary">{{t "Accounts"}}</a>
+  <a class="button outline" href="/categories" data-variant="secondary">{{t "Categories"}}</a>
+  <a class="button outline" href="/rules" data-variant="secondary">{{t "Rules"}}</a>
+  <a class="button outline" href="/imports" data-variant="secondary">{{t "Import"}}</a>
 </div>
 
 <h2>{{t "Time zone"}}</h2>
-<form method="post" action="/settings/timezone">
-  <div class="row">
-    <label class="grow">{{t "IANA time zone"}} <input name="timezone" value="{{$.User.Timezone}}" placeholder="Europe/Moscow" required></label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+<article class="card mb-4"><form method="post" action="/settings/timezone">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "IANA time zone"}} <input name="timezone" value="{{$.User.Timezone}}" placeholder="Europe/Moscow" required></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
-  <p class="muted">{{t "Used for imported times and today's date."}}</p>
-</form>
+  <p class="text-light">{{t "Used for imported times and today's date."}}</p>
+</form></article>
 
 <h2>{{t "Display"}}</h2>
-<form method="post" action="/settings/display">
-  <div class="row">
-    <label class="grow"><input type="checkbox" role="switch" name="show_minor_units"{{if showMinorUnits}} checked{{end}}> {{t "Show minor units"}}</label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+<article class="card mb-4"><form method="post" action="/settings/display">
+  <div class="row mb-4">
+    <label data-field class="col-4"><input type="checkbox" role="switch" name="show_minor_units"{{if showMinorUnits}} checked{{end}}> {{t "Show minor units"}}</label>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
-  <p class="muted">{{t "Off rounds amounts to whole units, such as rubles without kopecks."}}</p>
-</form>
+  <p class="text-light">{{t "Off rounds amounts to whole units, such as rubles without kopecks."}}</p>
+</form></article>
 
 <h2>{{t "Language"}}</h2>
-<form method="post" action="/settings/language">
-  <div class="row">
-    <label class="grow">
+<article class="card mb-4"><form method="post" action="/settings/language">
+  <div class="row mb-4">
+    <label data-field class="col-4">
       <select name="language" aria-label="{{t "Language"}}">
         <option value=""{{if eq $d.Settings.Language ""}} selected{{end}}>{{t "Default"}}</option>
         {{- range $d.Languages}}
@@ -41,48 +41,48 @@
         {{- end}}
       </select>
     </label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
-</form>
+</form></article>
 
 <h2>{{t "Exchange rates"}}</h2>
-<form method="post" action="/settings/rates">
-  <div class="row">
-    <label>{{t "Source"}}
+<article class="card mb-4"><form method="post" action="/settings/rates">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Source"}}
       <select name="rate_source">
         {{range $d.RateSources}}<option value="{{.}}"{{if eq . $d.Settings.RateSource}} selected{{end}}>{{if eq . ""}}{{t "Off"}}{{else if eq . "cbr"}}{{t "Central Bank of Russia"}}{{else}}{{.}}{{end}}</option>{{end}}
       </select>
     </label>
-    <label class="rates-only">{{t "Primary currency"}}
+    <label data-field class="col-4">{{t "Primary currency"}}
       <select name="primary_currency">
         <option value=""></option>
         {{range $d.Currencies}}<option value="{{.}}"{{if eq . $d.Settings.PrimaryCurrency}} selected{{end}}>{{.}}</option>{{end}}
       </select>
     </label>
-    <button type="submit" class="shrink">{{t "Save"}}</button>
+    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
-  <p class="muted">{{t "Converts other currencies to the primary one."}}</p>
-</form>
+  <p class="text-light">{{t "Converts other currencies to the primary one."}} {{t "Applies when an exchange-rate source is enabled."}}</p>
+</form></article>
 {{if $d.Settings.RateSource}}
 {{if not $d.RateCurrencies}}
-<p class="muted">{{t "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate." $d.Settings.RateSource.Pivot}}</p>
+<p class="text-light">{{t "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate." $d.Settings.RateSource.Pivot}}</p>
 {{else}}
-{{with $d.RatesSync}}{{if .Done}}<article><p>{{if .Updated}}{{t "Daily rates updated: %d." .Updated}}{{else}}{{t "Rates are up to date."}}{{end}}{{if .Err}} {{t "Some failed:"}} {{errText .Err}}{{end}}</p></article>{{end}}{{end}}
+{{with $d.RatesSync}}{{if .Done}}<article class="card"><p>{{if .Updated}}{{t "Daily rates updated: %d." .Updated}}{{else}}{{t "Rates are up to date."}}{{end}}{{if .Err}} {{t "Some failed:"}} {{errText .Err}}{{end}}</p></article>{{end}}{{end}}
 {{if $d.Rates}}
-<div class="table-wrap">
-<table class="cards">
+<div class="table">
+<table>
   <thead><tr><th>{{t "Currency"}}</th><th>{{t "Last date"}}</th><th>{{t "Rate, %s" $d.Settings.RateSource.Pivot}}</th><th></th></tr></thead>
   <tbody>
   {{range $d.Rates}}
     <tr>
-      <td data-label="{{t "Currency"}}">{{.Currency}}</td>
-      <td data-label="{{t "Last date"}}">{{date .Date}}</td>
-      <td data-label="{{t "Rate"}}">{{.Rate}}</td>
+      <td>{{.Currency}}</td>
+      <td>{{date .Date}}</td>
+      <td>{{.Rate}}</td>
       <td>{{if .Manual}}
-        <form method="post" action="/settings/rates/reset" class="inline" hx-confirm="{{t "Replace the manual %s rate of %s with the source one?" .Currency (date .Date)}}">
+        <form method="post" action="/settings/rates/reset" hx-confirm="{{t "Replace the manual %s rate of %s with the source one?" .Currency (date .Date)}}">
           <input type="hidden" name="currency" value="{{.Currency}}">
           <input type="hidden" name="date" value="{{date .Date}}">
-          <button type="submit" class="secondary outline small">{{t "Reset"}}</button>
+          <button type="submit" class="outline small" data-variant="secondary">{{t "Reset"}}</button>
         </form>{{end}}
       </td>
     </tr>
@@ -91,72 +91,72 @@
 </table>
 </div>
 {{else}}
-<p class="muted">{{t "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates." $d.Settings.RateSource.Pivot}}</p>
+<p class="text-light">{{t "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates." $d.Settings.RateSource.Pivot}}</p>
 {{end}}
 <form method="post" action="/settings/rates/sync">
   <button type="submit">{{t "Update rates"}}</button>
 </form>
 {{end}}
 <form method="post" action="/settings/rates/set">
-  <div class="row">
-    <label>{{t "Currency"}}
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Currency"}}
       <select name="currency">
         {{range $d.Currencies}}{{if ne . $d.Settings.RateSource.Pivot}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}
       </select>
     </label>
-    <label>{{t "Date"}} <input type="date" name="date" required></label>
-    <label>{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040" required></label>
-    <button type="submit" class="shrink">{{t "Set rate"}}</button>
+    <label data-field class="col-4">{{t "Date"}} <input type="date" name="date" required></label>
+    <label data-field class="col-4">{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040" required></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Set rate"}}</button></div>
   </div>
 </form>
 <p><a href="/imports/new?source=rates">{{t "Import rates from CSV"}}</a></p>
 {{end}}
 
 <h2>{{t "Password"}}</h2>
-<form method="post" action="/settings/password">
-  <div class="row">
-    <label>{{t "Current password"}} <input type="password" name="current" autocomplete="current-password" required></label>
-    <label>{{t "New password"}} <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
-    <button type="submit" class="shrink">{{t "Change"}}</button>
+<article class="card mb-4"><form method="post" action="/settings/password">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="current" autocomplete="current-password" required></label>
+    <label data-field class="col-4">{{t "New password"}} <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Change"}}</button></div>
   </div>
-</form>
+</form></article>
 
 <h2>{{t "Security & access"}}</h2>
 {{if $d.NewToken}}
-<article>
+<article class="card">
   <p>{{t "Copy the key now, it is not shown again:"}}</p>
-  <p class="token">{{$d.NewToken}}</p>
-  <p class="muted">{{t "Send it as"}} <code>Authorization: Bearer &lt;key&gt;</code> {{t "to"}} <code>/api</code> {{t "or to the MCP server at"}} <code>/mcp</code> {{t "on this host."}}</p>
+  <div class="table"><code>{{$d.NewToken}}</code></div>
+  <p class="text-light">{{t "Send it as"}} <code>Authorization: Bearer &lt;key&gt;</code> {{t "to"}} <code>/api</code> {{t "or to the MCP server at"}} <code>/mcp</code> {{t "on this host."}}</p>
 </article>
 {{end}}
-<div class="table-wrap">
-<table class="cards">
+<div class="table">
+<table>
   <thead><tr><th>{{t "Type"}}</th><th>{{t "Name"}}</th><th>{{t "Scope"}}</th><th>{{t "Last used"}}</th><th>{{t "Expires"}}</th><th></th></tr></thead>
   <tbody>
   {{range $d.Sessions}}
     <tr>
-      <td data-label="{{t "Type"}}">{{t "Session"}}</td>
-      <td data-label="{{t "Name"}}">{{.UserAgent}}</td>
-      <td data-label="{{t "Scope"}}">{{t "full"}}</td>
-      <td data-label="{{t "Last used"}}">{{datetime .LastUsedAt $.User}}</td>
-      <td data-label="{{t "Expires"}}">{{datetime .ExpiresAt $.User}}</td>
-      <td>{{if .Current}}<span class="muted">{{t "this browser"}}</span>{{else}}
-        <form method="post" action="/settings/sessions/{{.ID}}/revoke" class="inline" hx-confirm="{{t "Sign out this session?"}}">
-          <button type="submit" class="secondary outline small">{{t "Revoke"}}</button>
+      <td>{{t "Session"}}</td>
+      <td>{{.UserAgent}}</td>
+      <td>{{t "full"}}</td>
+      <td>{{datetime .LastUsedAt $.User}}</td>
+      <td>{{datetime .ExpiresAt $.User}}</td>
+      <td>{{if .Current}}<span class="badge" data-variant="secondary">{{t "this browser"}}</span>{{else}}
+        <form method="post" action="/settings/sessions/{{.ID}}/revoke" hx-confirm="{{t "Sign out this session?"}}">
+          <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
         </form>{{end}}
       </td>
     </tr>
   {{end}}
   {{range $d.Keys}}
     <tr>
-      <td data-label="{{t "Type"}}">{{t "API key"}}</td>
-      <td data-label="{{t "Name"}}">{{.Name}} <code>gf_{{.Prefix}}_…</code></td>
-      <td data-label="{{t "Scope"}}">{{t (print .Scope)}}</td>
-      <td data-label="{{t "Last used"}}">{{if .LastUsedAt.IsZero}}{{t "never"}}{{else}}{{datetime .LastUsedAt $.User}}{{end}}</td>
-      <td data-label="{{t "Expires"}}">{{if .ExpiresAt.IsZero}}{{t "never"}}{{else}}{{datetime .ExpiresAt $.User}}{{end}}</td>
-      <td>{{if .Revoked}}<span class="muted">{{t "revoked"}}</span>{{else if .Expired}}<span class="muted">{{t "expired"}}</span>{{else}}
-        <form method="post" action="/settings/api-keys/{{.ID}}/revoke" class="inline" hx-confirm="{{t "Revoke %s?" .Name}}">
-          <button type="submit" class="secondary outline small">{{t "Revoke"}}</button>
+      <td>{{t "API key"}}</td>
+      <td>{{.Name}} <code>gf_{{.Prefix}}_…</code></td>
+      <td>{{t (print .Scope)}}</td>
+      <td>{{if .LastUsedAt.IsZero}}{{t "never"}}{{else}}{{datetime .LastUsedAt $.User}}{{end}}</td>
+      <td>{{if .ExpiresAt.IsZero}}{{t "never"}}{{else}}{{datetime .ExpiresAt $.User}}{{end}}</td>
+      <td>{{if .Revoked}}<span class="badge" data-variant="secondary">{{t "revoked"}}</span>{{else if .Expired}}<span class="badge" data-variant="secondary">{{t "expired"}}</span>{{else}}
+        <form method="post" action="/settings/api-keys/{{.ID}}/revoke" hx-confirm="{{t "Revoke %s?" .Name}}">
+          <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
         </form>{{end}}
       </td>
     </tr>
@@ -164,13 +164,13 @@
   </tbody>
 </table>
 </div>
-<form method="post" action="/settings/api-keys">
-  <div class="row">
-    <label class="grow">{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}" required></label>
-    <label>{{t "Scope"}}
+<article class="card mb-4"><form method="post" action="/settings/api-keys">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}" required></label>
+    <label data-field class="col-4">{{t "Scope"}}
       <select name="scope"><option value="read">{{t "read"}}</option><option value="write">{{t "write"}}</option></select>
     </label>
-    <label>{{t "Expiration"}}
+    <label data-field class="col-4">{{t "Expiration"}}
       <select name="expires">
         <option value="7">{{t "7 days"}}</option>
         <option value="30" selected>{{t "30 days"}}</option>
@@ -179,43 +179,43 @@
         <option value="never">{{t "No expiration"}}</option>
       </select>
     </label>
-    <label>{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
-    <button type="submit" class="shrink">{{t "Create key"}}</button>
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Create key"}}</button></div>
   </div>
-</form>
+</form></article>
 
 <h2>{{t "Export"}}</h2>
-<form method="get" action="/settings/export" hx-boost="false">
-  <div class="row">
-    <label>{{t "Format"}}
+<article class="card mb-4"><form method="get" action="/settings/export" hx-boost="false">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Format"}}
       <select name="format"><option value="csv">CSV</option></select>
     </label>
-    <label>{{t "From"}} <input type="date" name="from"></label>
-    <label>{{t "To"}} <input type="date" name="to"></label>
-    <button type="submit" class="shrink">{{t "Export"}}</button>
+    <label data-field class="col-4">{{t "From"}} <input type="date" name="from"></label>
+    <label data-field class="col-4">{{t "To"}} <input type="date" name="to"></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Export"}}</button></div>
   </div>
-  <p class="muted">{{t "Leave dates empty to export everything."}}</p>
-</form>
+  <p class="text-light">{{t "Leave dates empty to export everything."}}</p>
+</form></article>
 
 {{if $d.CanBackup}}
 <h2>{{t "Backup"}}</h2>
-<form method="post" action="/settings/backup" hx-boost="false">
-  <div class="row">
-    <label>{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
-    <label class="grow">{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password" minlength="12" required></label>
-    <button type="submit" class="shrink">{{t "Download backup"}}</button>
+<article class="card mb-4"><form method="post" action="/settings/backup" hx-boost="false">
+  <div class="row mb-4">
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+    <label data-field class="col-4">{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password" minlength="12" required></label>
+    <div class="col-12 hstack"><button type="submit">{{t "Download backup"}}</button></div>
   </div>
-  <p class="muted">{{t "The whole database of all users, encrypted with"}} <a href="https://age-encryption.org">age</a>. {{t "Decrypt with"}} <code>age -d gigafin-DATE.db.age &gt; gigafin.db</code>.</p>
-</form>
+  <p class="text-light">{{t "The whole database of all users, encrypted with"}} <a href="https://age-encryption.org">age</a>. {{t "Decrypt with"}} <code>age -d gigafin-DATE.db.age &gt; gigafin.db</code>.</p>
+</form></article>
 {{end}}
 
 <h2>{{t "Danger zone"}}</h2>
-<article class="danger-zone">
+<article class="card">
   <p><strong>{{t "Delete all data"}}</strong>: {{t "every account, operation, category, plan and import, plus saved import mappings. Your login, password, time zone, sessions and API keys stay. This cannot be undone."}}</p>
   <form method="post" action="/settings/delete-data" hx-confirm="{{t "Delete all accounts, operations, categories, plans and imports? This cannot be undone."}}">
-    <div class="row">
-      <label class="grow">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
-      <button type="submit" class="danger shrink">{{t "Delete all data"}}</button>
+    <div class="row mb-4">
+      <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+      <div class="col-12 hstack"><button type="submit" data-variant="danger">{{t "Delete all data"}}</button></div>
     </div>
   </form>
 </article>

@@ -3,18 +3,24 @@
 // ui.trendChart.
 (() => {
   const halfMonth = 15 * 24 * 60 * 60;
-  // the page language, see layout.html
-  const locale = document.documentElement.lang || undefined;
-  const compact = new Intl.NumberFormat(locale, { notation: 'compact' });
-  // whole units unless the user shows minor units, see the display setting
-  const full = new Intl.NumberFormat(locale, {
-    maximumFractionDigits: document.body.hasAttribute('data-minor-units') ? 2 : 0,
-  });
   let charts = [];
 
-  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // Resolve Oat's light-dark() tokens through an element's computed color;
+  // custom properties themselves still contain expressions unsuitable for canvas.
+  function colors() {
+    const probe = document.createElement('span');
+    probe.hidden = true;
+    document.body.append(probe);
+    const palette = {};
+    for (const name of ['success', 'danger', 'primary', 'border', 'muted-foreground']) {
+      probe.style.color = `var(--${name})`;
+      palette[name] = getComputedStyle(probe).color;
+    }
+    probe.remove();
+    return palette;
+  }
 
-  function bars(color, align) {
+  function bars(color, align, full) {
     return {
       stroke: color,
       fill: color,
@@ -28,13 +34,22 @@
   function render() {
     charts.forEach((c) => c.destroy());
     charts = [];
-    document.querySelectorAll('figure.trend').forEach((fig) => {
+    const figures = document.querySelectorAll('figure.trend');
+    if (!figures.length) return;
+    const palette = colors();
+    figures.forEach((fig) => {
+      // Figure attributes arrive with every htmx response, including after settings change.
+      const locale = fig.dataset.locale || document.documentElement.lang || undefined;
+      const compact = new Intl.NumberFormat(locale, { notation: 'compact' });
+      const full = new Intl.NumberFormat(locale, {
+        maximumFractionDigits: fig.hasAttribute('data-minor-units') ? 2 : 0,
+      });
       const data = fig.querySelector('script');
       const d = JSON.parse(data.textContent);
       // translated series labels, see dashboard.html
       const label = data.dataset;
       const networth = d.balance != null;
-      const axis = { stroke: css('--pico-muted-color'), grid: { stroke: css('--pico-muted-border-color'), width: 1 }, ticks: { show: false } };
+      const axis = { stroke: palette['muted-foreground'], grid: { stroke: palette.border, width: 1 }, ticks: { show: false } };
       // With no cursor over the chart the legend shows the last (current) month.
       const current = (u) => { if (u.cursor.idx == null) u.setLegend({ idx: u.data[0].length - 1 }); };
       charts.push(new uPlot({
@@ -51,9 +66,9 @@
         ],
         series: [
           { value: (u, t) => (t == null ? '' : new Date(t * 1000).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) },
-          { label: label.labelIncome || 'Income', ...bars(css('--gf-income'), -1) },
-          { label: label.labelExpense || 'Expense', ...bars(css('--gf-expense'), 1) },
-          ...(networth ? [{ label: label.labelBalance || 'Net worth', scale: 'networth', stroke: css('--pico-primary'), width: 2, points: { size: 5 }, value: (u, v) => (v == null ? '' : full.format(v)) }] : []),
+          { label: label.labelIncome || 'Income', ...bars(palette.success, -1, full) },
+          { label: label.labelExpense || 'Expense', ...bars(palette.danger, 1, full) },
+          ...(networth ? [{ label: label.labelBalance || 'Net worth', scale: 'networth', stroke: palette.primary, width: 2, points: { size: 5 }, value: (u, v) => (v == null ? '' : full.format(v)) }] : []),
         ],
       }, networth ? [d.months, d.income, d.expense, d.balance] : [d.months, d.income, d.expense], fig));
     });

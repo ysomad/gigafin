@@ -1,26 +1,28 @@
 {{define "content"}}
 {{$d := .Data}}
-<ul class="tabs">
-  {{range kinds}}<li{{if eq . $d.Kind}} aria-current="page"{{end}}><a href="/categories?kind={{.}}">{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</a></li>{{end}}
+<ul class="unstyled hstack mb-4">
+  {{range kinds}}<li><a href="/categories?kind={{.}}"{{if eq . $d.Kind}} aria-current="page"{{end}}>{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</a></li>{{end}}
 </ul>
-<details class="add">
-<summary role="button">+ {{t "New category"}}</summary>
-<form method="post" action="/categories" class="row">
+<details class="mb-6">
+<summary>+ {{t "New category"}}</summary>
+<form method="post" action="/categories">
+<div class="row mb-4">
   <input type="hidden" name="kind" value="{{$d.Kind}}">
-  <input class="grow" name="name" placeholder="{{t "Name"}}" required aria-label="{{t "Name"}}">
-  <select name="parent" aria-label="{{t "Inside"}}">
+  <label data-field class="col-4">{{t "Name"}}<input name="name" placeholder="{{t "Name"}}" required></label>
+  <label data-field class="col-4">{{t "Inside"}}<select name="parent">
     <option value="0">{{t "Top level"}}</option>
     {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}<option value="{{.ID}}">{{t "in %s" .Name}}</option>{{end}}{{end}}
-  </select>
-  <button type="submit" class="shrink">{{t "Create"}}</button>
+  </select></label>
+  <div class="col-12 hstack"><button type="submit">{{t "Create"}}</button></div>
+</div>
 </form>
 </details>
-<ul class="tree">
+<ul class="vstack">
   {{range $d.Categories}}{{if eq .Kind $d.Kind}}
   <li>
-    <a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="muted">{{t "archived"}}</span>{{end}}
+    <a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}
     {{if .Children}}<ul>{{range .Children}}
-      <li><a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="muted">{{t "archived"}}</span>{{end}}</li>
+      <li><a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</li>
     {{end}}</ul>{{end}}
   </li>
   {{end}}{{end}}

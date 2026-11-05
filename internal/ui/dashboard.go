@@ -71,7 +71,12 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	}
 	charts := make(map[string]*trendChart, len(dash.Trends))
 	for _, t := range dash.Trends {
-		c := &trendChart{Currency: t.Currency, Months: chartMonths, Income: make([]float64, n), Expense: make([]float64, n)}
+		c := &trendChart{
+			Currency: t.Currency,
+			Months:   chartMonths,
+			Income:   make([]float64, n),
+			Expense:  make([]float64, n),
+		}
 		for i, m := range t.Months {
 			c.Income[i] = m.Income.Float64()
 			c.Expense[i] = m.Expense.Float64()
@@ -81,7 +86,12 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	for _, t := range dash.NetWorth {
 		c, ok := charts[t.Currency]
 		if !ok {
-			c = &trendChart{Currency: t.Currency, Months: chartMonths, Income: make([]float64, n), Expense: make([]float64, n)}
+			c = &trendChart{
+				Currency: t.Currency,
+				Months:   chartMonths,
+				Income:   make([]float64, n),
+				Expense:  make([]float64, n),
+			}
 			charts[t.Currency] = c
 		}
 		c.Balance = make([]float64, n)

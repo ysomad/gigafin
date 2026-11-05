@@ -1,22 +1,39 @@
 {{define "content"}}
 {{$d := .Data}}
-<div class="actions">
-  <a role="button" href="/operations/new?type=expense">− {{t "Expense"}}</a>
-  <a role="button" class="secondary outline" href="/operations/new?type=income">+ {{t "Income"}}</a>
-  <a role="button" class="secondary outline" href="/operations/new?type=transfer">⇄ {{t "Transfer"}}</a>
+<div class="hstack mb-4">
+  <button type="button" commandfor="operation-dialog" command="show-modal">+ {{t "New operation"}}</button>
 </div>
+<dialog id="operation-dialog" closedby="any" aria-labelledby="operation-dialog-title">
+  <header><h2 id="operation-dialog-title">{{t "New operation"}}</h2></header>
+  <section>
+  <ot-tabs>
+    <div role="tablist" aria-label="{{t "Type"}}">
+      <button type="button" role="tab">− {{t "Expense"}}</button>
+      <button type="button" role="tab">+ {{t "Income"}}</button>
+      <button type="button" role="tab">⇄ {{t "Transfer"}}</button>
+    </div>
+    {{range $type := opTypes}}{{if ne $type "adjustment"}}
+    <div role="tabpanel" hx-get="/operations/new?type={{$type}}" hx-trigger="toggle from:#operation-dialog once" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">
+      <p role="status">{{t "Loading…"}}</p>
+      <button type="button" class="outline" hx-get="/operations/new?type={{$type}}" hx-target="closest [role=tabpanel]" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">{{t "Retry"}}</button>
+    </div>
+    {{end}}{{end}}
+  </ot-tabs>
+  </section>
+  <footer><button type="button" class="outline" commandfor="operation-dialog" command="close">{{t "Close"}}</button></footer>
+</dialog>
 
 <details{{if $d.Filtered}} open{{end}}>
   <summary>{{t "Filter"}}</summary>
   <form method="get" action="/operations">
-    <div class="row">
-      <label>{{t "Account"}}
+    <div class="row mb-4">
+      <label data-field class="col-4">{{t "Account"}}
         <select name="account">
           <option value="">{{t "All"}}</option>
           {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.Filter.AccountID}} selected{{end}}>{{.Name}}</option>{{end}}
         </select>
       </label>
-      <label>{{t "Category"}}
+      <label data-field class="col-4">{{t "Category"}}
         <select name="category">
           <option value="">{{t "All"}}</option>
           {{range $d.Categories}}
@@ -25,23 +42,23 @@
           {{end}}
         </select>
       </label>
-      <label>{{t "Type"}}
+      <label data-field class="col-4">{{t "Type"}}
         <select name="type">
           <option value="">{{t "All"}}</option>
           {{range $t := opTypes}}<option value="{{$t}}"{{if eq $t $d.Filter.Type}} selected{{end}}>{{t (print $t)}}</option>{{end}}
         </select>
       </label>
     </div>
-    <div class="row">
-      <label>{{t "From"}} <input type="date" name="from" value="{{date $d.Filter.DateFrom}}"></label>
-      <label>{{t "To"}} <input type="date" name="to" value="{{date $d.Filter.DateTo}}"></label>
-      <label class="grow">{{t "Search"}} <input type="search" name="q" value="{{$d.Filter.Query}}" placeholder="{{t "payee or note"}}"></label>
+    <div class="row mb-4">
+      <label data-field class="col-4">{{t "From"}} <input type="date" name="from" value="{{date $d.Filter.DateFrom}}"></label>
+      <label data-field class="col-4">{{t "To"}} <input type="date" name="to" value="{{date $d.Filter.DateTo}}"></label>
+      <label data-field class="col-4">{{t "Search"}} <input type="search" name="q" value="{{$d.Filter.Query}}" placeholder="{{t "payee or note"}}"></label>
     </div>
-    <div class="row">
-      <label>{{t "Amount from"}} <input name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
-      <label>{{t "Amount to"}} <input name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
+    <div class="row mb-4">
+      <label data-field class="col-4">{{t "Amount from"}} <input name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
+      <label data-field class="col-4">{{t "Amount to"}} <input name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
       {{if $d.Tags}}
-      <label>{{t "Tag"}}
+      <label data-field class="col-4">{{t "Tag"}}
         <select name="tag">
           <option value="">{{t "All"}}</option>
           {{range $d.Tags}}<option value="{{.}}"{{if eq . $d.Filter.Tag}} selected{{end}}>{{.}}</option>{{end}}
@@ -49,27 +66,27 @@
       </label>
       {{end}}
     </div>
-    <div class="actions">
+    <div class="hstack mb-4">
       <button type="submit">{{t "Apply"}}</button>
-      <a role="button" class="secondary outline" href="/operations">{{t "Reset"}}</a>
+      <a class="button outline" href="/operations" data-variant="secondary">{{t "Reset"}}</a>
     </div>
   </form>
 </details>
-<form method="post" action="{{$d.RunURL}}" class="actions" hx-confirm="{{if $d.Filtered}}{{t "Run rules on the filtered operations?"}}{{else}}{{t "Run rules on all operations?"}}{{end}}">
-  <button type="submit" class="secondary outline small">{{t "Run rules"}}</button>
+<form method="post" action="{{$d.RunURL}}" class="hstack mb-4" hx-confirm="{{if $d.Filtered}}{{t "Run rules on the filtered operations?"}}{{else}}{{t "Run rules on all operations?"}}{{end}}">
+  <button type="submit" class="outline small" data-variant="secondary">{{t "Run rules"}}</button>
   <a href="/rules">{{t "Rules"}}</a>
 </form>
-{{if ge $d.Changed 0}}<p role="status">{{t "Rules changed %d operations." $d.Changed}}</p>{{end}}
+{{if ge $d.Changed 0}}<p role="status" class="badge" data-variant="success">{{t "Rules changed %d operations." $d.Changed}}</p>{{end}}
 
 {{if $d.Totals}}
-<div class="stats">
+<div class="row mb-6">
   {{range $d.Totals}}
-  <article>
-    <span class="label">{{t "Filtered"}} · {{.Currency}}</span>
-    <strong class="value {{if .Net.IsNegative}}expense{{else}}income{{end}}">{{money .Net .Currency}}</strong>
+  <article class="card col-6">
+    <header><h3>{{t "Filtered"}} · {{.Currency}}</h3></header>
+    <h2>{{money .Net .Currency}}</h2>
     <dl>
-      <dt>{{t "Income"}}</dt><dd class="income">+{{money .Income .Currency}}</dd>
-      <dt>{{t "Expense"}}</dt><dd class="expense">−{{money .Expense .Currency}}</dd>
+      <dt>{{t "Income"}}</dt><dd><span class="badge" data-variant="success">+{{money .Income .Currency}}</span></dd>
+      <dt>{{t "Expense"}}</dt><dd><span class="badge" data-variant="danger">−{{money .Expense .Currency}}</span></dd>
     </dl>
   </article>
   {{end}}
@@ -77,10 +94,10 @@
 {{end}}
 
 {{if $d.Days}}
-<ul class="ops">{{template "op-rows" $d}}</ul>
+<ul class="unstyled vstack">{{template "op-rows" $d}}</ul>
 {{else}}
-<p class="muted">{{t "No operations yet."}}{{if not $d.Filtered}} {{t "Add one above or"}} <a href="/imports">{{t "import"}}</a>.{{end}}</p>
+<p class="text-light">{{t "No operations yet."}}{{if not $d.Filtered}} {{t "Add one above or"}} <a href="/imports">{{t "import"}}</a>.{{end}}</p>
 {{end}}
 {{end}}
 
-{{define "to-top"}}{{if .Data.Days}}<a href="#top" class="to-top" role="button" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}
+{{define "to-top"}}{{if .Data.Days}}<a class="button" href="#top" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}

@@ -260,7 +260,8 @@ func (u *UI) newOperation(w http.ResponseWriter, r *http.Request, user domain.Us
 	if err != nil {
 		typ = domain.OpExpense
 	}
-	f := opForm{Type: typ, Date: timex.FormatDate(u.svc.Today(user))}
+	now := time.Now().In(user.Location())
+	f := opForm{Type: typ, Date: timex.FormatDate(now), Time: now.Format("15:04")}
 	return u.renderForm(w, r, user, http.StatusOK, f, nil)
 }
 

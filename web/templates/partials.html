@@ -12,34 +12,34 @@
 {{end}}
 
 {{define "split"}}
-<div class="split row">
-  <label class="grow">{{t "Category"}}
+<div class="split row mb-4">
+  <label data-field class="col-4">{{t "Category"}}
     <select name="split_category" required>
       <option value="">—</option>
       {{template "category-options" (dict "Categories" .Categories "Selected" .Split.CategoryID)}}
     </select>
   </label>
-  <label>{{t "Amount"}}
+  <label data-field class="col-4">{{t "Amount"}}
     <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}" required>
   </label>
-  <label class="grow">{{t "Note"}}
+  <label data-field class="col-4">{{t "Note"}}
     <input name="split_note" value="{{.Split.Note}}">
   </label>
-  <button type="button" class="secondary outline small shrink" hx-get="/noop" hx-target="closest .split" hx-swap="delete" aria-label="{{t "Remove part"}}">✕</button>
+  <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .split" hx-swap="delete" aria-label="{{t "Remove part"}}" data-variant="secondary">✕</button></div>
 </div>
 {{end}}
 
 {{define "op-rows"}}
   {{range .Days}}
-    {{if not .Continued}}<li class="day">{{dayTitle .Date}}</li>{{end}}
+    {{if not .Continued}}<li class="text-light mt-4">{{dayTitle .Date}}</li>{{end}}
     {{range .Ops}}
-    <li>
-      <a class="main" href="/operations/{{.ID}}/edit">
+    <li class="card hstack justify-between">
+      <a href="/operations/{{.ID}}/edit">
         <div>{{opTitle . $.CatNames}}</div>
-        <div class="muted">{{opSubtitle . $.CatNames $.AccByID}}</div>
+        <div class="text-light">{{opSubtitle . $.CatNames $.AccByID}}</div>
       </a>
-      {{if .Tags}}<div class="tags">{{range .Tags}}<a class="tag" href="/operations?tag={{.}}">{{.}}</a>{{end}}</div>{{end}}
-      <div class="num {{opClass .}}">{{opAmount .}}</div>
+      {{if .Tags}}<div class="hstack gap-1">{{range .Tags}}<a class="badge outline" href="/operations?tag={{.}}">{{.}}</a>{{end}}</div>{{end}}
+      <div class="align-right"><span class="badge" data-variant="{{if eq (opClass .) "income"}}success{{else if eq (opClass .) "expense"}}danger{{end}}">{{opAmount .}}</span></div>
     </li>
     {{end}}
   {{end}}
@@ -50,18 +50,18 @@
 
 {{define "import-steps"}}
 {{$step := .Step}}
-<ol class="steps">
-  <li{{if eq $step "type"}} aria-current="step"{{else}} class="done"{{end}}>{{if eq $step "file"}}<a href="/imports/new">{{t "Source"}}</a>{{else}}{{t "Source"}}{{end}}</li>
-  <li{{if eq $step "file"}} aria-current="step"{{else if or .Preview .Rates}} class="done"{{end}}>{{t "Upload|step"}}</li>
+<ol class="hstack mb-6">
+  <li{{if eq $step "type"}} aria-current="step"{{else}} class="text-light"{{end}}>{{if eq $step "file"}}<a href="/imports/new">{{t "Source"}}</a>{{else}}{{t "Source"}}{{end}}</li>
+  <li{{if eq $step "file"}} aria-current="step"{{else if or .Preview .Rates}} class="text-light"{{end}}>{{t "Upload|step"}}</li>
   {{if .Rates}}
-  <li{{if eq $step "preview"}} aria-current="step"{{else if eq $step "done"}} class="done"{{end}}>{{t "Review"}}</li>
+  <li{{if eq $step "preview"}} aria-current="step"{{else if eq $step "done"}} class="text-light"{{end}}>{{t "Review"}}</li>
   {{else if .Preview}}
   {{$p := .Preview}}
   {{$base := printf "/imports/%d" $p.Import.ID}}
   {{$staged := eq $p.Import.Status "staged"}}
-  <li{{if $p.AccountsMapped}} class="done"{{end}}{{if eq $step "accounts"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/accounts">{{t "Accounts"}}</a>{{else}}{{t "Accounts"}}{{end}}</li>
-  <li{{if $p.CategoriesMapped}} class="done"{{end}}{{if eq $step "categories"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/categories">{{t "Categories"}}</a>{{else}}{{t "Categories"}}{{end}}</li>
-  <li{{if not $staged}} class="done"{{end}}{{if eq $step "preview"}} aria-current="step"{{end}}><a href="{{$base}}/preview">{{t "Review"}}</a></li>
+  <li{{if $p.AccountsMapped}} class="text-light"{{end}}{{if eq $step "accounts"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/accounts">{{t "Accounts"}}</a>{{else}}{{t "Accounts"}}{{end}}</li>
+  <li{{if $p.CategoriesMapped}} class="text-light"{{end}}{{if eq $step "categories"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/categories">{{t "Categories"}}</a>{{else}}{{t "Categories"}}{{end}}</li>
+  <li{{if not $staged}} class="text-light"{{end}}{{if eq $step "preview"}} aria-current="step"{{end}}><a href="{{$base}}/preview">{{t "Review"}}</a></li>
   {{else}}
   <li>{{t "Accounts"}}</li>
   <li>{{t "Categories"}}</li>
@@ -71,16 +71,19 @@
 {{end}}
 
 {{/* month-nav is a pager over Month with links PrevURL and NextURL and a select of
-Months that submits to Action with the optional Kind on change, see app.js. */}}
+Months that submits to Action with the optional Kind. */}}
 {{define "month-nav"}}
-<form method="get" action="{{.Action}}" class="month-nav">
-  <a role="button" class="secondary outline" href="{{.PrevURL}}" aria-label="{{t "Previous month"}}">‹</a>
+<form method="get" action="{{.Action}}" class="hstack mb-4">
+  <a class="button outline" href="{{.PrevURL}}" aria-label="{{t "Previous month"}}" data-variant="secondary">‹</a>
   {{with .Kind}}<input type="hidden" name="kind" value="{{.}}">{{end}}
   {{$sel := .Month.String}}
-  <select name="month" aria-label="{{t "Month"}}">
+  <label data-field>{{t "Month"}}
+  <select name="month">
     {{range .Months}}<option value="{{.}}"{{if eq .String $sel}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
   </select>
-  <a role="button" class="secondary outline" href="{{.NextURL}}" aria-label="{{t "Next month"}}">›</a>
+  </label>
+  <button type="submit">{{t "Apply"}}</button>
+  <a class="button outline" href="{{.NextURL}}" aria-label="{{t "Next month"}}" data-variant="secondary">›</a>
 </form>
 {{end}}
 
@@ -129,18 +132,18 @@ Months that submits to Action with the optional Kind on change, see app.js. */}}
 Fields to pick from, and Categories and Accounts for their value selects. */}}
 {{define "rule-condition"}}
 {{$r := .Row}}
-<div class="cond row">
-  <label>{{t "Field"}}
+<div class="cond row mb-4">
+  <label data-field class="col-4">{{t "Field"}}
     <select name="cond_field" hx-get="/rules/condition" hx-include="closest .cond" hx-target="closest .cond" hx-swap="outerHTML">
       {{range .Fields}}<option value="{{.Field}}"{{if eq .Field $r.Field}} selected{{end}}>{{template "rule-field" .Field}}</option>{{end}}
     </select>
   </label>
-  <label>{{t "Condition"}}
+  <label data-field class="col-4">{{t "Condition"}}
     <select name="cond_op">
       {{range $r.Ops}}<option value="{{.}}"{{if eq . $r.Op}} selected{{end}}>{{template "rule-op" .}}</option>{{end}}
     </select>
   </label>
-  <label class="grow">{{t "Value"}}
+  <label data-field class="col-4">{{t "Value"}}
     {{if eq $r.Field "category"}}
     <select name="cond_value">
       <option value="">—</option>
@@ -159,7 +162,7 @@ Fields to pick from, and Categories and Accounts for their value selects. */}}
     <input name="cond_value" value="{{$r.Value}}" autocomplete="off" placeholder="{{t "one of and between take values separated by |"}}">
     {{end}}
   </label>
-  <button type="button" class="secondary outline small shrink" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label="{{t "Remove condition"}}">✕</button>
+  <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label="{{t "Remove condition"}}" data-variant="secondary">✕</button></div>
 </div>
 {{end}}
 
@@ -167,13 +170,13 @@ Fields to pick from, and Categories and Accounts for their value selects. */}}
 Categories for the category select. */}}
 {{define "rule-action"}}
 {{$r := .Row}}
-<div class="act row">
-  <label>{{t "Action"}}
+<div class="act row mb-4">
+  <label data-field class="col-4">{{t "Action"}}
     <select name="act_type" hx-get="/rules/action" hx-include="closest .act" hx-target="closest .act" hx-swap="outerHTML">
       {{range ruleActionTypes}}<option value="{{.}}"{{if eq . $r.Type}} selected{{end}}>{{template "rule-action-type" .}}</option>{{end}}
     </select>
   </label>
-  <label class="grow">{{t "Value"}}
+  <label data-field class="col-4">{{t "Value"}}
     {{if eq $r.Type "set_category"}}
     <select name="act_value">
       <option value="">—</option>
@@ -183,15 +186,15 @@ Categories for the category select. */}}
     <input name="act_value" value="{{$r.Value}}" autocomplete="off">
     {{end}}
   </label>
-  <button type="button" class="secondary outline small shrink" hx-get="/noop" hx-target="closest .act" hx-swap="delete" aria-label="{{t "Remove action"}}">✕</button>
+  <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .act" hx-swap="delete" aria-label="{{t "Remove action"}}" data-variant="secondary">✕</button></div>
 </div>
 {{end}}
 
 {{/* rule-preview lists the latest operations a rule form matches, a rulePreview. */}}
 {{define "rule-preview"}}
-{{if .Error}}<p class="error" role="alert">{{errText .Error}}</p>
+{{if .Error}}<p role="alert" data-variant="danger">{{errText .Error}}</p>
 {{else if .Total}}
 <p>{{t "Matches %d operations, the latest:" .Total}}</p>
-<ul class="ops">{{template "op-rows" .}}</ul>
-{{else}}<p class="muted">{{t "Matches no operations."}}</p>{{end}}
+<ul class="unstyled vstack">{{template "op-rows" .}}</ul>
+{{else}}<p class="text-light">{{t "Matches no operations."}}</p>{{end}}
 {{end}}
