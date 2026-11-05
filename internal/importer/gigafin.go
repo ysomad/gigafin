@@ -207,7 +207,7 @@ func parseGigaFinRow(rec []string, idx map[string]int, loc *time.Location) (doma
 	if row.MCC != "" && !domain.ValidMCC(row.MCC) {
 		return domain.Record{}, domain.NewError(errors.ErrInvalid, "%s: %q must be 4 digits", _gigaFinColMCC, row.MCC)
 	}
-	if !money.Valid(row.Currency) {
+	if !money.ValidCurrency(row.Currency) {
 		return domain.Record{}, domain.NewError(
 			errors.ErrInvalid,
 			"%s: unsupported currency %q",

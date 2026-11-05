@@ -100,7 +100,7 @@ func NewRate(source RateSource, from, to string, date time.Time, rate decimal.De
 	if from == pivot {
 		return Rate{}, NewError(errors.ErrInvalid, "rate: %s/%s: same currency", from, to)
 	}
-	if !money.Valid(from) {
+	if !money.ValidCurrency(from) {
 		return Rate{}, NewError(errors.ErrInvalid, "rate: unknown currency %q", from)
 	}
 	return Rate{Source: source, Currency: from, Date: date, Rate: rate}, nil

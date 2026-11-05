@@ -73,7 +73,7 @@ func FormatDate(t time.Time) string {
 // ParseClock parses a wall clock time "HH:MM" or "HH:MM:SS" and returns it as "HH:MM".
 func ParseClock(s string) (string, error) {
 	s = strings.TrimSpace(s)
-	for _, layout := range []string{_clockLayout, time.TimeOnly} {
+	for _, layout := range [...]string{_clockLayout, time.TimeOnly} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t.Format(_clockLayout), nil
 		}

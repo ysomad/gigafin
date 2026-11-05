@@ -1,4 +1,4 @@
-package logx_test
+package logger_test
 
 import (
 	"bytes"
@@ -8,18 +8,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 )
 
 func TestHandler(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	log := slog.New(logx.Handler{slog.NewJSONHandler(&buf, nil)}).With(slog.String("job", "x"))
+	log := slog.New(logger.Handler{slog.NewJSONHandler(&buf, nil)}).With(slog.String("job", "x"))
 
-	ctx := logx.Start(t.Context(), "req1")
-	logx.Add(ctx, slog.Int64("user_id", 7))
+	ctx := logger.Context(t.Context(), "req1")
+	logger.WithAttrs(ctx, slog.Int64("user_id", 7))
 	log.InfoContext(ctx, "hello")
 
 	var got map[string]any
@@ -27,7 +26,7 @@ func TestHandler(t *testing.T) {
 	assert.Equal(t, "req1", got["request_id"])
 	assert.InDelta(t, 7, got["user_id"], 0)
 	assert.Equal(t, "x", got["job"], "attrs of With are kept")
-	assert.Equal(t, "req1", logx.RequestID(ctx))
+	assert.Equal(t, "req1", logger.RequestID(ctx))
 
 	buf.Reset()
 	log.InfoContext(ctx, "again", slog.Int64("user_id", 8))
@@ -39,14 +38,14 @@ func TestHandler_NoRequest(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	log := slog.New(logx.Handler{slog.NewJSONHandler(&buf, nil)})
+	log := slog.New(logger.Handler{slog.NewJSONHandler(&buf, nil)})
 
-	logx.Add(t.Context(), slog.Int64("user_id", 7))
+	logger.WithAttrs(t.Context(), slog.Int64("user_id", 7))
 	log.InfoContext(t.Context(), "hello")
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
 	assert.NotContains(t, got, "request_id")
 	assert.NotContains(t, got, "user_id")
-	assert.Empty(t, logx.RequestID(t.Context()))
+	assert.Empty(t, logger.RequestID(t.Context()))
 }

@@ -26,7 +26,7 @@ import (
 	"github.com/ysomad/gigafin/internal/api"
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 	"github.com/ysomad/gigafin/internal/service"
 )
 
@@ -97,7 +97,7 @@ func New(a *service.Auth, apiHandler http.Handler, spec []byte, log *slog.Logger
 			log.ErrorContext(ctx, "authenticate api key", slog.Any("error", err))
 			return nil, errors.Error("internal error")
 		}
-		logx.Add(ctx, slog.Int64("user_id", key.UserID), slog.Int64("key_id", key.ID))
+		logger.WithAttrs(ctx, slog.Int64("user_id", key.UserID), slog.Int64("key_id", key.ID))
 		return &auth.TokenInfo{
 			Scopes: []string{string(key.Scope)},
 			UserID: strconv.FormatInt(key.UserID, 10),

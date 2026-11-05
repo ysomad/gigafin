@@ -19,7 +19,7 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/i18n"
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 	"github.com/ysomad/gigafin/internal/service"
 	"github.com/ysomad/gigafin/web"
 )
@@ -256,7 +256,7 @@ func (u *UI) authed(h handler) http.Handler {
 			u.serverError(w, r, err)
 			return
 		}
-		logx.Add(r.Context(), slog.Int64("user_id", user.ID))
+		logger.WithAttrs(r.Context(), slog.Int64("user_id", user.ID))
 		settings, err := u.svc.Settings.Get(r.Context(), user.ID)
 		if err != nil {
 			u.serverError(w, r, err)
@@ -305,7 +305,7 @@ func (u *UI) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	u.log.ErrorContext(r.Context(), "request failed",
 		slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.Any("error", err))
 	msg := "Internal error, see server logs."
-	if id := logx.RequestID(r.Context()); id != "" {
+	if id := logger.RequestID(r.Context()); id != "" {
 		msg = "Internal error, see server logs for request ID " + id + "."
 	}
 	http.Error(w, msg, http.StatusInternalServerError)

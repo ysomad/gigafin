@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -14,7 +16,7 @@ import (
 	"github.com/ysomad/gigafin/internal/api"
 	"github.com/ysomad/gigafin/internal/config"
 	"github.com/ysomad/gigafin/internal/errors"
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 	"github.com/ysomad/gigafin/internal/mcp"
 	"github.com/ysomad/gigafin/internal/service"
 	"github.com/ysomad/gigafin/internal/ui"
@@ -109,7 +111,7 @@ func logRequests(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := rand.Text()
-		ctx := logx.Start(r.Context(), id)
+		ctx := logger.Context(r.Context(), id)
 		r = r.WithContext(ctx)
 		w.Header().Set("X-Request-Id", id)
 		rw := &responseWriter{ResponseWriter: w}
@@ -171,4 +173,23 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 // underlying writer.
 func (w *responseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
+}
+
+func newHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+		},
+	}
 }

@@ -29,7 +29,7 @@ func NewPlan(
 		return Plan{}, NewError(errors.ErrInvalid, "month: required")
 	}
 	cur := strings.ToUpper(strings.TrimSpace(currency))
-	if !money.Valid(cur) {
+	if !money.ValidCurrency(cur) {
 		return Plan{}, NewError(errors.ErrInvalid, "currency: unsupported currency %q", cur)
 	}
 	if _, err := amount.ToMinor(cur); err != nil {

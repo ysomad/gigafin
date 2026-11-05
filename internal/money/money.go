@@ -1,5 +1,3 @@
-// Package money holds amounts of money and converts them to and from the integer
-// minor units stored in the database.
 package money
 
 import (
@@ -40,8 +38,8 @@ func Exponent(currency string) (int32, error) {
 	return exp, nil
 }
 
-// Valid reports whether currency is supported.
-func Valid(currency string) bool {
+// ValidCurrency reports whether currency is supported.
+func ValidCurrency(currency string) bool {
 	_, ok := _exponents[currency]
 	return ok
 }

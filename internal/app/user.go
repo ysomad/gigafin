@@ -54,7 +54,7 @@ func userRole(ctx context.Context, cfg config.Config, log *slog.Logger, args []s
 	if *login == "" {
 		return errors.Error("-login is required")
 	}
-	svc, closeStore, err := newService(ctx, cfg, log)
+	svc, closeStore, err := newServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func userCommand(
 		}
 		*pass = p
 	}
-	svc, closeStore, err := newService(ctx, cfg, log)
+	svc, closeStore, err := newServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}

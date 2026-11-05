@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 )
 
 func TestProtect(t *testing.T) {
@@ -46,9 +46,9 @@ func TestLogRequests(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	log := slog.New(logx.Handler{Handler: slog.NewJSONHandler(&buf, nil)})
+	log := slog.New(logger.Handler{Handler: slog.NewJSONHandler(&buf, nil)})
 	h := logRequests(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logx.Add(r.Context(), slog.Int64("user_id", 7))
+		logger.WithAttrs(r.Context(), slog.Int64("user_id", 7))
 		w.WriteHeader(http.StatusCreated)
 		_, err := w.Write([]byte("hello"))
 		assert.NoError(t, err)
@@ -92,7 +92,7 @@ func TestLogRequests_Panic(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	log := slog.New(logx.Handler{Handler: slog.NewJSONHandler(&buf, nil)})
+	log := slog.New(logger.Handler{Handler: slog.NewJSONHandler(&buf, nil)})
 	h := logRequests(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("boom")
 	}), log)

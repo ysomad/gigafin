@@ -26,7 +26,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		slog.String("log_level", cfg.Logger.Level.String()))
 	log.DebugContext(ctx, "config", slog.Any("config", cfg))
 
-	svc, closeStore, err := newService(ctx, cfg, log)
+	svc, closeStore, err := newServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}

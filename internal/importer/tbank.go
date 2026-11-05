@@ -201,7 +201,7 @@ func parseTBankRow(rec []string, idx map[string]int, loc *time.Location) (domain
 			get(_tbankColTime),
 		)
 	}
-	if !money.Valid(row.Currency) {
+	if !money.ValidCurrency(row.Currency) {
 		return domain.Record{}, domain.NewError(
 			errors.ErrInvalid,
 			"%s: unsupported currency %q",

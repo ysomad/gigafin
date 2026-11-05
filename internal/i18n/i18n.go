@@ -19,9 +19,7 @@ import (
 
 // Language is a UI language.
 type Language struct {
-	// Code is the BCP 47 code, such as "ru".
 	Code string
-	// Name is the name of the language in itself.
 	Name string
 }
 

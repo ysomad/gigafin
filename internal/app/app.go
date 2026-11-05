@@ -11,7 +11,7 @@ import (
 
 	"github.com/ysomad/gigafin/internal/config"
 	"github.com/ysomad/gigafin/internal/errors"
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 )
 
 // Run runs the command in args until it finishes or SIGINT/SIGTERM arrives.
@@ -30,7 +30,7 @@ func Run(args []string) error {
 	if serving {
 		out = os.Stdout
 	}
-	log := slog.New(logx.Handler{Handler: slog.NewJSONHandler(out, &slog.HandlerOptions{
+	log := slog.New(logger.Handler{Handler: slog.NewJSONHandler(out, &slog.HandlerOptions{
 		Level:     cfg.Logger.Level,
 		AddSource: cfg.Logger.AddSource,
 	})})

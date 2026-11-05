@@ -94,7 +94,7 @@ func NewAccount(in AccountInput) (Account, error) {
 		return Account{}, NewError(errors.ErrInvalid, "name: too long")
 	}
 	currency := strings.ToUpper(strings.TrimSpace(in.Currency))
-	if !money.Valid(currency) {
+	if !money.ValidCurrency(currency) {
 		return Account{}, NewError(errors.ErrInvalid, "currency: unsupported currency %q", currency)
 	}
 	kind, err := ParseAccountKind(string(in.Kind))

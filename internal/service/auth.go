@@ -29,27 +29,33 @@ func (s *Auth) CreateUser(ctx context.Context, login, pass, timezone, role strin
 	if err != nil {
 		return domain.User{}, err
 	}
+
 	r, err := domain.ParseRole(role)
 	if err != nil {
 		return domain.User{}, err
 	}
-	if err := password.CheckPolicy(pass); err != nil {
+
+	if err := domain.CheckPasswordPolicy(pass); err != nil {
 		return domain.User{}, err
 	}
+
 	tz, err := domain.ParseTimezone(timezone)
 	if err != nil {
 		return domain.User{}, err
 	}
+
 	hash, err := password.Hash(pass)
 	if err != nil {
 		return domain.User{}, err
 	}
-	u, err := s.store.Write().Users.Create(ctx, login, hash, tz, r, s.clock.Now())
+
+	usr, err := s.store.Write().Users.Create(ctx, login, hash, tz, r, s.clock.Now())
 	if err != nil {
 		return domain.User{}, err
 	}
-	s.log.InfoContext(ctx, "user created", slog.Int64("user_id", u.ID), slog.String("role", string(u.Role)))
-	return u, nil
+
+	s.log.InfoContext(ctx, "user created", slog.Int64("user_id", usr.ID), slog.String("role", string(usr.Role)))
+	return usr, nil
 }
 
 // SetRoleByLogin sets the role of a user. It applies to the user's next request.
@@ -58,13 +64,16 @@ func (s *Auth) SetRoleByLogin(ctx context.Context, login, role string) error {
 	if err != nil {
 		return err
 	}
+
 	r, err := domain.ParseRole(role)
 	if err != nil {
 		return err
 	}
+
 	if err := s.store.Write().Users.SetRoleByLogin(ctx, login, r, s.clock.Now()); err != nil {
 		return err
 	}
+
 	s.log.InfoContext(ctx, "user role set", slog.String("login", login), slog.String("role", string(r)))
 	return nil
 }
@@ -75,22 +84,26 @@ func (s *Auth) SetPasswordByLogin(ctx context.Context, login, pass string) error
 	if err != nil {
 		return err
 	}
+
 	c, err := s.store.Read().Users.CredentialsByLogin(ctx, login)
 	if err != nil {
 		return err
 	}
+
 	return s.SetPassword(ctx, c.User.ID, pass)
 }
 
 // SetPassword sets the password of a user and ends all their sessions.
 func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error {
-	if err := password.CheckPolicy(pass); err != nil {
+	if err := domain.CheckPasswordPolicy(pass); err != nil {
 		return err
 	}
+
 	hash, err := password.Hash(pass)
 	if err != nil {
 		return err
 	}
+
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
 		if err := r.Users.SetPassword(ctx, userID, hash, s.clock.Now()); err != nil {
 			return err
@@ -100,6 +113,7 @@ func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error
 	if err != nil {
 		return err
 	}
+
 	s.log.InfoContext(ctx, "password set, sessions ended", slog.Int64("user_id", userID))
 	return nil
 }
@@ -111,13 +125,15 @@ func (s *Auth) CheckPassword(ctx context.Context, userID int64, pass string) err
 	if err != nil {
 		return err
 	}
-	ok, err := password.Check(c.PasswordHash, pass)
+
+	ok, err := password.Compare(c.PasswordHash, pass)
 	if err != nil {
 		return err
 	}
 	if !ok {
 		return errInvalidCredentials
 	}
+
 	return nil
 }
 
@@ -128,19 +144,24 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 	if err := s.CheckPassword(ctx, userID, current); err != nil {
 		return "", err
 	}
-	if err := password.CheckPolicy(pass); err != nil {
+
+	if err := domain.CheckPasswordPolicy(pass); err != nil {
 		return "", err
 	}
+
 	hash, err := password.Hash(pass)
 	if err != nil {
 		return "", err
 	}
+
 	tok, err := credential.New(credential.KindSession)
 	if err != nil {
 		return "", err
 	}
+
 	now := s.clock.Now()
 	userAgent = domain.ParseUserAgent(userAgent)
+
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
 		if err := r.Users.SetPassword(ctx, userID, hash, now); err != nil {
 			return err
@@ -153,6 +174,7 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 	if err != nil {
 		return "", err
 	}
+
 	s.log.InfoContext(ctx, "password changed, other sessions ended", slog.Int64("user_id", userID))
 	return tok.Token, nil
 }
@@ -163,9 +185,11 @@ func (s *Auth) SetTimezone(ctx context.Context, userID int64, timezone string) e
 	if err != nil {
 		return err
 	}
+
 	if err := s.store.Write().Users.SetTimezone(ctx, userID, tz, s.clock.Now()); err != nil {
 		return err
 	}
+
 	s.log.DebugContext(ctx, "timezone set", slog.Int64("user_id", userID), slog.String("timezone", tz))
 	return nil
 }
@@ -177,7 +201,8 @@ func (s *Auth) Login(ctx context.Context, login, pass, userAgent string) (string
 	if err != nil {
 		return "", domain.User{}, err
 	}
-	c, err := s.store.Read().Users.CredentialsByLogin(ctx, login)
+
+	cred, err := s.store.Read().Users.CredentialsByLogin(ctx, login)
 	if errors.Is(err, errors.ErrNotFound) {
 		// hash anyway so response time does not reveal which logins exist
 		if _, err := password.Hash(pass); err != nil {
@@ -185,28 +210,34 @@ func (s *Auth) Login(ctx context.Context, login, pass, userAgent string) (string
 		}
 		return "", domain.User{}, errInvalidCredentials
 	}
+
 	if err != nil {
 		return "", domain.User{}, err
 	}
-	ok, err := password.Check(c.PasswordHash, pass)
+
+	ok, err := password.Compare(cred.PasswordHash, pass)
 	if err != nil {
 		return "", domain.User{}, err
 	}
 	if !ok {
 		return "", domain.User{}, errInvalidCredentials
 	}
+
 	tok, err := credential.New(credential.KindSession)
 	if err != nil {
 		return "", domain.User{}, err
 	}
+
 	now := s.clock.Now()
 	userAgent = domain.ParseUserAgent(userAgent)
-	err = s.store.Write().Sessions.Create(ctx, tok.Hash, c.User.ID, userAgent, s.session.Expiry(now, now), now)
+
+	err = s.store.Write().Sessions.Create(ctx, tok.Hash, cred.User.ID, userAgent, s.session.Expiry(now, now), now)
 	if err != nil {
 		return "", domain.User{}, err
 	}
-	s.log.InfoContext(ctx, "user signed in", slog.Int64("user_id", c.User.ID), slog.String("user_agent", userAgent))
-	return tok.Token, c.User, nil
+
+	s.log.InfoContext(ctx, "user signed in", slog.Int64("user_id", cred.User.ID), slog.String("user_agent", userAgent))
+	return tok.Token, cred.User, nil
 }
 
 // SessionUser returns the user of a live session or errors.ErrUnauthorized, and
@@ -215,7 +246,9 @@ func (s *Auth) SessionUser(ctx context.Context, tok string) (domain.User, error)
 	if tok == "" {
 		return domain.User{}, errors.ErrUnauthorized
 	}
+
 	hash, now := credential.Hash(tok), s.clock.Now()
+
 	sess, err := s.store.Read().Sessions.Get(ctx, hash)
 	if errors.Is(err, errors.ErrNotFound) {
 		return domain.User{}, errors.ErrUnauthorized
@@ -226,11 +259,13 @@ func (s *Auth) SessionUser(ctx context.Context, tok string) (domain.User, error)
 	if !sess.Live(now) {
 		return domain.User{}, errors.ErrUnauthorized
 	}
+
 	if exp, ok := sess.Touch(now, s.session); ok {
 		if err := s.store.Write().Sessions.Touch(ctx, sess.ID, exp, now); err != nil {
 			return domain.User{}, err
 		}
 	}
+
 	return sess.User, nil
 }
 
@@ -246,14 +281,18 @@ func (s *Auth) ListSessions(ctx context.Context, userID int64, token string) ([]
 	if err != nil {
 		return nil, err
 	}
+
 	var current int64
+
 	if token != "" {
 		cur, err := s.store.Read().Sessions.Get(ctx, credential.Hash(token))
 		if err != nil && !errors.Is(err, errors.ErrNotFound) {
 			return nil, err
 		}
+
 		current = cur.ID
 	}
+
 	now := s.clock.Now()
 	live := make([]domain.Session, 0, len(all))
 	for _, sess := range all {
@@ -263,6 +302,7 @@ func (s *Auth) ListSessions(ctx context.Context, userID int64, token string) ([]
 		sess.Current = sess.ID == current
 		live = append(live, sess)
 	}
+
 	return live, nil
 }
 
@@ -289,39 +329,44 @@ func (s *Auth) CreateAPIKey(
 	if err := s.CheckPassword(ctx, userID, pass); err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	name, err := domain.ParseAPIKeyName(name)
 	if err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	if scope, err = domain.ParseScope(string(scope)); err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	life, err := domain.ParseKeyTTL(ttl)
 	if err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	tok, err := credential.New(credential.KindAPIKey)
 	if err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	now := s.clock.Now()
+
 	var expires time.Time
 	if life > 0 {
 		expires = now.Add(life)
 	}
+
 	k, err := s.store.Write().APIKeys.Create(ctx, userID, name, scope, tok, expires, now)
 	if err != nil {
 		return "", domain.APIKey{}, err
 	}
+
 	s.log.InfoContext(
 		ctx,
 		"api key created",
 		slog.Int64("user_id", userID),
 		slog.Int64("key_id", k.ID),
-		slog.String(
-			"key_prefix",
-			k.Prefix,
-		),
+		slog.String("key_prefix", k.Prefix),
 		slog.String("scope", string(k.Scope)),
 		slog.Time("expires_at", k.ExpiresAt),
 	)
@@ -360,6 +405,7 @@ func (s *Auth) AuthenticateAPIKey(ctx context.Context, tok string, want domain.S
 		s.log.WarnContext(ctx, "api key rejected", slog.String("reason", "malformed"))
 		return domain.APIKey{}, errors.ErrUnauthorized
 	}
+
 	k, err := s.store.Read().APIKeys.ByPrefix(ctx, prefix)
 	if errors.Is(err, errors.ErrNotFound) {
 		s.log.WarnContext(ctx, "api key rejected", slog.String("reason", "unknown"), slog.String("key_prefix", prefix))
@@ -368,30 +414,38 @@ func (s *Auth) AuthenticateAPIKey(ctx context.Context, tok string, want domain.S
 	if err != nil {
 		return domain.APIKey{}, err
 	}
+
 	now := s.clock.Now()
+
 	if !credential.Matches(tok, k.Hash) {
-		s.log.WarnContext(ctx, "api key rejected", slog.String("reason", "wrong secret"),
-			slog.String("key_prefix", prefix), slog.Int64("key_id", k.Key.ID))
+		s.log.WarnContext(ctx, "api key rejected",
+			slog.String("reason", "wrong secret"),
+			slog.String("key_prefix", prefix),
+			slog.Int64("key_id", k.Key.ID),
+		)
 		return domain.APIKey{}, errors.ErrUnauthorized
 	}
+
 	if !k.Key.Live(now) {
-		s.log.WarnContext(ctx, "api key rejected", slog.String("reason", "revoked or expired"),
-			slog.String("key_prefix", prefix), slog.Int64("key_id", k.Key.ID))
+		s.log.WarnContext(ctx, "api key rejected",
+			slog.String("reason", "revoked or expired"),
+			slog.String("key_prefix", prefix),
+			slog.Int64("key_id", k.Key.ID),
+		)
 		return domain.APIKey{}, errors.ErrUnauthorized
 	}
+
 	if !k.Key.Scope.Allows(want) {
 		s.log.WarnContext(
 			ctx,
 			"api key rejected",
 			slog.String("reason", "scope"),
 			slog.String("key_prefix", prefix),
-			slog.Int64(
-				"key_id",
-				k.Key.ID,
-			),
+			slog.Int64("key_id", k.Key.ID),
 			slog.String("scope", string(k.Key.Scope)),
 			slog.String("want", string(want)),
 		)
+
 		return domain.APIKey{}, domain.NewError(
 			errors.ErrForbidden,
 			"api key scope %q does not allow %s",
@@ -399,10 +453,12 @@ func (s *Auth) AuthenticateAPIKey(ctx context.Context, tok string, want domain.S
 			want,
 		)
 	}
+
 	if k.Key.Touch(now) {
 		if err := s.store.Write().APIKeys.Touch(ctx, k.Key.ID, now); err != nil {
 			return domain.APIKey{}, err
 		}
 	}
+
 	return k.Key, nil
 }

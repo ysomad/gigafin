@@ -14,7 +14,7 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/gen/ogen"
-	"github.com/ysomad/gigafin/internal/logx"
+	"github.com/ysomad/gigafin/internal/logger"
 	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/service"
@@ -105,7 +105,7 @@ func (h *Handler) HandleBearerAuth(
 	if err != nil {
 		return ctx, err
 	}
-	logx.Add(ctx, slog.Int64("user_id", key.UserID), slog.Int64("key_id", key.ID))
+	logger.WithAttrs(ctx, slog.Int64("user_id", key.UserID), slog.Int64("key_id", key.ID))
 	return context.WithValue(ctx, keyCtx{}, key), nil
 }
 

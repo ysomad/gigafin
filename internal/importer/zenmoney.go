@@ -229,7 +229,7 @@ func parseZenMoneyAmounts(row domain.Record, get func(name string) string) (doma
 	if !row.IsTransfer() && row.Category == "" {
 		row.Category = _zenMoneyDefaultCategory
 	}
-	if !money.Valid(row.Currency) {
+	if !money.ValidCurrency(row.Currency) {
 		return domain.Record{}, domain.NewError(errors.ErrInvalid, "currency: unsupported currency %q", row.Currency)
 	}
 	if outAccount == "" && !outcome.IsZero() {

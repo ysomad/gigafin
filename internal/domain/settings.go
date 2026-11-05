@@ -37,7 +37,7 @@ func (s Settings) Validate() error {
 	if s.PrimaryCurrency == "" {
 		return NewError(errors.ErrInvalid, "primary currency: required with exchange rates on")
 	}
-	if !money.Valid(s.PrimaryCurrency) {
+	if !money.ValidCurrency(s.PrimaryCurrency) {
 		return NewError(errors.ErrInvalid, "primary currency: unknown %q", s.PrimaryCurrency)
 	}
 	return nil

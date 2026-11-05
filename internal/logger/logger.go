@@ -1,6 +1,4 @@
-// Package logx adds request-scoped attributes, such as the request and user IDs, to every
-// log record made with the request's context.
-package logx
+package logger
 
 import (
 	"context"
@@ -8,29 +6,24 @@ import (
 	"sync"
 )
 
-// RequestIDKey is the attribute key of the request ID.
 const RequestIDKey = "request_id"
 
 type ctxKey struct{}
 
-// attrs is mutable, so attributes added deep in a handler, such as the user ID, reach
-// records made by the middleware after the handler returns.
 type attrs struct {
 	mu        sync.Mutex
 	requestID string
 	list      []slog.Attr
 }
 
-// Start returns ctx with an empty attribute list of the request with id.
-func Start(ctx context.Context, requestID string) context.Context {
+func Context(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, &attrs{
 		requestID: requestID,
 		list:      []slog.Attr{slog.String(RequestIDKey, requestID)},
 	})
 }
 
-// Add appends attributes to the request of ctx. It does nothing outside a request.
-func Add(ctx context.Context, a ...slog.Attr) {
+func WithAttrs(ctx context.Context, a ...slog.Attr) {
 	r, ok := ctx.Value(ctxKey{}).(*attrs)
 	if !ok {
 		return
@@ -40,7 +33,6 @@ func Add(ctx context.Context, a ...slog.Attr) {
 	r.mu.Unlock()
 }
 
-// RequestID returns the ID of the request of ctx, or "" outside a request.
 func RequestID(ctx context.Context) string {
 	if r, ok := ctx.Value(ctxKey{}).(*attrs); ok {
 		return r.requestID
@@ -48,15 +40,12 @@ func RequestID(ctx context.Context) string {
 	return ""
 }
 
-// Handler adds the attributes of the record's request to every record.
 type Handler struct {
 	slog.Handler
 }
 
 var _ slog.Handler = Handler{}
 
-// Handle implements slog.Handler. It skips request attributes whose key the record
-// already has, such as a user_id logged by a service, so no key appears twice.
 func (h Handler) Handle(ctx context.Context, rec slog.Record) error {
 	r, ok := ctx.Value(ctxKey{}).(*attrs)
 	if !ok {
@@ -77,12 +66,10 @@ func (h Handler) Handle(ctx context.Context, rec slog.Record) error {
 	return h.Handler.Handle(ctx, rec)
 }
 
-// WithAttrs implements slog.Handler.
 func (h Handler) WithAttrs(a []slog.Attr) slog.Handler {
 	return Handler{h.Handler.WithAttrs(a)}
 }
 
-// WithGroup implements slog.Handler.
 func (h Handler) WithGroup(name string) slog.Handler {
 	return Handler{h.Handler.WithGroup(name)}
 }
