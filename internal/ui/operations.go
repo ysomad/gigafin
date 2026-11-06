@@ -23,17 +23,17 @@ type dayGroup struct {
 }
 
 type opsData struct {
-	Days       []dayGroup
-	MoreURL    string
-	Filter     domain.Filter
-	Filtered   bool
-	Accounts   []domain.Account
-	AccByID    map[int64]domain.Account
-	Categories []domain.Category
-	CatNames   map[int64]string
-	Tags       []string
-	// Totals are of all operations matching Filter, set when Filtered.
-	Totals []domain.CashFlow
+	Days     []dayGroup
+	MoreURL  string
+	Filter   domain.Filter
+	Filtered bool
+	// FilterCount is the number of Filter fields set in the filter dialog, all but Query.
+	FilterCount int
+	Accounts    []domain.Account
+	AccByID     map[int64]domain.Account
+	Categories  []domain.Category
+	CatNames    map[int64]string
+	Tags        []string
 	// RunURL runs rules on the operations matching Filter.
 	RunURL string
 	// Changed is the number of operations rules just changed, -1 when they did not run.
@@ -61,12 +61,17 @@ func (u *UI) filterFromQuery(q url.Values) (domain.Filter, error) {
 		Type     string `form:"type"`
 		Min      string `form:"min"`
 		Max      string `form:"max"`
-		Tag      string `form:"tag"`
+		Tags     string `form:"tags"` // comma-separated
 	}
 	if err := u.formDecoder.Decode(&in, q); err != nil {
 		return domain.Filter{}, fmt.Errorf("filter: %w: %w", err, errors.ErrInvalid)
 	}
-	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category, Tag: strings.TrimSpace(in.Tag)}
+	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category}
+	for tag := range strings.SplitSeq(in.Tags, ",") {
+		if tag = strings.TrimSpace(tag); tag != "" {
+			f.Tags = append(f.Tags, tag)
+		}
+	}
 	var err error
 	if in.From != "" {
 		if f.DateFrom, err = timex.ParseDate(in.From); err != nil {
@@ -141,6 +146,14 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 	for _, a := range accounts {
 		d.AccByID[a.ID] = a
 	}
+	for _, set := range []bool{
+		f.AccountID != 0, f.CategoryID != 0, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
+		f.AmountMin.Valid, f.AmountMax.Valid, len(f.Tags) > 0,
+	} {
+		if set {
+			d.FilterCount++
+		}
+	}
 	// negative counts are not shown
 	if n, err := strconv.Atoi(q.Get("changed")); err == nil {
 		d.Changed = n
@@ -158,11 +171,6 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 	}
 	if d.Tags, err = u.svc.Operations.Tags(r.Context(), user.ID); err != nil {
 		return err
-	}
-	if d.Filtered {
-		if d.Totals, err = u.svc.Operations.Totals(r.Context(), user.ID, f); err != nil {
-			return err
-		}
 	}
 	return u.render(
 		w,

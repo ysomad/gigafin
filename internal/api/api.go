@@ -677,7 +677,9 @@ func fromOperationQuery(req *ogen.OperationQuery) (domain.Filter, error) {
 		DateFrom:   req.DateFrom.Or(time.Time{}),
 		DateTo:     req.DateTo.Or(time.Time{}),
 		Query:      req.Query.Or(""),
-		Tag:        req.Tag.Or(""),
+	}
+	if tag, ok := req.Tag.Get(); ok && tag != "" {
+		f.Tags = []string{tag}
 	}
 	if v, ok := req.AmountMin.Get(); ok {
 		d, err := money.Parse(string(v))

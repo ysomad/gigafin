@@ -33,12 +33,11 @@
   {{range .Days}}
     {{if not .Continued}}<li class="text-light mt-4">{{dayTitle .Date}}</li>{{end}}
     {{range .Ops}}
-    <li class="card hstack justify-between">
+    <li class="card compact hstack justify-between">
       <a href="/operations/{{.ID}}/edit">
         <div>{{opTitle . $.CatNames}}</div>
         <div class="text-light">{{opSubtitle . $.CatNames $.AccByID}}</div>
       </a>
-      {{if .Tags}}<div class="hstack gap-1">{{range .Tags}}<a class="badge outline" href="/operations?tag={{.}}">{{.}}</a>{{end}}</div>{{end}}
       <div class="align-right"><span class="badge" data-variant="{{if eq (opClass .) "income"}}success{{else if eq (opClass .) "expense"}}danger{{end}}">{{opAmount .}}</span></div>
     </li>
     {{end}}
@@ -195,6 +194,6 @@ Categories for the category select. */}}
 {{if .Error}}<p role="alert" data-variant="danger">{{errText .Error}}</p>
 {{else if .Total}}
 <p>{{t "Matches %d operations, the latest:" .Total}}</p>
-<ul class="unstyled vstack">{{template "op-rows" .}}</ul>
+<ul class="unstyled vstack gap-1">{{template "op-rows" .}}</ul>
 {{else}}<p class="text-light">{{t "Matches no operations."}}</p>{{end}}
 {{end}}

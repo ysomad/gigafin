@@ -46,9 +46,11 @@ WHERE o.user_id = sqlc.arg(user_id)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
   AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)
   AND (abs(o.amount) <= (sqlc.narg(amount_max) ->> a.currency) OR sqlc.narg(amount_max) IS NULL)
+  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+  -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = sqlc.arg(user_id) AND t.name = sqlc.narg(tag))
-       OR sqlc.narg(tag) IS NULL)
+                WHERE t.user_id = sqlc.arg(user_id) AND instr(sqlc.narg(tags), ',' || t.name || ',') > 0)
+       OR sqlc.narg(tags) IS NULL)
   AND (o.date < sqlc.narg(before_date)
        OR (o.date = sqlc.narg(before_date) AND o.id < sqlc.narg(before_id))
        OR sqlc.narg(before_date) IS NULL)
@@ -74,9 +76,11 @@ WHERE o.user_id = sqlc.arg(user_id)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
   AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)
   AND (abs(o.amount) <= (sqlc.narg(amount_max) ->> a.currency) OR sqlc.narg(amount_max) IS NULL)
+  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+  -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = sqlc.arg(user_id) AND t.name = sqlc.narg(tag))
-       OR sqlc.narg(tag) IS NULL)
+                WHERE t.user_id = sqlc.arg(user_id) AND instr(sqlc.narg(tags), ',' || t.name || ',') > 0)
+       OR sqlc.narg(tags) IS NULL)
 GROUP BY o.type, a.currency;
 
 -- name: DeleteImportOperations :execrows

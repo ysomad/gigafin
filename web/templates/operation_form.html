@@ -8,7 +8,7 @@
   <a class="button{{if ne $d.Type "transfer"}} outline{{end}}"{{if eq $d.Type "transfer"}} aria-current="page"{{end}} href="/operations/new?type=transfer" data-variant="secondary">⇄ {{t "Transfer"}}</a>
 </div>
 {{end}}
-<form id="op-form-{{$d.Type}}" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
+<form id="op-form-{{$d.Type}}" class="form-compact" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
   {{if .Error}}<div data-field aria-invalid="true"><div class="error" role="status">{{errText .Error}}</div></div>{{end}}
   <input type="hidden" name="type" value="{{$d.Type}}">
   {{if $d.ImportID}}<input type="hidden" name="import_id" value="{{$d.ImportID}}">{{end}}
@@ -31,10 +31,11 @@
     {{end}}
     {{if or (eq $d.Type "expense") (eq $d.Type "income")}}
     <label data-field class="col-6">{{t "Category"}}
-      <select name="category"{{if $d.ID}} required{{end}}>
+      <select name="category" required aria-describedby="category-error-{{$d.Type}}">
         <option value="">—</option>
         {{template "category-options" (dict "Categories" $d.Categories "Selected" $d.CategoryID)}}
       </select>
+      <div id="category-error-{{$d.Type}}" class="error" role="status">{{t "Select a category."}}</div>
     </label>
     {{end}}
     <label data-field class="col-12">{{t "Amount"}}
@@ -43,11 +44,16 @@
     </label>
   </fieldset>
   <fieldset class="row mb-4" aria-label="{{t "Date and payee"}}">
-    <label data-field class="col-6">{{t "Date"}} <input type="date" name="date" value="{{$d.Date}}" required aria-describedby="date-error-{{$d.Type}}"><span id="date-error-{{$d.Type}}" class="error" role="status">{{t "Enter a valid date."}}</span></label>
-    <label data-field class="col-6">{{t "Time"}} <input type="time" name="time" value="{{$d.Time}}"></label>
+    <div data-field class="col-12">
+      <label for="date-{{$d.Type}}">{{t "Date"}}</label>
+      <fieldset class="group">
+        <input type="date" id="date-{{$d.Type}}" name="date" value="{{$d.Date}}" required aria-describedby="date-error-{{$d.Type}}">
+        <input type="time" name="time" value="{{$d.Time}}" aria-label="{{t "Time"}}">
+      </fieldset>
+      <span id="date-error-{{$d.Type}}" class="error" role="status">{{t "Enter a valid date."}}</span>
+    </div>
     <label data-field class="col-12">{{t "Payee"}}
-      <input name="payee" {{if not $d.ID}}aria-describedby="payee-hint-{{$d.Type}}"{{end}} value="{{$d.Payee}}" autocomplete="off"{{if not $d.ID}} hx-post="/operations/fill" hx-trigger="change" hx-select="#op-form-{{$d.Type}}" hx-target="closest form" hx-swap="outerHTML ignoreTitle:true"{{end}}>
-      {{if not $d.ID}}<small id="payee-hint-{{$d.Type}}" data-hint>{{t "Rules fill an empty category, note and tags from the payee."}}</small>{{end}}
+      <input name="payee" value="{{$d.Payee}}" autocomplete="off"{{if not $d.ID}} hx-post="/operations/fill" hx-trigger="change" hx-select="#op-form-{{$d.Type}}" hx-target="closest form" hx-swap="outerHTML ignoreTitle:true"{{end}}>
     </label>
   </fieldset>
   {{if and $d.SourcePayee (ne $d.SourcePayee $d.Payee)}}<p class="text-light">{{t "Bank payee"}}: {{$d.SourcePayee}}</p>{{end}}
@@ -64,7 +70,7 @@
 
   <div class="hstack mb-4">
     <button type="submit">{{t "Save"}}</button>
-    <a class="button outline" href="/operations" data-operation-cancel data-variant="secondary">{{t "Cancel"}}</a>
+    {{if $d.ID}}<a class="button outline" href="/operations" data-operation-cancel data-variant="secondary">{{t "Cancel"}}</a>{{end}}
   </div>
 </form>
 {{if and $d.ID (or (eq $d.Type "expense") (eq $d.Type "income"))}}

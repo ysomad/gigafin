@@ -67,7 +67,6 @@ func TestTemplatesWithoutDatabase(t *testing.T) {
 				{ID: 2, Type: "income", Currency: "RUB", Amount: amount},
 			}}},
 			MoreURL: "/operations?cursor=next",
-			Totals:  []domain.CashFlow{{Currency: "RUB", Income: amount}},
 		}},
 		{name: "operation-new", page: "operation_form", data: opForm{Type: "transfer"}},
 		{name: "operation-split", page: "operation_form", data: opForm{

@@ -1,10 +1,100 @@
 {{define "content"}}
 {{$d := .Data}}
-<div class="hstack mb-4">
-  <button type="button" commandfor="operation-dialog" command="show-modal">+ {{t "New operation"}}</button>
+<div class="hstack justify-between mb-4">
+  <ot-dropdown>
+    <menu class="buttons">
+      <li><button type="button" id="new-operation" commandfor="operation-dialog" command="show-modal">+ {{t "New operation"}}</button></li>
+      <li>
+        <button type="button" popovertarget="op-actions" aria-label="{{t "More actions"}}">▾</button>
+      </li>
+    </menu>
+    <menu popover id="op-actions">
+      <form method="post" action="{{$d.RunURL}}" hx-confirm="{{if $d.Filtered}}{{t "Run rules on the filtered operations?"}}{{else}}{{t "Run rules on all operations?"}}{{end}}">
+        <button type="submit" role="menuitem" class="ghost">{{t "Run rules"}}</button>
+      </form>
+      <a href="/rules" role="menuitem" class="button ghost">{{t "Rules"}}</a>
+    </menu>
+  </ot-dropdown>
+  <form method="get" action="/operations">
+    <div class="hstack">
+      <fieldset class="group">
+        <input type="search" name="q" value="{{$d.Filter.Query}}" placeholder="{{t "payee or note"}}" aria-label="{{t "Search"}}">
+        <button type="submit">{{t "Search"}}</button>
+      </fieldset>
+      <ot-dropdown>
+        <button type="button" class="outline" popovertarget="filter-popover">
+          {{t "Filter"}}{{if $d.FilterCount}} <span class="badge">{{$d.FilterCount}}</span>{{end}}
+        </button>
+        <article class="card p-4 form-compact" popover id="filter-popover">
+          <div class="row">
+            <label data-field class="col-6">{{t "Account"}}
+              <select name="account">
+                <option value="">{{t "All"}}</option>
+                {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.Filter.AccountID}} selected{{end}}>{{.Name}}</option>{{end}}
+              </select>
+            </label>
+            <label data-field class="col-6">{{t "Type"}}
+              <select name="type">
+                <option value="">{{t "All"}}</option>
+                {{range $t := opTypes}}<option value="{{$t}}"{{if eq $t $d.Filter.Type}} selected{{end}}>{{t (print $t)}}</option>{{end}}
+              </select>
+            </label>
+            <label data-field class="col-12">{{t "Category"}}
+              <select name="category">
+                <option value="">{{t "All"}}</option>
+                {{range $d.Categories}}
+                  <option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{.Name}} ({{t (print .Kind)}})</option>
+                  {{range .Children}}<option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>&nbsp;&nbsp;{{.Name}}</option>{{end}}
+                {{end}}
+              </select>
+            </label>
+            <div data-field class="col-12">
+              <label for="filter-from">{{t "Date"}}</label>
+              <fieldset class="group">
+                <input type="date" id="filter-from" name="from" value="{{date $d.Filter.DateFrom}}" aria-label="{{t "From"}}">
+                <label for="filter-to" aria-hidden="true">—</label>
+                <input type="date" id="filter-to" name="to" value="{{date $d.Filter.DateTo}}" aria-label="{{t "To"}}">
+              </fieldset>
+            </div>
+            <div data-field class="col-12">
+              <label for="filter-min">{{t "Amount"}}</label>
+              <fieldset class="group">
+                <input id="filter-min" name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "any"}}" aria-label="{{t "Amount from"}}">
+                <label for="filter-max" aria-hidden="true">—</label>
+                <input id="filter-max" name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "any"}}" aria-label="{{t "Amount to"}}">
+              </fieldset>
+            </div>
+            {{if $d.Tags}}
+            {{$tags := ""}}{{range $i, $tag := $d.Filter.Tags}}{{if $i}}{{$tags = print $tags ", "}}{{end}}{{$tags = print $tags $tag}}{{end}}
+            <div data-field data-operation-tags class="col-12">
+              <label for="filter-tags">{{t "Tags"}}</label>
+              <ot-taginput value="{{$tags}}">
+                <input id="filter-tags" list="filter-tag-list" autocomplete="off" placeholder="{{t "All"}}">
+                <datalist id="filter-tag-list"></datalist>
+              </ot-taginput>
+              <input type="hidden" name="tags" value="{{$tags}}">
+              <template data-tag-suggestions>{{range $d.Tags}}<option value="{{.}}"></option>{{end}}</template>
+            </div>
+            {{end}}
+          </div>
+          <footer class="hstack justify-end mt-4">
+            <button type="button" class="outline" popovertarget="filter-popover" popovertargetaction="hide">{{t "Close"}}</button>
+            <button type="submit">{{t "Apply"}}</button>
+          </footer>
+        </article>
+      </ot-dropdown>
+      {{if $d.Filtered}}<a class="button ghost" href="/operations">{{t "Reset"}}</a>{{end}}
+    </div>
+  </form>
 </div>
-<dialog id="operation-dialog" closedby="any" aria-labelledby="operation-dialog-title">
-  <header><h2 id="operation-dialog-title">{{t "New operation"}}</h2></header>
+{{if ge $d.Changed 0}}<p role="status" class="badge mb-4" data-variant="success">{{t "Rules changed %d operations." $d.Changed}}</p>{{end}}
+<dialog id="operation-dialog" class="fullscreen" closedby="any" aria-labelledby="operation-dialog-title">
+  <header>
+    <div class="hstack justify-between">
+      <h2 id="operation-dialog-title">{{t "New operation"}}</h2>
+      <button type="button" class="ghost small" commandfor="operation-dialog" command="close" aria-label="{{t "Close"}}">✕</button>
+    </div>
+  </header>
   <section>
   <ot-tabs>
     <div role="tablist" aria-label="{{t "Type"}}">
@@ -13,91 +103,21 @@
       <button type="button" role="tab">⇄ {{t "Transfer"}}</button>
     </div>
     {{range $type := opTypes}}{{if ne $type "adjustment"}}
-    <div role="tabpanel" hx-get="/operations/new?type={{$type}}" hx-trigger="toggle from:#operation-dialog once" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">
+    <div role="tabpanel" hx-get="/operations/new?type={{$type}}" hx-trigger="click from:#new-operation once" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">
       <p role="status">{{t "Loading…"}}</p>
       <button type="button" class="outline" hx-get="/operations/new?type={{$type}}" hx-target="closest [role=tabpanel]" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">{{t "Retry"}}</button>
     </div>
     {{end}}{{end}}
   </ot-tabs>
   </section>
-  <footer><button type="button" class="outline" commandfor="operation-dialog" command="close">{{t "Close"}}</button></footer>
 </dialog>
 
-<details{{if $d.Filtered}} open{{end}}>
-  <summary>{{t "Filter"}}</summary>
-  <form method="get" action="/operations">
-    <div class="row mb-4">
-      <label data-field class="col-4">{{t "Account"}}
-        <select name="account">
-          <option value="">{{t "All"}}</option>
-          {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.Filter.AccountID}} selected{{end}}>{{.Name}}</option>{{end}}
-        </select>
-      </label>
-      <label data-field class="col-4">{{t "Category"}}
-        <select name="category">
-          <option value="">{{t "All"}}</option>
-          {{range $d.Categories}}
-            <option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{.Name}} ({{t (print .Kind)}})</option>
-            {{range .Children}}<option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>&nbsp;&nbsp;{{.Name}}</option>{{end}}
-          {{end}}
-        </select>
-      </label>
-      <label data-field class="col-4">{{t "Type"}}
-        <select name="type">
-          <option value="">{{t "All"}}</option>
-          {{range $t := opTypes}}<option value="{{$t}}"{{if eq $t $d.Filter.Type}} selected{{end}}>{{t (print $t)}}</option>{{end}}
-        </select>
-      </label>
-    </div>
-    <div class="row mb-4">
-      <label data-field class="col-4">{{t "From"}} <input type="date" name="from" value="{{date $d.Filter.DateFrom}}"></label>
-      <label data-field class="col-4">{{t "To"}} <input type="date" name="to" value="{{date $d.Filter.DateTo}}"></label>
-      <label data-field class="col-4">{{t "Search"}} <input type="search" name="q" value="{{$d.Filter.Query}}" placeholder="{{t "payee or note"}}"></label>
-    </div>
-    <div class="row mb-4">
-      <label data-field class="col-4">{{t "Amount from"}} <input name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
-      <label data-field class="col-4">{{t "Amount to"}} <input name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "any"}}"></label>
-      {{if $d.Tags}}
-      <label data-field class="col-4">{{t "Tag"}}
-        <select name="tag">
-          <option value="">{{t "All"}}</option>
-          {{range $d.Tags}}<option value="{{.}}"{{if eq . $d.Filter.Tag}} selected{{end}}>{{.}}</option>{{end}}
-        </select>
-      </label>
-      {{end}}
-    </div>
-    <div class="hstack mb-4">
-      <button type="submit">{{t "Apply"}}</button>
-      <a class="button outline" href="/operations" data-variant="secondary">{{t "Reset"}}</a>
-    </div>
-  </form>
-</details>
-<form method="post" action="{{$d.RunURL}}" class="hstack mb-4" hx-confirm="{{if $d.Filtered}}{{t "Run rules on the filtered operations?"}}{{else}}{{t "Run rules on all operations?"}}{{end}}">
-  <button type="submit" class="outline small" data-variant="secondary">{{t "Run rules"}}</button>
-  <a href="/rules">{{t "Rules"}}</a>
-</form>
-{{if ge $d.Changed 0}}<p role="status" class="badge" data-variant="success">{{t "Rules changed %d operations." $d.Changed}}</p>{{end}}
-
-{{if $d.Totals}}
-<div class="row mb-6">
-  {{range $d.Totals}}
-  <article class="card col-6">
-    <header><h3>{{t "Filtered"}} · {{.Currency}}</h3></header>
-    <h2>{{money .Net .Currency}}</h2>
-    <dl>
-      <dt>{{t "Income"}}</dt><dd><span class="badge" data-variant="success">+{{money .Income .Currency}}</span></dd>
-      <dt>{{t "Expense"}}</dt><dd><span class="badge" data-variant="danger">−{{money .Expense .Currency}}</span></dd>
-    </dl>
-  </article>
-  {{end}}
-</div>
-{{end}}
 
 {{if $d.Days}}
-<ul class="unstyled vstack">{{template "op-rows" $d}}</ul>
+<ul class="unstyled vstack gap-1">{{template "op-rows" $d}}</ul>
 {{else}}
 <p class="text-light">{{t "No operations yet."}}{{if not $d.Filtered}} {{t "Add one above or"}} <a href="/imports">{{t "import"}}</a>.{{end}}</p>
 {{end}}
 {{end}}
 
-{{define "to-top"}}{{if .Data.Days}}<a class="button" href="#top" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}
+{{define "to-top"}}{{if .Data.Days}}<a class="button to-top" href="#top" hx-boost="false" hidden aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}

@@ -604,7 +604,7 @@ func TestTags(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"Vacation 2026", "food"}, tags, "a case variant joins the tag")
 
-	vacation := domain.Filter{Tag: "Vacation 2026"}
+	vacation := domain.Filter{Tags: []string{"Vacation 2026"}}
 	ops, _, err := f.svc.Operations.List(ctx, f.userID, vacation, pagination.Params{})
 	require.NoError(t, err)
 	assert.Len(t, ops, 2)

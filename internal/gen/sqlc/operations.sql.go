@@ -184,8 +184,10 @@ WHERE o.user_id = ?1
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
   AND (abs(o.amount) >= (?8 ->> a.currency) OR ?8 IS NULL)
   AND (abs(o.amount) <= (?9 ->> a.currency) OR ?9 IS NULL)
+  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+  -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND t.name = ?10)
+                WHERE t.user_id = ?1 AND instr(?10, ',' || t.name || ',') > 0)
        OR ?10 IS NULL)
   AND (o.date < ?11
        OR (o.date = ?11 AND o.id < ?12)
@@ -204,7 +206,7 @@ type ListOperationsParams struct {
 	Query      sql.NullString
 	AmountMin  sql.NullString
 	AmountMax  sql.NullString
-	Tag        sql.NullString
+	Tags       sql.NullString
 	BeforeDate sql.NullString
 	BeforeID   sql.NullInt64
 	Lim        int64
@@ -226,7 +228,7 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 		arg.Query,
 		arg.AmountMin,
 		arg.AmountMax,
-		arg.Tag,
+		arg.Tags,
 		arg.BeforeDate,
 		arg.BeforeID,
 		arg.Lim,
@@ -437,8 +439,10 @@ WHERE o.user_id = ?1
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
   AND (abs(o.amount) >= (?8 ->> a.currency) OR ?8 IS NULL)
   AND (abs(o.amount) <= (?9 ->> a.currency) OR ?9 IS NULL)
+  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+  -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND t.name = ?10)
+                WHERE t.user_id = ?1 AND instr(?10, ',' || t.name || ',') > 0)
        OR ?10 IS NULL)
 GROUP BY o.type, a.currency
 `
@@ -453,7 +457,7 @@ type SumFilteredOperationsParams struct {
 	Query      sql.NullString
 	AmountMin  sql.NullString
 	AmountMax  sql.NullString
-	Tag        sql.NullString
+	Tags       sql.NullString
 }
 
 type SumFilteredOperationsRow struct {
@@ -475,7 +479,7 @@ func (q *Queries) SumFilteredOperations(ctx context.Context, arg SumFilteredOper
 		arg.Query,
 		arg.AmountMin,
 		arg.AmountMax,
-		arg.Tag,
+		arg.Tags,
 	)
 	if err != nil {
 		return nil, err

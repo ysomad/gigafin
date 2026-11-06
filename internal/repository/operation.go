@@ -242,7 +242,7 @@ func (r *Operations) List(
 		DateFrom:   fp.DateFrom,
 		DateTo:     fp.DateTo,
 		Query:      fp.Query,
-		Tag:        fp.Tag,
+		Tags:       fp.Tags,
 		AmountMin:  fp.AmountMin,
 		AmountMax:  fp.AmountMax,
 		Lim:        int64(limit),
@@ -327,7 +327,7 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 		DateFrom:   sql.NullString{String: timex.FormatDate(f.DateFrom), Valid: !f.DateFrom.IsZero()},
 		DateTo:     sql.NullString{String: timex.FormatDate(f.DateTo), Valid: !f.DateTo.IsZero()},
 		Query:      sql.NullString{String: query, Valid: query != ""},
-		Tag:        sql.NullString{String: f.Tag, Valid: f.Tag != ""},
+		Tags:       sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
 		AmountMin:  bounds[0],
 		AmountMax:  bounds[1],
 	}, nil

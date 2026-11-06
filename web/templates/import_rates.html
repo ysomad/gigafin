@@ -37,4 +37,4 @@
 {{end}}
 {{end}}
 
-{{define "to-top"}}{{if not .Data.Done}}<a class="button" href="#top" hx-boost="false" aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}
+{{define "to-top"}}{{if not .Data.Done}}<a class="button to-top" href="#top" hx-boost="false" hidden aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}{{end}}

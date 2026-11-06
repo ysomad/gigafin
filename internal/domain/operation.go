@@ -371,14 +371,14 @@ type Filter struct {
 	// currency, unset when not Valid.
 	AmountMin money.NullAmount
 	AmountMax money.NullAmount
-	// Tag is a tag name, matched exactly.
-	Tag string
+	// Tags are tag names, matched exactly; an operation matches any of them.
+	Tags []string
 }
 
 // Filtered reports whether any field is set.
 func (f Filter) Filtered() bool {
 	return f.AccountID != 0 || f.CategoryID != 0 || f.Type != "" || !f.DateFrom.IsZero() ||
-		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || f.Tag != ""
+		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || len(f.Tags) > 0
 }
 
 // Validate checks that amount bounds are not negative and min is not above max.

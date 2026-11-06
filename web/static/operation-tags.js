@@ -19,13 +19,6 @@
     dialog.close();
   }, true);
 
-  // Let native constraints drive Oat's field error presentation.
-  document.addEventListener('invalid', e => {
-    if (e.target.closest('form[id^="op-form-"]')) {
-      e.target.setAttribute('aria-invalid', 'true');
-    }
-  }, true);
-
   for (const event of ['input', 'change']) {
     document.addEventListener(event, e => {
       const form = e.target.closest?.('form[id^="op-form-"]');
@@ -42,9 +35,6 @@
         if (destination.hasAttribute('aria-invalid')) {
           destination.setAttribute('aria-invalid', String(!destination.validity.valid));
         }
-      }
-      if (e.target.validity && e.target.hasAttribute('aria-invalid')) {
-        e.target.setAttribute('aria-invalid', String(!e.target.validity.valid));
       }
     });
   }
