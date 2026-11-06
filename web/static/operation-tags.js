@@ -10,15 +10,6 @@
     return value;
   }
 
-  document.addEventListener('click', e => {
-    const cancel = e.target.closest?.('[data-operation-cancel]');
-    const dialog = cancel?.closest('dialog');
-    if (!dialog) return;
-    e.preventDefault();
-    e.stopPropagation();
-    dialog.close();
-  }, true);
-
   for (const event of ['input', 'change']) {
     document.addEventListener(event, e => {
       const form = e.target.closest?.('form[id^="op-form-"]');
@@ -26,12 +17,12 @@
       const amount = form.elements.amount;
       if (e.target === amount && form.elements.type.value !== 'adjustment') {
         amount.setCustomValidity(amount.value && Number(amount.value.replace(',', '.')) <= 0
-          ? form.querySelector(`#amount-error-${form.elements.type.value}`).textContent : '');
+          ? form.querySelector('[id^="amount-error-"]').textContent : '');
       }
       const destination = form.elements.to_account;
       if (destination && ['account', 'to_account'].includes(e.target.name)) {
         destination.setCustomValidity(destination.value === form.elements.account.value
-          ? form.querySelector(`#to-account-error-${form.elements.type.value}`).textContent : '');
+          ? form.querySelector('[id^="to-account-error-"]').textContent : '');
         if (destination.hasAttribute('aria-invalid')) {
           destination.setAttribute('aria-invalid', String(!destination.validity.valid));
         }

@@ -3,7 +3,7 @@
 <div class="hstack justify-between mb-4">
   <ot-dropdown>
     <menu class="buttons">
-      <li><button type="button" id="new-operation" commandfor="operation-dialog" command="show-modal">+ {{t "New operation"}}</button></li>
+      <li><a class="button" href="/operations/new">+ {{t "New operation"}}</a></li>
       <li>
         <button type="button" popovertarget="op-actions" aria-label="{{t "More actions"}}">▾</button>
       </li>
@@ -42,9 +42,9 @@
             <label data-field class="col-12">{{t "Category"}}
               <select name="category">
                 <option value="">{{t "All"}}</option>
-                {{range $d.Categories}}
+                {{range $parent := $d.Categories}}
                   <option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{.Name}} ({{t (print .Kind)}})</option>
-                  {{range .Children}}<option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>&nbsp;&nbsp;{{.Name}}</option>{{end}}
+                  {{range .Children}}<option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{$parent.Name}} / {{.Name}}</option>{{end}}
                 {{end}}
               </select>
             </label>
@@ -59,9 +59,9 @@
             <div data-field class="col-12">
               <label for="filter-min">{{t "Amount"}}</label>
               <fieldset class="group">
-                <input id="filter-min" name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "any"}}" aria-label="{{t "Amount from"}}">
+                <input id="filter-min" name="min" inputmode="decimal" value="{{if $d.Filter.AmountMin.Valid}}{{amountInput $d.Filter.AmountMin.Amount.String}}{{end}}" placeholder="{{t "min"}}" aria-label="{{t "Amount from"}}">
                 <label for="filter-max" aria-hidden="true">—</label>
-                <input id="filter-max" name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "any"}}" aria-label="{{t "Amount to"}}">
+                <input id="filter-max" name="max" inputmode="decimal" value="{{if $d.Filter.AmountMax.Valid}}{{amountInput $d.Filter.AmountMax.Amount.String}}{{end}}" placeholder="{{t "max"}}" aria-label="{{t "Amount to"}}">
               </fieldset>
             </div>
             {{if $d.Tags}}
@@ -88,31 +88,6 @@
   </form>
 </div>
 {{if ge $d.Changed 0}}<p role="status" class="badge mb-4" data-variant="success">{{t "Rules changed %d operations." $d.Changed}}</p>{{end}}
-<dialog id="operation-dialog" class="fullscreen" closedby="any" aria-labelledby="operation-dialog-title">
-  <header>
-    <div class="hstack justify-between">
-      <h2 id="operation-dialog-title">{{t "New operation"}}</h2>
-      <button type="button" class="ghost small" commandfor="operation-dialog" command="close" aria-label="{{t "Close"}}">✕</button>
-    </div>
-  </header>
-  <section>
-  <ot-tabs>
-    <div role="tablist" aria-label="{{t "Type"}}">
-      <button type="button" role="tab">− {{t "Expense"}}</button>
-      <button type="button" role="tab">+ {{t "Income"}}</button>
-      <button type="button" role="tab">⇄ {{t "Transfer"}}</button>
-    </div>
-    {{range $type := opTypes}}{{if ne $type "adjustment"}}
-    <div role="tabpanel" hx-get="/operations/new?type={{$type}}" hx-trigger="click from:#new-operation once" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">
-      <p role="status">{{t "Loading…"}}</p>
-      <button type="button" class="outline" hx-get="/operations/new?type={{$type}}" hx-target="closest [role=tabpanel]" hx-select="#op-form-{{$type}}" hx-swap="innerHTML ignoreTitle:true">{{t "Retry"}}</button>
-    </div>
-    {{end}}{{end}}
-  </ot-tabs>
-  </section>
-</dialog>
-
-
 {{if $d.Days}}
 <ul class="unstyled vstack gap-1">{{template "op-rows" $d}}</ul>
 {{else}}

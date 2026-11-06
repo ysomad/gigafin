@@ -1,31 +1,31 @@
 {{define "category-options"}}
-  {{range .Categories}}
+  {{range $parent := .Categories}}
     {{if or (not .Archived) (eq .ID $.Selected)}}
     <option value="{{.ID}}"{{if eq .ID $.Selected}} selected{{end}}>{{.Name}}</option>
     {{end}}
     {{range .Children}}
       {{if or (not .Archived) (eq .ID $.Selected)}}
-      <option value="{{.ID}}"{{if eq .ID $.Selected}} selected{{end}}>&nbsp;&nbsp;&nbsp;{{.Name}}</option>
+      <option value="{{.ID}}"{{if eq .ID $.Selected}} selected{{end}}>{{$parent.Name}} / {{.Name}}</option>
       {{end}}
     {{end}}
   {{end}}
 {{end}}
 
 {{define "split"}}
-<div class="split row mb-4">
-  <label data-field class="col-4">{{t "Category"}}
+<div class="split row">
+  <label data-field class="col-6">{{t "Category"}}
     <select name="split_category" required>
       <option value="">—</option>
       {{template "category-options" (dict "Categories" .Categories "Selected" .Split.CategoryID)}}
     </select>
   </label>
-  <label data-field class="col-4">{{t "Amount"}}
+  <label data-field class="col-6">{{t "Amount"}}
     <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}" required>
   </label>
-  <label data-field class="col-4">{{t "Note"}}
-    <input name="split_note" value="{{.Split.Note}}">
-  </label>
-  <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .split" hx-swap="delete" aria-label="{{t "Remove part"}}" data-variant="secondary">✕</button></div>
+  <fieldset class="group col-12">
+    <input name="split_note" value="{{.Split.Note}}" placeholder="{{t "Note"}}" aria-label="{{t "Note"}}">
+    <button type="button" class="outline" data-split-remove aria-label="{{t "Remove part"}}" data-variant="secondary">✕</button>
+  </fieldset>
 </div>
 {{end}}
 

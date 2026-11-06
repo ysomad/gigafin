@@ -14,9 +14,9 @@
   <div class="row mb-4">
     <label data-field class="col-4">{{t "Category"}}
       <select name="category" required>
-        {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}
+        {{range $parent := $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}
           <option value="{{.ID}}">{{.Name}}</option>
-          {{range .Children}}{{if not .Archived}}<option value="{{.ID}}">&nbsp;&nbsp;{{.Name}}</option>{{end}}{{end}}
+          {{range .Children}}{{if not .Archived}}<option value="{{.ID}}">{{$parent.Name}} / {{.Name}}</option>{{end}}{{end}}
         {{end}}{{end}}
       </select>
     </label>

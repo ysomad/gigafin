@@ -16,7 +16,7 @@
   <fieldset class="row mb-4" aria-label="{{t "Operation details"}}">
     <label data-field class="col-6">{{if eq $d.Type "transfer"}}{{t "From"}}{{else}}{{t "Account"}}{{end}}
       <select name="account" required aria-describedby="account-error-{{$d.Type}}">
-        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.AccountID}} selected{{end}}>{{.Name}} ({{.Currency}})</option>{{end}}
+        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.AccountID}} selected{{end}}>{{.Name}} ({{if $d.ID}}{{.Currency}}{{else}}{{money .Balance .Currency}} {{.Currency}}{{end}})</option>{{end}}
       </select>
       <div id="account-error-{{$d.Type}}" class="error" role="status">{{t "Select an account."}}</div>
     </label>
@@ -24,7 +24,7 @@
     <label data-field class="col-6">{{t "To"}}
       <select name="to_account" required aria-describedby="to-account-error-{{$d.Type}}">
         <option value="">—</option>
-        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.ToAccountID}} selected{{end}}>{{.Name}} ({{.Currency}})</option>{{end}}
+        {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.ToAccountID}} selected{{end}}>{{.Name}} ({{if $d.ID}}{{.Currency}}{{else}}{{money .Balance .Currency}} {{.Currency}}{{end}})</option>{{end}}
       </select>
       <div id="to-account-error-{{$d.Type}}" class="error" role="status">{{t "Select a different destination account."}}</div>
     </label>
@@ -68,31 +68,21 @@
     <template data-tag-suggestions>{{range $d.AllTags}}<option value="{{.}}"></option>{{end}}</template>
   </div>
 
-  <div class="hstack mb-4">
-    <button type="submit">{{t "Save"}}</button>
-    {{if $d.ID}}<a class="button outline" href="/operations" data-operation-cancel data-variant="secondary">{{t "Cancel"}}</a>{{end}}
+  <div class="hstack justify-between">
+    <div class="hstack">
+      <button type="submit">{{t "Save"}}</button>
+      {{if and $d.ID (or (eq $d.Type "expense") (eq $d.Type "income"))}}<a class="button outline" href="/operations/{{$d.ID}}/split" data-variant="secondary">{{t "Split"}}</a>{{end}}
+      {{if $d.ID}}<a class="button outline" href="/operations" data-variant="secondary">{{t "Cancel"}}</a>{{end}}
+    </div>
+    {{if $d.ID}}<button type="submit" form="op-delete" class="outline" data-variant="danger">{{t "Delete"}}</button>{{end}}
   </div>
 </form>
-{{if and $d.ID (or (eq $d.Type "expense") (eq $d.Type "income"))}}
-<h2 id="split">{{t "Split"}}</h2>
-{{if $d.OriginID}}<p class="text-light">{{t "Part of a split. Splitting it again adds parts to the same split."}}</p>{{end}}
-{{if $d.SplitError}}<p role="alert" data-variant="danger">{{errText $d.SplitError}}</p>{{end}}
-<form method="post" action="/operations/{{$d.ID}}/split">
-  <p class="text-light">{{t "Divide the saved amount between categories. Each part becomes an operation of its own."}}</p>
-  <div id="splits">
-    {{range $d.Parts}}{{template "split" (dict "Categories" $d.Categories "Split" .)}}{{end}}
-  </div>
-  <div class="hstack mb-4">
-    <button type="button" class="outline small" hx-get="/operations/split?type={{$d.Type}}" hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ {{t "Add part"}}</button>
-    <button type="submit">{{t "Split"}}</button>
-  </div>
-</form>
-{{end}}
 {{if $d.ID}}
-<form method="post" action="/operations/{{$d.ID}}/delete" hx-confirm="{{t "Delete this operation?"}}">
-  <button type="submit" class="outline" data-variant="secondary">{{t "Delete operation"}}</button>
-</form>
-{{if $d.Payee}}<p><a href="{{$d.RuleURL}}">{{t "Create a rule for this payee"}}</a></p>{{end}}
-{{if $d.ImportID}}<p class="text-light">{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a>.</p>{{end}}
+<form id="op-delete" method="post" action="/operations/{{$d.ID}}/delete" hx-confirm="{{t "Delete this operation?"}}"></form>
+{{if or $d.Payee $d.ImportID}}<p class="text-light mt-4">
+  {{if $d.Payee}}<a href="{{$d.RuleURL}}">{{t "Create a rule for this payee"}}</a>{{end}}
+  {{if and $d.Payee $d.ImportID}} · {{end}}
+  {{if $d.ImportID}}{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a>{{end}}
+</p>{{end}}
 {{end}}
 {{end}}

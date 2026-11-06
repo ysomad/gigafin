@@ -209,7 +209,7 @@ type opForm struct {
 	RuleURL string
 	// Tags are comma separated names.
 	Tags string `form:"tags"`
-	// Parts are the rows of the split form of a saved expense or income.
+	// Parts are the rows of the split page of a saved expense or income.
 	Parts      []splitForm
 	SplitError error
 	Accounts   []domain.Account
@@ -241,9 +241,6 @@ func (u *UI) fillForm(r *http.Request, user domain.User, f *opForm) error {
 			kind = domain.KindIncome
 		}
 		f.Categories = domain.ByKind(tree, kind)
-		if f.ID != 0 && len(f.Parts) == 0 {
-			f.Parts = []splitForm{{CategoryID: f.CategoryID, Amount: f.Amount}, {}}
-		}
 	}
 	return nil
 }
@@ -342,14 +339,6 @@ func (u *UI) editOperation(w http.ResponseWriter, r *http.Request, user domain.U
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	return u.renderEdit(w, r, user, id, http.StatusOK, nil, nil)
-}
-
-// renderEdit renders the edit form of operation id with the split form showing parts
-// and splitErr, or the operation as the first part when parts is empty.
-func (u *UI) renderEdit(
-	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, parts []splitForm, splitErr error,
-) error {
 	op, err := u.svc.Operations.Get(r.Context(), user.ID, id)
 	if err != nil {
 		return err
@@ -369,8 +358,6 @@ func (u *UI) renderEdit(
 		Note:        op.Note,
 		Tags:        strings.Join(op.Tags, ", "),
 		SourcePayee: op.SourcePayee,
-		Parts:       parts,
-		SplitError:  splitErr,
 	}
 	rq := url.Values{}
 	rq.Set("payee", op.Payee)
@@ -378,7 +365,52 @@ func (u *UI) renderEdit(
 		rq.Set("category", strconv.FormatInt(op.CategoryID, 10))
 	}
 	f.RuleURL = "/rules/new?" + rq.Encode()
-	return u.renderForm(w, r, user, status, f, nil)
+	return u.renderForm(w, r, user, http.StatusOK, f, nil)
+}
+
+func (u *UI) splitOperationPage(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		return errors.ErrNotFound
+	}
+	return u.renderSplit(w, r, user, id, http.StatusOK, nil, nil)
+}
+
+// renderSplit renders the split page of expense or income id with parts and splitErr,
+// or the operation as the first part when parts is empty.
+func (u *UI) renderSplit(
+	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, parts []splitForm, splitErr error,
+) error {
+	op, err := u.svc.Operations.Get(r.Context(), user.ID, id)
+	if err != nil {
+		return err
+	}
+	kind := domain.KindExpense
+	switch op.Type {
+	case domain.OpExpense:
+	case domain.OpIncome:
+		kind = domain.KindIncome
+	default:
+		return errors.ErrNotFound
+	}
+	tree, err := u.svc.Categories.Tree(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	amount := op.Amount.Fixed(op.Currency)
+	if len(parts) == 0 {
+		parts = []splitForm{{CategoryID: op.CategoryID, Amount: amount}, {}}
+	}
+	return u.render(w, r, status, "operation_split", view{User: &user, Nav: "operations", Title: "Split", Data: opForm{
+		ID:         op.ID,
+		OriginID:   op.OriginID,
+		Type:       op.Type,
+		Amount:     amount,
+		Payee:      op.Payee,
+		Parts:      parts,
+		SplitError: splitErr,
+		Categories: domain.ByKind(tree, kind),
+	}})
 }
 
 func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -422,7 +454,7 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 		_, err = u.svc.Operations.Split(r.Context(), user.ID, id, parts)
 	}
 	if isUserError(err) {
-		return u.renderEdit(w, r, user, id, http.StatusUnprocessableEntity, rows, err)
+		return u.renderSplit(w, r, user, id, http.StatusUnprocessableEntity, rows, err)
 	}
 	if err != nil {
 		return err

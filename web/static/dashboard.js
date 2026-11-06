@@ -57,15 +57,17 @@
         height: 220,
         cursor: { points: { show: false }, drag: { x: false, y: false } },
         hooks: { ready: [current], setCursor: [current] },
+        // the net worth line has no fill: give every legend marker its series color
+        legend: { markers: { fill: (u, i) => u.series[i].stroke(u, i) } },
         scales: { x: { time: true, range: (u, min, max) => [min - halfMonth, max + halfMonth] } },
         axes: [
           { ...axis, grid: { show: false }, splits: (u) => u.data[0], values: (u, ts) => ts.map((t) => new Date(t * 1000).toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })) },
-          { ...axis, size: 50, values: (u, vs) => vs.map((v) => compact.format(v)) },
+          { ...axis, size: 70, values: (u, vs) => vs.map((v) => compact.format(v)) },
           // net worth dwarfs a month of income or expense: its own scale, no grid
-          ...(networth ? [{ ...axis, scale: 'networth', side: 1, size: 50, grid: { show: false }, values: (u, vs) => vs.map((v) => compact.format(v)) }] : []),
+          ...(networth ? [{ ...axis, scale: 'networth', side: 1, size: 70, grid: { show: false }, values: (u, vs) => vs.map((v) => compact.format(v)) }] : []),
         ],
         series: [
-          { value: (u, t) => (t == null ? '' : new Date(t * 1000).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) },
+          { label: label.labelMonth || 'Month', value: (u, t) => (t == null ? '' : new Date(t * 1000).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) },
           { label: label.labelIncome || 'Income', ...bars(palette.success, -1, full) },
           { label: label.labelExpense || 'Expense', ...bars(palette.danger, 1, full) },
           ...(networth ? [{ label: label.labelBalance || 'Net worth', scale: 'networth', stroke: palette.primary, width: 2, points: { size: 5 }, value: (u, v) => (v == null ? '' : full.format(v)) }] : []),

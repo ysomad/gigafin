@@ -233,6 +233,9 @@ func TestPagesAndFlows(t *testing.T) {
 	status, body = b.get(opPath + "/edit")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `value="150.25"`)
+	assert.Contains(t, body, `href="`+opPath+`/split"`)
+	status, body = b.get(opPath + "/split")
+	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `name="split_category"`)
 
 	status, body = b.post(opPath+"/split", url.Values{
@@ -257,7 +260,7 @@ func TestPagesAndFlows(t *testing.T) {
 	ops, _, err = f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})
 	require.NoError(t, err)
 	require.Len(t, ops, 2)
-	status, body = b.get(opPath + "/edit")
+	status, body = b.get(opPath + "/split")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "Part of a split")
 

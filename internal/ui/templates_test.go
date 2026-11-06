@@ -69,7 +69,7 @@ func TestTemplatesWithoutDatabase(t *testing.T) {
 			MoreURL: "/operations?cursor=next",
 		}},
 		{name: "operation-new", page: "operation_form", data: opForm{Type: "transfer"}},
-		{name: "operation-split", page: "operation_form", data: opForm{
+		{name: "operation-split", page: "operation_split", data: opForm{
 			ID: 1, Type: "expense", Parts: []splitForm{{Amount: "1"}},
 		}},
 		{name: "accounts", page: "accounts", data: accountsData{

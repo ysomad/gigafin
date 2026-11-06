@@ -58,23 +58,6 @@
   }
 }
 
-/* While a modal dialog is open only the dialog scrolls, not the page behind it. */
-html:has(dialog:modal) {
-  overflow: hidden;
-}
-
-/* Dialog that fills the screen on phones. */
-@media (max-width: 768px) {
-  dialog.fullscreen {
-    width: 100%;
-    max-width: none;
-    height: 100dvh;
-    max-height: none;
-    border: none;
-    border-radius: 0;
-  }
-}
-
 /* Let Oat input groups, such as a date range, shrink to narrow screens. */
 fieldset.group {
   min-inline-size: 0;
@@ -95,5 +78,13 @@ ot-taginput:has(.badge) input::placeholder {
   flex-wrap: nowrap;
   > :last-child {
     flex-shrink: 0;
+  }
+}
+
+/* uPlot's legend is a table: no Oat row lines or hover between its series. */
+.u-legend tr {
+  border-bottom: none;
+  &:hover {
+    background-color: transparent;
   }
 }

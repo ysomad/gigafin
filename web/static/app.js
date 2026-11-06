@@ -26,3 +26,33 @@ for (const type of ['input', 'change']) {
     }
   });
 }
+
+// In the split form the first part, the operation itself, keeps what the other parts
+// leave of the total, so typing a part's amount takes it from the first one.
+function splitRest(form) {
+  const [first, ...parts] = form.querySelectorAll('[name=split_amount]');
+  const total = form.dataset.splitTotal;
+  const digits = total.split('.')[1]?.length ?? 0;
+  const scale = 10 ** digits;
+  let rest = Math.round(Number(total) * scale);
+  for (const part of parts) {
+    const v = Number(part.value.replace(',', '.'));
+    if (!Number.isNaN(v)) rest -= Math.round(v * scale);
+  }
+  first.value = rest % scale ? (rest / scale).toFixed(digits) : String(rest / scale);
+}
+
+document.addEventListener('input', e => {
+  const form = e.target.closest('[data-split-total]');
+  if (form && e.target.name === 'split_amount' && e.target !== form.querySelector('[name=split_amount]')) {
+    splitRest(form);
+  }
+});
+
+document.addEventListener('click', e => {
+  const button = e.target.closest('[data-split-remove]');
+  if (!button) return;
+  const form = button.form;
+  button.closest('.split').remove();
+  splitRest(form);
+});

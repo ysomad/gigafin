@@ -1,0 +1,19 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{t "Split"}}</h1>
+<p class="text-light">{{if $d.Payee}}{{$d.Payee}} · {{end}}{{amountInput $d.Amount}}</p>
+<form class="form-compact" method="post" action="/operations/{{$d.ID}}/split" data-split-total="{{$d.Amount}}">
+  {{if $d.SplitError}}<div data-field aria-invalid="true"><div class="error" role="status">{{errText $d.SplitError}}</div></div>{{end}}
+  <p class="text-light">{{t "Divide the saved amount between categories. Each part becomes an operation of its own."}}{{if $d.OriginID}} {{t "Part of a split. Splitting it again adds parts to the same split."}}{{end}}</p>
+  <div id="splits" class="vstack">
+    {{range $d.Parts}}{{template "split" (dict "Categories" $d.Categories "Split" .)}}{{end}}
+  </div>
+  <div class="hstack justify-between">
+    <button type="button" class="outline" hx-get="/operations/split?type={{$d.Type}}" hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ {{t "Add part"}}</button>
+    <div class="hstack">
+      <a class="button outline" href="/operations/{{$d.ID}}/edit" data-variant="secondary">{{t "Cancel"}}</a>
+      <button type="submit">{{t "Split"}}</button>
+    </div>
+  </div>
+</form>
+{{end}}

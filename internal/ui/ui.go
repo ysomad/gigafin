@@ -32,8 +32,8 @@ const (
 )
 
 var _pages = [...]string{
-	"login", "dashboard", "operations", "operation_form", "accounts", "account", "categories", "category",
-	"plans", "imports", "import", "import_new", "import_rates", "settings", "rules", "rule", "notfound",
+	"login", "dashboard", "operations", "operation_form", "operation_split", "accounts", "account", "categories",
+	"category", "plans", "imports", "import", "import_new", "import_rates", "settings", "rules", "rule", "notfound",
 }
 
 // Config configures the UI.
@@ -161,6 +161,7 @@ func (u *UI) Register(mux *http.ServeMux) error {
 		"GET /operations/{id}/edit":           u.editOperation,
 		"POST /operations/{id}":               u.updateOperation,
 		"POST /operations/{id}/delete":        u.deleteOperation,
+		"GET /operations/{id}/split":          u.splitOperationPage,
 		"POST /operations/{id}/split":         u.splitOperation,
 		"GET /accounts":                       u.accounts,
 		"POST /accounts":                      u.createAccount,
