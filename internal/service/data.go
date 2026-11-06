@@ -115,15 +115,11 @@ func (s *Data) Export(ctx context.Context, userID int64, f domain.Filter, w io.W
 // copy is removed on success; on failure it may be left in dir.
 func (s *Data) Backup(ctx context.Context, u domain.User, pass, passphrase, dir string) (*os.File, error) {
 	if !u.Can(domain.PermBackup) {
-		return nil, domain.NewFieldError(errors.ErrForbidden, "backup", "forbidden")
+		return nil, domain.NewError(errors.ErrForbidden, "backups are forbidden")
 	}
 
 	if err := domain.CheckPasswordPolicy(passphrase); err != nil {
-		if e, ok := errors.AsType[domain.Error](err); ok {
-			e.Field = "passphrase"
-			return nil, e
-		}
-		return nil, err
+		return nil, domain.NewError(err, "passphrase")
 	}
 
 	if err := s.auth.CheckPassword(ctx, u.ID, pass); err != nil {

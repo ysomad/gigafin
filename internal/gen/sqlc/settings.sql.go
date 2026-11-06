@@ -10,7 +10,7 @@ import (
 )
 
 const getUserSettings = `-- name: GetUserSettings :one
-SELECT user_id, show_minor_units, primary_currency, rate_source, language, created_at, updated_at FROM user_settings WHERE user_id = ?
+SELECT user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, created_at, updated_at FROM user_settings WHERE user_id = ?
 `
 
 func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSetting, error) {
@@ -22,6 +22,7 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 		&i.PrimaryCurrency,
 		&i.RateSource,
 		&i.Language,
+		&i.AutoCategoryRules,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -29,23 +30,27 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 }
 
 const upsertUserSettings = `-- name: UpsertUserSettings :exec
-INSERT INTO user_settings (user_id, show_minor_units, primary_currency, rate_source, language, created_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO user_settings (
+    user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, created_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id) DO UPDATE SET
     show_minor_units = excluded.show_minor_units,
     primary_currency = excluded.primary_currency,
     rate_source = excluded.rate_source,
     language = excluded.language,
+    auto_category_rules = excluded.auto_category_rules,
     updated_at = excluded.created_at
 `
 
 type UpsertUserSettingsParams struct {
-	UserID          int64
-	ShowMinorUnits  bool
-	PrimaryCurrency string
-	RateSource      string
-	Language        string
-	CreatedAt       int64
+	UserID            int64
+	ShowMinorUnits    bool
+	PrimaryCurrency   string
+	RateSource        string
+	Language          string
+	AutoCategoryRules bool
+	CreatedAt         int64
 }
 
 func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettingsParams) error {
@@ -55,6 +60,7 @@ func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettings
 		arg.PrimaryCurrency,
 		arg.RateSource,
 		arg.Language,
+		arg.AutoCategoryRules,
 		arg.CreatedAt,
 	)
 	return err

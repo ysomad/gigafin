@@ -20,7 +20,7 @@ type SessionLifetime struct {
 // Validate checks that both durations of l are positive.
 func (l SessionLifetime) Validate() error {
 	if l.Max <= 0 || l.Idle <= 0 {
-		return NewFieldError(errors.ErrInvalid, "session lifetime", "must be positive")
+		return NewError(errors.ErrInvalid, "session lifetime: must be positive")
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func ParseRole(s string) (Role, error) {
 	case RoleUser, RoleAdmin:
 		return r, nil
 	default:
-		return "", NewFieldError(errors.ErrInvalid, "role", "must be user or admin")
+		return "", NewError(errors.ErrInvalid, "role: must be user or admin")
 	}
 }
 
@@ -140,10 +140,10 @@ func (u User) Location() *time.Location {
 func ParseLogin(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", NewFieldError(errors.ErrInvalid, "login", "required")
+		return "", NewError(errors.ErrInvalid, "login: required")
 	}
-	if utf8.RuneCountInString(s) > _maxTextLen {
-		return "", NewFieldError(errors.ErrInvalid, "login", "too long")
+	if utf8.RuneCountInString(s) > MaxTextLen {
+		return "", NewError(errors.ErrInvalid, "login: too long")
 	}
 	return s, nil
 }
@@ -152,10 +152,10 @@ func ParseLogin(s string) (string, error) {
 func ParseTimezone(tz string) (string, error) {
 	tz = strings.TrimSpace(tz)
 	if tz == "" || tz == "Local" {
-		return "", NewFieldError(errors.ErrInvalid, "time zone", "unknown time zone %q", tz)
+		return "", NewError(errors.ErrInvalid, "time zone: unknown time zone %q", tz)
 	}
 	if _, err := time.LoadLocation(tz); err != nil {
-		return "", NewFieldError(errors.ErrInvalid, "time zone", "unknown time zone %q", tz)
+		return "", NewError(errors.ErrInvalid, "time zone: unknown time zone %q", tz)
 	}
 	return tz, nil
 }
@@ -174,7 +174,7 @@ func ParseScope(s string) (Scope, error) {
 	case ScopeRead, ScopeWrite:
 		return sc, nil
 	default:
-		return "", NewFieldError(errors.ErrInvalid, "scope", "must be read or write")
+		return "", NewError(errors.ErrInvalid, "scope: must be read or write")
 	}
 }
 
@@ -188,7 +188,7 @@ func (s Scope) Allows(want Scope) bool {
 func ParseKeyTTL(s string) (time.Duration, error) {
 	days, ok := map[string]int{"never": 0, "7": 7, "30": 30, "90": 90, "365": 365}[s]
 	if !ok {
-		return 0, NewFieldError(errors.ErrInvalid, "expiration", "must be 7, 30, 90, 365 days or never")
+		return 0, NewError(errors.ErrInvalid, "expiration: must be 7, 30, 90, 365 days or never")
 	}
 	return time.Duration(days) * 24 * time.Hour, nil
 }
@@ -232,10 +232,10 @@ func (k APIKey) Touch(now time.Time) bool {
 func ParseAPIKeyName(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", NewFieldError(errors.ErrInvalid, "name", "required")
+		return "", NewError(errors.ErrInvalid, "name: required")
 	}
-	if utf8.RuneCountInString(s) > _maxTextLen {
-		return "", NewFieldError(errors.ErrInvalid, "name", "too long")
+	if utf8.RuneCountInString(s) > MaxTextLen {
+		return "", NewError(errors.ErrInvalid, "name: too long")
 	}
 	return s, nil
 }

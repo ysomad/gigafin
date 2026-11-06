@@ -1,0 +1,41 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{t "New account"}}</h1>
+<form id="form-account" class="form-compact" method="post" action="/accounts">
+  {{with $.Errors.Form "account"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <fieldset class="row mb-4" aria-label="{{t "Account"}}">
+    {{$e := $.Errors.Get "name"}}
+    <label data-field class="col-12"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "kind"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Kind"}}
+      <select name="kind" data-account-kind{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
+        {{range $d.Kinds}}<option value="{{.}}"{{if eq (print .) $d.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
+      </select>
+      {{if $e}}<div id="kind-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "currency"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
+      <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="currency-error"{{end}}>
+        {{range $d.Currencies}}<option{{if eq . $d.Currency}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      {{if $e}}<div id="currency-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "balance"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Opening balance"}} <input name="balance" inputmode="decimal" placeholder="0" value="{{amountInput $d.Balance}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
+      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "credit_limit"}}
+    {{$credit := eq $d.Kind "credit"}}
+    <label data-field data-credit-limit class="col-6"{{if not $credit}} hidden{{end}}{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" value="{{amountInput $d.CreditLimit}}"{{if not $credit}} disabled{{end}}{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
+      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+  </fieldset>
+  <p class="text-light">{{t "Credit card and loan balances are negative when you owe. Pay a card with a transfer to it."}}</p>
+  <div class="hstack">
+    <button type="submit">{{t "Create"}}</button>
+    <a class="button outline" href="/accounts" data-variant="secondary">{{t "Cancel"}}</a>
+  </div>
+</form>
+{{end}}

@@ -10,13 +10,14 @@ CREATE TABLE users (
 ) STRICT;
 
 CREATE TABLE user_settings (
-    user_id          INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    show_minor_units INTEGER NOT NULL,
-    primary_currency TEXT    NOT NULL,
-    rate_source      TEXT    NOT NULL,
-    language         TEXT    NOT NULL,
-    created_at       INTEGER NOT NULL,
-    updated_at       INTEGER
+    user_id              INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    show_minor_units     INTEGER NOT NULL,
+    primary_currency     TEXT    NOT NULL,
+    rate_source          TEXT    NOT NULL,
+    language             TEXT    NOT NULL,
+    auto_category_rules  INTEGER NOT NULL,
+    created_at           INTEGER NOT NULL,
+    updated_at           INTEGER
 ) STRICT;
 
 CREATE TABLE sessions (
@@ -228,13 +229,6 @@ CREATE TABLE rules (
 
 CREATE INDEX rules_user_id_idx ON rules (user_id);
 
-CREATE TABLE rule_settings (
-    user_id     INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    is_learning INTEGER NOT NULL,
-    created_at  INTEGER NOT NULL,
-    updated_at  INTEGER
-) STRICT;
-
 CREATE TABLE exchange_rates (
     source     TEXT    NOT NULL,
     currency   TEXT    NOT NULL,
@@ -261,7 +255,6 @@ FROM accounts AS a;
 -- +goose Down
 DROP VIEW account_balances;
 DROP TABLE exchange_rates;
-DROP TABLE rule_settings;
 DROP TABLE rules;
 DROP TABLE import_category_map;
 DROP TABLE import_account_map;

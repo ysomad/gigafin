@@ -155,13 +155,6 @@ type Rule struct {
 	UpdatedAt  sql.NullInt64
 }
 
-type RuleSetting struct {
-	UserID     int64
-	IsLearning bool
-	CreatedAt  int64
-	UpdatedAt  sql.NullInt64
-}
-
 type Session struct {
 	ID         int64
 	UserID     int64
@@ -190,11 +183,12 @@ type User struct {
 }
 
 type UserSetting struct {
-	UserID          int64
-	ShowMinorUnits  bool
-	PrimaryCurrency string
-	RateSource      string
-	Language        string
-	CreatedAt       int64
-	UpdatedAt       sql.NullInt64
+	UserID            int64
+	ShowMinorUnits    bool
+	PrimaryCurrency   string
+	RateSource        string
+	Language          string
+	AutoCategoryRules bool
+	CreatedAt         int64
+	UpdatedAt         sql.NullInt64
 }

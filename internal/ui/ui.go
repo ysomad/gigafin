@@ -8,8 +8,10 @@ import (
 	"html/template"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,12 +29,14 @@ import (
 const (
 	_sessionCookie = "gigafin_session"
 	_flashCookie   = "gigafin_flash"
+	_noticeCookie  = "gigafin_notice"
 	_maxForm       = 1 << 20
 )
 
 var _pages = [...]string{
-	"login", "dashboard", "operations", "operation_form", "operation_split", "accounts", "account", "categories",
-	"category", "plans", "imports", "import", "import_new", "import_rates", "settings", "rules", "rule", "notfound",
+	"login", "dashboard", "operations", "operation_form", "operation_split", "accounts", "account", "account_new",
+	"categories", "category", "category_new", "plans", "plan_new", "imports", "import", "import_new", "import_rates",
+	"settings", "rules", "rule", "notfound",
 }
 
 // Config configures the UI.
@@ -64,7 +68,8 @@ type handler func(w http.ResponseWriter, r *http.Request, user domain.User) erro
 
 // prefs are the settings and UI language of the signed-in user, read once per request
 // by authed and kept in the request context under prefsKey. A handler that changes the
-// settings redirects, so they are never stale when rendered.
+// settings redirects, so they are never stale when rendered, except the settings page
+// rendered for htmx, which reads the settings itself and shows no amounts.
 type prefs struct {
 	settings domain.Settings
 	lang     string
@@ -79,40 +84,68 @@ type view struct {
 	// Title is translated, then formatted with TitleArgs, if any.
 	Title     string
 	TitleArgs []any
-	// Error is the error of a failed form post. render turns it, or the flash message
-	// of redirectBack, into Errors.
-	Error  error
+	// Error is the error of a failed form post: fieldsError of its inputs, or an error
+	// of the business logic. render turns it, or the flash message of redirectBack, into
+	// Errors.
+	Error error
+	// Form names the posted form, which shows an Error other than fieldsError on itself
+	// rather than as a toast; see formErrors.Form.
+	Form   string
 	Errors *formErrors
+	// Notice is a success message set before a redirect, shown as a toast.
+	Notice string
 	Data   any
 }
 
-// formErrors are the translated messages of an error shown on a page: a field message,
-// shown next to its input, and toasts, the messages of no field on the page.
-type formErrors struct {
-	field string
-	// msg is the field message without the field.
-	msg string
-	// text is the whole message, with the field.
-	text  string
-	shown bool
+// fieldsError holds the translated messages of the inputs of a form that failed
+// validation, keyed by input name. A handler validates every input of its form, before
+// calling a service, and passes them as the view error.
+type fieldsError map[string]string
+
+// type check
+var _ error = fieldsError{}
+
+// Error implements the error interface for fieldsError.
+func (e fieldsError) Error() string {
+	msgs := make([]string, 0, len(e))
+	for _, k := range slices.Sorted(maps.Keys(e)) {
+		msgs = append(msgs, k+": "+e[k])
+	}
+	return strings.Join(msgs, "; ")
 }
 
-// Get returns the message about field, if any, and marks it as shown, so it is no
-// longer a toast. Call it before Toasts, which the layout calls after the content.
+// formErrors are the translated messages of an error shown on a page: field messages,
+// shown next to their inputs, a form message, shown on the posted form, and a toast.
+type formErrors struct {
+	fields fieldsError
+	// form is the form of msg.
+	form  string
+	msg   string
+	toast string
+}
+
+// Get returns the message about the input named field, if any.
 func (e *formErrors) Get(field string) string {
-	if e == nil || e.field == "" || e.field != field {
+	if e == nil {
 		return ""
 	}
-	e.shown = true
+	return e.fields[field]
+}
+
+// Form returns the message about the form named name, if any.
+func (e *formErrors) Form(name string) string {
+	if e == nil || e.form != name {
+		return ""
+	}
 	return e.msg
 }
 
-// Toasts returns the messages not shown next to an input.
+// Toasts returns the messages shown as toasts.
 func (e *formErrors) Toasts() []string {
-	if e == nil || e.shown || e.text == "" {
+	if e == nil || e.toast == "" {
 		return nil
 	}
-	return []string{e.text}
+	return []string{e.toast}
 }
 
 // New parses templates and returns the UI.
@@ -204,12 +237,14 @@ func (u *UI) Register(mux *http.ServeMux) error {
 		"POST /operations/{id}/split":         u.splitOperation,
 		"GET /accounts":                       u.accounts,
 		"POST /accounts":                      u.createAccount,
+		"GET /accounts/new":                   u.newAccount,
 		"GET /accounts/{id}":                  u.account,
 		"POST /accounts/{id}":                 u.updateAccount,
 		"POST /accounts/{id}/balance":         u.setBalance,
 		"POST /accounts/{id}/archive":         u.archiveAccount,
 		"POST /accounts/{id}/delete":          u.deleteAccount,
 		"GET /categories":                     u.categories,
+		"GET /categories/new":                 u.newCategory,
 		"POST /categories":                    u.createCategory,
 		"GET /categories/{id}":                u.category,
 		"POST /categories/{id}":               u.updateCategory,
@@ -221,13 +256,13 @@ func (u *UI) Register(mux *http.ServeMux) error {
 		"GET /rules/condition":                u.ruleCondition,
 		"GET /rules/action":                   u.ruleAction,
 		"POST /rules/preview":                 u.previewRule,
-		"POST /rules/learning":                u.setRuleLearning,
 		"GET /rules/{id}":                     u.rule,
 		"POST /rules/{id}":                    u.updateRule,
 		"POST /rules/{id}/apply":              u.applyRule,
 		"POST /rules/{id}/delete":             u.deleteRule,
 		"GET /plans":                          u.plans,
 		"POST /plans":                         u.setPlan,
+		"GET /plans/new":                      u.newPlan,
 		"POST /plans/fill":                    u.fillPlans,
 		"GET /imports":                        u.imports,
 		"POST /imports":                       u.upload,
@@ -243,10 +278,7 @@ func (u *UI) Register(mux *http.ServeMux) error {
 		"POST /imports/{id}/undo":             u.undo,
 		"POST /imports/{id}/discard":          u.discard,
 		"GET /settings":                       u.settings,
-		"POST /settings/timezone":             u.setTimezone,
-		"POST /settings/display":              u.setDisplay,
-		"POST /settings/language":             u.setLanguage,
-		"POST /settings/rates":                u.setRates,
+		"POST /settings":                      u.saveSettings,
 		"POST /settings/rates/sync":           u.syncRates,
 		"POST /settings/rates/set":            u.setRate,
 		"POST /settings/rates/reset":          u.resetRate,
@@ -332,7 +364,16 @@ func (u *UI) handleError(w http.ResponseWriter, r *http.Request, user domain.Use
 		}
 		u.log.Log(r.Context(), level, "request rejected", slog.Any("error", err))
 		p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-		u.redirectBack(w, r, errText(u.dicts, p.lang, err))
+		msg := errText(u.dicts, p.lang, err)
+		// an htmx action, one of no form to show the error on, leaves the page as it is
+		// and gets the error as a toast
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Reswap", "none")
+			//nolint:errcheck // fragment logs its own errors
+			_ = u.fragment(w, r, http.StatusUnprocessableEntity, "toast", msg)
+			return
+		}
+		u.redirectBack(w, r, msg)
 	default:
 		u.serverError(w, r, err)
 	}
@@ -367,16 +408,17 @@ func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page str
 		// signed out: default settings, the browser language
 		p.lang = i18n.Match(r.Header.Get("Accept-Language"))
 	}
-	switch e, ok := errors.AsType[domain.Error](v.Error); {
-	case ok && e.Field != "":
-		field, text := e.Field, errText(u.dicts, p.lang, v.Error)
-		e.Field = ""
-		v.Errors = &formErrors{field: field, msg: errText(u.dicts, p.lang, e), text: text}
+	switch fields, ok := errors.AsType[fieldsError](v.Error); {
+	case ok:
+		v.Errors = &formErrors{fields: fields}
+	case v.Error != nil && v.Form != "":
+		v.Errors = &formErrors{form: v.Form, msg: errText(u.dicts, p.lang, v.Error)}
 	case v.Error != nil:
-		v.Errors = &formErrors{text: errText(u.dicts, p.lang, v.Error)}
+		v.Errors = &formErrors{toast: errText(u.dicts, p.lang, v.Error)}
 	default:
-		v.Errors = &formErrors{text: u.takeFlash(w, r)}
+		v.Errors = &formErrors{toast: u.takeFlash(w, r, _flashCookie)}
 	}
+	v.Notice = u.takeFlash(w, r, _noticeCookie)
 	v.Title = u.dicts.T(p.lang, v.Title, v.TitleArgs...)
 	// a clone, since funcs of an executed template can no longer change
 	t, err := u.pages[page].Clone()
@@ -393,6 +435,25 @@ func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page str
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	// a page rendered for a post, such as a form with errors, keeps the URL of the form,
+	// since the action URL of a boosted form can't be reloaded
+	if r.Method != http.MethodGet && r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Push-Url", "false")
+	}
+	// and stays where it was instead of scrolling to the top, which htmx does for boosted
+	// requests, so its errors or result are in view. A named form replaces just itself,
+	// so the rest of the page keeps its state; forms with their own hx-post aren't
+	// boosted and keep their own target.
+	if r.Method != http.MethodGet && r.Header.Get("HX-Boosted") == "true" {
+		if v.Form != "" {
+			sel := "#form-" + v.Form
+			w.Header().Set("HX-Retarget", sel)
+			w.Header().Set("HX-Reselect", sel)
+			w.Header().Set("HX-Reswap", "outerHTML show:none")
+		} else {
+			w.Header().Set("HX-Reswap", "innerHTML show:none")
+		}
+	}
 	w.WriteHeader(status)
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		u.log.DebugContext(r.Context(), "write response", slog.Any("error", err))
@@ -400,7 +461,7 @@ func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page str
 	return nil
 }
 
-func (u *UI) fragment(w http.ResponseWriter, r *http.Request, name string, data any) error {
+func (u *UI) fragment(w http.ResponseWriter, r *http.Request, status int, name string, data any) error {
 	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
 	t, err := u.fragments.Clone()
 	if err != nil {
@@ -416,6 +477,7 @@ func (u *UI) fragment(w http.ResponseWriter, r *http.Request, name string, data 
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		u.log.DebugContext(r.Context(), "write response", slog.Any("error", err))
 	}
@@ -437,13 +499,14 @@ func (u *UI) redirectBack(w http.ResponseWriter, r *http.Request, msg string) {
 	redirect(w, r, target)
 }
 
-// takeFlash returns the message set by redirectBack and clears it.
-func (u *UI) takeFlash(w http.ResponseWriter, r *http.Request) string {
-	c, err := r.Cookie(u.cookie(_flashCookie, "", 0).Name)
+// takeFlash returns the message of the flash cookie name, set by redirectBack for
+// _flashCookie, and clears it.
+func (u *UI) takeFlash(w http.ResponseWriter, r *http.Request, name string) string {
+	c, err := r.Cookie(u.cookie(name, "", 0).Name)
 	if err != nil {
 		return ""
 	}
-	http.SetCookie(w, u.cookie(_flashCookie, "", -1))
+	http.SetCookie(w, u.cookie(name, "", -1))
 	msg, err := url.QueryUnescape(c.Value)
 	if err != nil {
 		return ""

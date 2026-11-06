@@ -536,11 +536,11 @@ func (h *Handler) GetRuleSettings(ctx context.Context) (*ogen.RuleSettings, erro
 	if !ok {
 		return nil, errors.ErrUnauthorized
 	}
-	s, err := h.svc.Rules.Settings(ctx, key.UserID)
+	s, err := h.svc.Settings.Get(ctx, key.UserID)
 	if err != nil {
 		return nil, err
 	}
-	return &ogen.RuleSettings{Learning: s.Learning}, nil
+	return &ogen.RuleSettings{Learning: s.AutoCategoryRules}, nil
 }
 
 // SetRuleSettings implements ogen.Handler.
@@ -550,7 +550,12 @@ func (h *Handler) SetRuleSettings(ctx context.Context, req *ogen.RuleSettings) e
 	if !ok {
 		return errors.ErrUnauthorized
 	}
-	return h.svc.Rules.SetLearning(ctx, key.UserID, req.Learning)
+	s, err := h.svc.Settings.Get(ctx, key.UserID)
+	if err != nil {
+		return err
+	}
+	s.AutoCategoryRules = req.Learning
+	return h.svc.Settings.Set(ctx, key.UserID, s)
 }
 
 func classify(err error) (int, ogen.ErrorCode, string) {

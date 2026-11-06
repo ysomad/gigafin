@@ -258,7 +258,7 @@ func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error
 }
 
 const listAPIKeys = `-- name: ListAPIKeys :many
-SELECT id, user_id, name, prefix, key_hash, scope, expires_at, last_used_at, revoked_at, created_at FROM api_keys WHERE user_id = ? ORDER BY id DESC
+SELECT id, user_id, name, prefix, key_hash, scope, expires_at, last_used_at, revoked_at, created_at FROM api_keys WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC
 `
 
 func (q *Queries) ListAPIKeys(ctx context.Context, userID int64) ([]ApiKey, error) {

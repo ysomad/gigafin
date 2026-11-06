@@ -34,17 +34,17 @@
               </select>
             </label>
             <label data-field class="col-6">{{t "Type"}}
-              <select name="type">
+              <select name="type" data-category-type>
                 <option value="">{{t "All"}}</option>
                 {{range $t := opTypes}}<option value="{{$t}}"{{if eq $t $d.Filter.Type}} selected{{end}}>{{t (print $t)}}</option>{{end}}
               </select>
             </label>
-            <label data-field class="col-12">{{t "Category"}}
+            <label data-field data-category-field class="col-12">{{t "Category"}}
               <select name="category">
                 <option value="">{{t "All"}}</option>
                 {{range $parent := $d.Categories}}
-                  <option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{.Name}} ({{t (print .Kind)}})</option>
-                  {{range .Children}}<option value="{{.ID}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{$parent.Name}} / {{.Name}}</option>{{end}}
+                  <option value="{{.ID}}" data-kind="{{.Kind}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{.Name}}</option>
+                  {{range .Children}}<option value="{{.ID}}" data-kind="{{$parent.Kind}}"{{if eq .ID $d.Filter.CategoryID}} selected{{end}}>{{$parent.Name}} / {{.Name}}</option>{{end}}
                 {{end}}
               </select>
             </label>

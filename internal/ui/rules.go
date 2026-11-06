@@ -3,12 +3,15 @@ package ui
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/money"
 )
 
 // _ruleValueSep separates the values of one_of, not_one_of and between in a condition
@@ -18,8 +21,7 @@ const _ruleValueSep = "|"
 type rulesData struct {
 	// Stages are the rules of each stage that has any, oldest first, in the order
 	// stages run.
-	Stages   []ruleStage
-	Settings domain.RuleSettings
+	Stages []ruleStage
 }
 
 type ruleStage struct {
@@ -49,10 +51,6 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 	if err != nil {
 		return err
 	}
-	settings, err := u.svc.Rules.Settings(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
 	tree, err := u.svc.Categories.Tree(r.Context(), user.ID)
 	if err != nil {
 		return err
@@ -74,7 +72,7 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 		}
 		return v
 	}
-	d := rulesData{Settings: settings}
+	var d rulesData
 	for _, stage := range domain.RuleStages() {
 		s := ruleStage{Stage: stage}
 		for _, rule := range rules {
@@ -116,17 +114,6 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 		}
 	}
 	return u.render(w, r, http.StatusOK, "rules", view{User: &user, Nav: "settings", Title: "Rules", Data: d})
-}
-
-func (u *UI) setRuleLearning(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
-	}
-	if err := u.svc.Rules.SetLearning(r.Context(), user.ID, r.PostFormValue("learning") == "on"); err != nil {
-		return err
-	}
-	redirect(w, r, "/rules")
-	return nil
 }
 
 // condRow is a condition row of the rule form, with the operators of its field.
@@ -196,7 +183,9 @@ func (u *UI) renderRule(
 	if f.ID != 0 {
 		title = "Rule"
 	}
-	return u.render(w, r, status, "rule", view{User: &user, Nav: "settings", Title: title, Error: viewErr, Data: f})
+	return u.render(w, r, status, "rule", view{
+		User: &user, Nav: "settings", Title: title, Error: viewErr, Form: "rule", Data: f,
+	})
 }
 
 // newRule renders an empty rule form, or one setting the category of the payee in the
@@ -239,11 +228,15 @@ func (u *UI) rule(w http.ResponseWriter, r *http.Request, user domain.User) erro
 }
 
 // parseRuleForm reads the form into both the rows, for re-rendering, and the domain
-// input. Condition rows without a value are dropped.
-func (u *UI) parseRuleForm(r *http.Request) (ruleForm, domain.RuleInput, error) {
+// input, and returns the messages of its invalid inputs translated to lang. Condition
+// rows without a value are dropped; row messages are keyed by the index of the row
+// among the ones kept.
+//
+//nolint:cyclop // every input of the form is checked here, so the checks stay together
+func (u *UI) parseRuleForm(r *http.Request, lang string) (ruleForm, domain.RuleInput, fieldsError, error) {
 	f := ruleForm{Applied: -1}
 	if err := r.ParseForm(); err != nil {
-		return f, domain.RuleInput{}, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+		return f, domain.RuleInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	// condition and action rows are added client-side, so they come as parallel lists
 	var in struct {
@@ -256,43 +249,100 @@ func (u *UI) parseRuleForm(r *http.Request) (ruleForm, domain.RuleInput, error) 
 		ActValues  []string `form:"act_value"`
 	}
 	if err := u.formDecoder.Decode(&in, r.PostForm); err != nil {
-		return f, domain.RuleInput{}, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+		return f, domain.RuleInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	if len(in.CondOps) != len(in.CondFields) || len(in.CondValues) != len(in.CondFields) ||
 		len(in.ActValues) != len(in.ActTypes) {
-		return f, domain.RuleInput{}, domain.NewFieldError(errors.ErrInvalid, "form", "rule rows do not match")
+		return f, domain.RuleInput{}, nil, domain.NewError(errors.ErrInvalid, "rule rows do not match")
 	}
+	errs := fieldsError{}
 	f.Stage, f.Match = domain.RuleStage(in.Stage), domain.RuleMatch(in.Match)
+	if !slices.Contains(domain.RuleStages(), f.Stage) {
+		errs["stage"] = u.dicts.T(lang, "choose from the list")
+	}
+	if f.Match != domain.RuleMatchAll && f.Match != domain.RuleMatchAny {
+		errs["match"] = u.dicts.T(lang, "choose from the list")
+	}
 	rule := domain.RuleInput{Stage: f.Stage, Match: f.Match}
 	for i, field := range in.CondFields {
 		if strings.TrimSpace(in.CondValues[i]) == "" {
 			continue
 		}
 		c := domain.Condition{Field: domain.RuleField(field), Op: domain.CondOp(in.CondOps[i])}
+		n := "[" + strconv.Itoa(len(f.Conditions)) + "]"
 		f.Conditions = append(f.Conditions, newCondRow(c.Field, c.Op, in.CondValues[i]))
+		want := 1
 		switch c.Op {
-		case domain.CondOneOf, domain.CondNotOneOf, domain.CondBetween:
-			c.Values = strings.Split(in.CondValues[i], _ruleValueSep)
+		case domain.CondOneOf, domain.CondNotOneOf:
+			c.Values, want = strings.Split(in.CondValues[i], _ruleValueSep), 0
+		case domain.CondBetween:
+			c.Values, want = strings.Split(in.CondValues[i], _ruleValueSep), 2
 		default:
 			c.Values = []string{in.CondValues[i]}
 		}
 		rule.Conditions = append(rule.Conditions, c)
+		j := slices.IndexFunc(domain.RuleFields(), func(o domain.RuleFieldOps) bool { return o.Field == c.Field })
+		if j < 0 {
+			errs["cond_field"+n] = u.dicts.T(lang, "choose from the list")
+			continue
+		}
+		if !slices.Contains(domain.RuleFields()[j].Ops, c.Op) {
+			errs["cond_op"+n] = u.dicts.T(lang, "choose from the list")
+			continue
+		}
+		if want != 0 && len(c.Values) != want {
+			errs["cond_value"+n] = u.dicts.T(lang, "%s takes %d values", u.dicts.T(lang, string(c.Op)), want)
+			continue
+		}
+		for _, v := range c.Values {
+			v = strings.TrimSpace(v)
+			var err error
+			switch {
+			case v == "":
+				errs["cond_value"+n] = u.dicts.T(lang, "values must not be empty")
+			case utf8.RuneCountInString(v) > domain.MaxTextLen:
+				errs["cond_value"+n] = u.dicts.T(lang, "too long")
+			case c.Field == domain.RuleFieldAmount:
+				if _, err = money.Parse(v); err != nil {
+					errs["cond_value"+n] = u.dicts.T(lang, "enter a number")
+				}
+			case c.Op == domain.CondMatches:
+				if _, err = regexp.Compile("(?i)" + v); err != nil {
+					errs["cond_value"+n] = u.dicts.T(lang, "%q is not a regular expression", v)
+				}
+			}
+		}
 	}
 	f.Actions = make([]actionRow, len(in.ActTypes))
 	rule.Actions = make([]domain.Action, len(in.ActTypes))
 	for i, typ := range in.ActTypes {
-		f.Actions[i] = actionRow{Type: domain.ActionType(typ), Value: in.ActValues[i]}
-		f.Actions[i].ID, _ = strconv.ParseInt(in.ActValues[i], 10, 64) //nolint:errcheck // 0 is not an id
-		rule.Actions[i] = domain.Action{Type: domain.ActionType(typ), Value: in.ActValues[i]}
+		a := domain.Action{Type: domain.ActionType(typ), Value: strings.TrimSpace(in.ActValues[i])}
+		f.Actions[i] = actionRow{Type: a.Type, Value: in.ActValues[i]}
+		f.Actions[i].ID, _ = strconv.ParseInt(a.Value, 10, 64) //nolint:errcheck // 0 is not an id
+		rule.Actions[i] = a
+		n := "[" + strconv.Itoa(i) + "]"
+		switch {
+		case !slices.Contains(domain.ActionTypes(), a.Type):
+			errs["act_type"+n] = u.dicts.T(lang, "choose from the list")
+		case utf8.RuneCountInString(a.Value) > domain.MaxTextLen:
+			errs["act_value"+n] = u.dicts.T(lang, "too long")
+		case a.Value == "" && a.Type != domain.ActionSetNote:
+			errs["act_value"+n] = u.dicts.T(lang, "required")
+		}
 	}
-	return f, rule, nil
+	return f, rule, errs, nil
 }
 
 func (u *UI) createRule(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	f, in, err := u.parseRuleForm(r)
-	if err == nil {
-		_, err = u.svc.Rules.Create(r.Context(), user.ID, in)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	f, in, errs, err := u.parseRuleForm(r, p.lang)
+	if err != nil {
+		return err
 	}
+	if len(errs) > 0 {
+		return u.renderRule(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	_, err = u.svc.Rules.Create(r.Context(), user.ID, in)
 	if isUserError(err) {
 		return u.renderRule(w, r, user, http.StatusUnprocessableEntity, f, err)
 	}
@@ -308,11 +358,16 @@ func (u *UI) updateRule(w http.ResponseWriter, r *http.Request, user domain.User
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	f, in, err := u.parseRuleForm(r)
-	f.ID = id
-	if err == nil {
-		_, err = u.svc.Rules.Update(r.Context(), user.ID, id, in)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	f, in, errs, err := u.parseRuleForm(r, p.lang)
+	if err != nil {
+		return err
 	}
+	f.ID = id
+	if len(errs) > 0 {
+		return u.renderRule(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	_, err = u.svc.Rules.Update(r.Context(), user.ID, id, in)
 	if isUserError(err) {
 		return u.renderRule(w, r, user, http.StatusUnprocessableEntity, f, err)
 	}
@@ -363,15 +418,17 @@ type rulePreview struct {
 func (u *UI) previewRule(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	const limit = 20
 	var d rulePreview
-	_, in, err := u.parseRuleForm(r)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	// invalid inputs are shown on saving; the preview shows what the service rejects
+	_, in, _, err := u.parseRuleForm(r, p.lang) //nolint:errcheck // input messages are not shown here
 	if err != nil {
 		d.Error = err
-		return u.fragment(w, r, "rule-preview", d)
+		return u.fragment(w, r, http.StatusOK, "rule-preview", d)
 	}
 	ops, total, err := u.svc.Rules.Preview(r.Context(), user.ID, in, limit)
 	if isUserError(err) {
 		d.Error = err
-		return u.fragment(w, r, "rule-preview", d)
+		return u.fragment(w, r, http.StatusOK, "rule-preview", d)
 	}
 	if err != nil {
 		return err
@@ -389,7 +446,7 @@ func (u *UI) previewRule(w http.ResponseWriter, r *http.Request, user domain.Use
 	for _, a := range accounts {
 		d.AccByID[a.ID] = a
 	}
-	return u.fragment(w, r, "rule-preview", d)
+	return u.fragment(w, r, http.StatusOK, "rule-preview", d)
 }
 
 // ruleCondition renders a new condition row, or the row of the field in the query
@@ -405,7 +462,7 @@ func (u *UI) ruleCondition(w http.ResponseWriter, r *http.Request, user domain.U
 		return err
 	}
 	row := newCondRow(domain.RuleField(q.Get("cond_field")), domain.CondOp(q.Get("cond_op")), "")
-	return u.fragment(w, r, "rule-condition", map[string]any{
+	return u.fragment(w, r, http.StatusOK, "rule-condition", map[string]any{
 		"Row": row, "Fields": domain.RuleFields(), "Categories": tree, "Accounts": accounts,
 	})
 }
@@ -421,7 +478,7 @@ func (u *UI) ruleAction(w http.ResponseWriter, r *http.Request, user domain.User
 	if !slices.Contains(domain.ActionTypes(), typ) {
 		typ = domain.ActionSetCategory
 	}
-	return u.fragment(w, r, "rule-action", map[string]any{"Row": actionRow{Type: typ}, "Categories": tree})
+	return u.fragment(w, r, http.StatusOK, "rule-action", map[string]any{"Row": actionRow{Type: typ}, "Categories": tree})
 }
 
 // categorizeOperations runs rules on the operations matching the filter in the query
@@ -444,8 +501,10 @@ func (u *UI) categorizeOperations(w http.ResponseWriter, r *http.Request, user d
 
 // fillOperation re-renders the new operation form with the empty fields rules fill.
 func (u *UI) fillOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	f, in, err := u.parseOpForm(r)
-	if err != nil && !errors.Is(err, errors.ErrInvalid) {
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	// the form is being filled in, so its invalid inputs are no error yet
+	f, in, _, err := u.parseOpForm(r, p.lang) //nolint:errcheck // input messages are not shown here
+	if err != nil {
 		return err
 	}
 	filled, err := u.svc.Operations.Fill(r.Context(), user.ID, in)

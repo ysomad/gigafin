@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -15,70 +16,99 @@ import (
 type plansData struct {
 	Month timex.Month
 	// Months are the months with operations, latest first, to pick Month from.
-	Months     []timex.Month
-	Prev       string
-	Next       string
-	From       string
-	To         string
-	Kind       domain.Kind
-	Totals     []planItem
-	Planned    []planItem
-	Unplanned  []planItem
-	Categories []domain.Category
-	Currencies []string
+	Months []timex.Month
+	// Prev and Next are the adjacent months within Months, empty at its ends.
+	Prev string
+	Next string
+	From string
+	To   string
+	// Sections are the plans of expenses, then of income.
+	Sections []planSection
 	// Day of Days is how far the month has gone: Days for a past month, 0 for a future one
 	Day  int
 	Days int
 	// Pace is Day as a share of Days in percent, the spending expected by now
 	Pace int
+	// Posted are the values of a plan form post that failed, to fill its inputs again.
+	Posted planForm
+	// Open is the "category:currency" of the plan row posted last, kept open.
+	Open string
 }
 
-// planItem is a plan row as shown: under its cat1 Parent for a cat2, with the
-// unplanned cat2 it Includes, and a State of "over", "exceeded" or "".
+// planForm is a posted plan form: the new plan form, with New set, or the form of a
+// plan row, whose amount message is keyed by planKey.
+type planForm struct {
+	New       bool   `form:"new"`
+	Category  int64  `form:"category"`
+	Month     string `form:"month"`
+	Currency  string `form:"currency"`
+	Amount    string `form:"amount"`
+	Repeating bool   `form:"repeating"`
+}
+
+// planSection is the plans of a Kind of categories, with their Totals per currency.
+type planSection struct {
+	Kind    domain.Kind
+	Totals  []domain.PlanRow
+	Planned []planItem
+}
+
+// planItem is a plan row as shown, under its cat1 Parent for a cat2.
 type planItem struct {
-	Row      domain.PlanRow
-	Parent   string
-	Includes []domain.PlanRow
-	State    string
+	Row    domain.PlanRow
+	Parent string
+}
+
+// planNewData is the new plan page: the form values of Posted, with Month parsed from
+// it.
+type planNewData struct {
+	Month      timex.Month
+	Months     []timex.Month
+	Categories []domain.Category
+	Currencies []string
+	Posted     planForm
 }
 
 func (u *UI) plans(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	q := r.URL.Query()
+	return u.renderPlans(w, r, user, http.StatusOK, planForm{Month: q.Get("month")}, nil)
+}
+
+// renderPlans renders the plans of the month of f, and the values of f, if it is a form
+// post that failed with viewErr.
+func (u *UI) renderPlans(
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, f planForm, viewErr error,
+) error {
 	today := u.svc.Today(user)
 	month := timex.MonthOf(today)
-	if s := q.Get("month"); s != "" {
+	if f.Month != "" {
 		var err error
-		if month, err = timex.ParseMonth(s); err != nil {
+		if month, err = timex.ParseMonth(f.Month); err != nil {
 			return fmt.Errorf("month: %w", err)
 		}
 	}
-	kind, err := domain.ParseKind(q.Get("kind"))
-	if err != nil {
-		kind = domain.KindExpense
-	}
-	rows, tree, err := u.svc.Plans.Report(r.Context(), user.ID, month, kind)
-	if err != nil {
-		return err
-	}
-	accounts, err := u.svc.Accounts.List(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
-	months, err := u.svc.Operations.Months(r.Context(), user.ID, timex.MonthOf(today), month)
+	// next month is open to plan ahead
+	months, err := u.svc.Operations.Months(r.Context(), user.ID, timex.MonthOf(today).Next(), month)
 	if err != nil {
 		return err
 	}
 	d := plansData{
-		Month:      month,
-		Months:     months,
-		Prev:       month.Prev().String(),
-		Next:       month.Next().String(),
-		From:       timex.FormatDate(month.First()),
-		To:         timex.FormatDate(month.Last()),
-		Kind:       kind,
-		Categories: tree,
-		Currencies: domain.AccountCurrencies(accounts),
-		Days:       month.Last().Day(),
+		Month:  month,
+		Months: months,
+		From:   timex.FormatDate(month.First()),
+		To:     timex.FormatDate(month.Last()),
+		Days:   month.Last().Day(),
+		Posted: f,
+	}
+	if f.Category != 0 && !f.New {
+		d.Open = strconv.FormatInt(f.Category, 10) + ":" + f.Currency
+	}
+	// months is a contiguous range, latest first, always holding month
+	if month.String() != months[len(months)-1].String() {
+		d.Prev = month.Prev().String()
+	}
+	if month.String() != months[0].String() {
+		d.Next = month.Next().String()
 	}
 	switch cur := timex.MonthOf(today).String(); {
 	case month.String() == cur:
@@ -87,110 +117,137 @@ func (u *UI) plans(w http.ResponseWriter, r *http.Request, user domain.User) err
 		d.Day = d.Days
 	}
 	d.Pace = d.Day * 100 / d.Days
-	state := func(r domain.PlanRow) string {
-		switch {
-		case r.Left().IsNegative() && kind == domain.KindIncome:
-			return "exceeded"
-		case r.Left().IsNegative():
-			return "over"
-		default:
-			return ""
+	for _, kind := range []domain.Kind{domain.KindExpense, domain.KindIncome} {
+		rows, _, err := u.svc.Plans.Report(r.Context(), user.ID, month, kind)
+		if err != nil {
+			return err
 		}
+		sec := planSection{Kind: kind, Totals: domain.PlanTotals(rows)}
+		// rows are groups of a cat1 followed by its cat2
+		parent := ""
+		for _, row := range rows {
+			if row.Level == 1 {
+				parent = row.Category.Name
+			}
+			if !row.HasPlan {
+				continue
+			}
+			it := planItem{Row: row}
+			if row.Level == 2 {
+				it.Parent = parent
+			}
+			sec.Planned = append(sec.Planned, it)
+		}
+		d.Sections = append(d.Sections, sec)
 	}
-	totals := domain.PlanTotals(rows)
-	d.Totals = make([]planItem, len(totals))
-	for i, t := range totals {
-		d.Totals[i] = planItem{Row: t, State: state(t)}
-	}
-	d.Planned, d.Unplanned = groupPlanRows(rows, state)
-	return u.render(w, r, http.StatusOK, "plans", view{
-		User: &user, Nav: "plans", Title: "Plans %s", TitleArgs: []any{month}, Data: d,
+	return u.render(w, r, status, "plans", view{
+		User: &user, Nav: "plans", Title: "Plans %s", TitleArgs: []any{month}, Error: viewErr, Form: "plan", Data: d,
 	})
 }
 
-// groupPlanRows splits report rows into plans, each cat1 with its unplanned cat2,
-// and rows spent without a plan.
-func groupPlanRows(
-	rows []domain.PlanRow, state func(domain.PlanRow) string,
-) (planned, unplanned []planItem) {
-	// rows are groups of a cat1 followed by its cat2
-	for i := 0; i < len(rows); {
-		j := i + 1
-		for j < len(rows) && rows[j].Level == 2 {
-			j++
-		}
-		c1, children := rows[i], rows[i+1:j]
-		i = j
-		if c1.HasPlan {
-			it := planItem{Row: c1, State: state(c1)}
-			var plannedChildren []planItem
-			for _, c2 := range children {
-				if c2.HasPlan {
-					plannedChildren = append(
-						plannedChildren,
-						planItem{Row: c2, Parent: c1.Category.Name, State: state(c2)},
-					)
-				} else {
-					it.Includes = append(it.Includes, c2)
-				}
-			}
-			planned = append(planned, it)
-			planned = append(planned, plannedChildren...)
-			continue
-		}
-		if !slices.ContainsFunc(children, func(c2 domain.PlanRow) bool { return c2.HasPlan }) {
-			unplanned = append(unplanned, planItem{Row: c1, Includes: children})
-			continue
-		}
-		// the cat1 total would repeat its planned cat2, so its cat2 show on their own
-		for _, c2 := range children {
-			if c2.HasPlan {
-				planned = append(planned, planItem{Row: c2, Parent: c1.Category.Name, State: state(c2)})
-			} else {
-				unplanned = append(unplanned, planItem{Row: c2, Parent: c1.Category.Name})
-			}
+func (u *UI) newPlan(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	q := r.URL.Query()
+	return u.renderNewPlan(w, r, user, http.StatusOK, planForm{
+		New: true, Month: q.Get("month"), Repeating: true,
+	}, nil)
+}
+
+// renderNewPlan renders the new plan form with the values of f, and viewErr of its
+// failed post.
+func (u *UI) renderNewPlan(
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, f planForm, viewErr error,
+) error {
+	today := u.svc.Today(user)
+	d := planNewData{Month: timex.MonthOf(today), Posted: f}
+	if f.Month != "" {
+		var err error
+		if d.Month, err = timex.ParseMonth(f.Month); err != nil {
+			return fmt.Errorf("month: %w", err)
 		}
 	}
-	return planned, unplanned
+	var err error
+	if d.Categories, err = u.svc.Categories.Tree(r.Context(), user.ID); err != nil {
+		return err
+	}
+	accounts, err := u.svc.Accounts.List(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	d.Currencies = domain.AccountCurrencies(accounts)
+	if d.Months, err = u.svc.Operations.Months(r.Context(), user.ID, timex.MonthOf(today).Next(), d.Month); err != nil {
+		return err
+	}
+	return u.render(w, r, status, "plan_new", view{
+		User: &user, Nav: "plans", Title: "New plan", Error: viewErr, Form: "plan", Data: d,
+	})
+}
+
+// planKey returns the key of the amount message of the plan row form of category in
+// currency.
+func planKey(category int64, currency string) string {
+	return "amount[" + strconv.FormatInt(category, 10) + ":" + currency + "]"
 }
 
 func (u *UI) setPlan(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f struct {
-		Category  int64  `form:"category"`
-		Month     string `form:"month"`
-		Kind      string `form:"kind"`
-		Currency  string `form:"currency"`
-		Amount    string `form:"amount"`
-		Repeating bool   `form:"repeating"`
-	}
+	var f planForm
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	// an empty amount removes only the month's plan; "0" with repeating stops carrying
-	amount := money.Amount{}
-	if f.Amount != "" {
-		var err error
-		if amount, err = money.Parse(f.Amount); err != nil {
-			return domain.NewFieldError(errors.ErrInvalid, "amount", "enter a number")
-		}
-	} else {
-		f.Repeating = false
-	}
 	month, err := timex.ParseMonth(f.Month)
 	if err != nil {
-		return fmt.Errorf("month: %w", err)
+		return fmt.Errorf("month: %w: %w", err, errors.ErrInvalid)
 	}
-	// category 0 is not found
-	if err := u.svc.Plans.Set(
-		r.Context(), user.ID, f.Category, month, f.Currency, amount, f.Repeating,
-	); err != nil {
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
+	amountKey := planKey(f.Category, f.Currency)
+	if f.New {
+		amountKey = "amount"
+		if f.Category == 0 {
+			errs["category"] = u.dicts.T(p.lang, "required")
+		}
+		if !money.ValidCurrency(f.Currency) {
+			errs["currency"] = u.dicts.T(p.lang, "choose from the list")
+		}
+	}
+	// an empty amount removes only the month's plan; "0" with repeating stops carrying
+	amount := money.Amount{}
+	f.Amount = strings.TrimSpace(f.Amount)
+	switch {
+	case f.Amount == "" && f.New:
+		errs[amountKey] = u.dicts.T(p.lang, "required")
+	case f.Amount == "":
+		f.Repeating = false
+	default:
+		if amount, err = money.Parse(f.Amount); err != nil {
+			errs[amountKey] = u.dicts.T(p.lang, "enter a number")
+		} else if amount.IsNegative() {
+			errs[amountKey] = u.dicts.T(p.lang, "must not be negative")
+		}
+	}
+	if len(errs) > 0 && f.New {
+		return u.renderNewPlan(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	if len(errs) > 0 {
+		return u.renderPlans(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	err = u.svc.Plans.Set(r.Context(), user.ID, f.Category, month, f.Currency, amount, f.Repeating)
+	// the new plan form shows an error on itself, a plan row gets it as a toast
+	if isUserError(err) && f.New {
+		return u.renderNewPlan(w, r, user, http.StatusUnprocessableEntity, f, err)
+	}
+	if err != nil {
 		return err
 	}
-	redirect(w, r, "/plans?"+url.Values{"month": {f.Month}, "kind": {f.Kind}}.Encode())
-	return nil
+	if f.New {
+		redirect(w, r, "/plans?"+url.Values{"month": {f.Month}}.Encode())
+		return nil
+	}
+	// a plan row saved in place stays open, as a redirect would close it; setting it
+	// again on a resubmit is harmless
+	return u.renderPlans(w, r, user, http.StatusOK, f, nil)
 }
 
 func (u *UI) fillPlans(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -199,7 +256,6 @@ func (u *UI) fillPlans(w http.ResponseWriter, r *http.Request, user domain.User)
 	}
 	var f struct {
 		Month string `form:"month"`
-		Kind  string `form:"kind"`
 	}
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
@@ -211,6 +267,6 @@ func (u *UI) fillPlans(w http.ResponseWriter, r *http.Request, user domain.User)
 	if _, err := u.svc.Plans.Fill(r.Context(), user.ID, month); err != nil {
 		return err
 	}
-	redirect(w, r, "/plans?"+url.Values{"month": {f.Month}, "kind": {f.Kind}}.Encode())
+	redirect(w, r, "/plans?"+url.Values{"month": {f.Month}}.Encode())
 	return nil
 }

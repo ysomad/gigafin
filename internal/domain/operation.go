@@ -2,7 +2,6 @@ package domain
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,7 +30,7 @@ func OpTypes() []OpType {
 func ParseOpType(s string) (OpType, error) {
 	t := OpType(s)
 	if !slices.Contains(OpTypes(), t) {
-		return "", NewFieldError(errors.ErrInvalid, "type", "must be expense, income, transfer or adjustment")
+		return "", NewError(errors.ErrInvalid, "type: must be expense, income, transfer or adjustment")
 	}
 	return t, nil
 }
@@ -148,25 +147,25 @@ func NewOperation(in OperationInput, acc Account, to *Account, cat *Category, kn
 		Time:      tm,
 	}
 	op.Payee = strings.TrimSpace(in.Payee)
-	if utf8.RuneCountInString(op.Payee) > _maxTextLen {
-		return Operation{}, NewFieldError(errors.ErrInvalid, "payee", "too long")
+	if utf8.RuneCountInString(op.Payee) > MaxTextLen {
+		return Operation{}, NewError(errors.ErrInvalid, "payee: too long")
 	}
 	op.SourcePayee = strings.TrimSpace(in.SourcePayee)
-	if utf8.RuneCountInString(op.SourcePayee) > _maxTextLen {
-		return Operation{}, NewFieldError(errors.ErrInvalid, "source_payee", "too long")
+	if utf8.RuneCountInString(op.SourcePayee) > MaxTextLen {
+		return Operation{}, NewError(errors.ErrInvalid, "bank payee: too long")
 	}
 	op.Note = strings.TrimSpace(in.Note)
-	if utf8.RuneCountInString(op.Note) > _maxTextLen {
-		return Operation{}, NewFieldError(errors.ErrInvalid, "note", "too long")
+	if utf8.RuneCountInString(op.Note) > MaxTextLen {
+		return Operation{}, NewError(errors.ErrInvalid, "note: too long")
 	}
 	if op.MCC = strings.TrimSpace(in.MCC); op.MCC != "" && !ValidMCC(op.MCC) {
-		return Operation{}, NewFieldError(errors.ErrInvalid, "mcc", "must be 4 digits")
+		return Operation{}, NewError(errors.ErrInvalid, "mcc: must be 4 digits")
 	}
 	if op.Tags, err = newTags(in.Tags, known); err != nil {
 		return Operation{}, err
 	}
 	if _, err := in.Amount.ToMinor(acc.Currency); err != nil {
-		return Operation{}, NewFieldError(errors.ErrInvalid, "amount", "not a valid amount in %s", acc.Currency)
+		return Operation{}, NewError(errors.ErrInvalid, "amount: not a valid amount in %s", acc.Currency)
 	}
 
 	switch typ {
@@ -174,10 +173,10 @@ func NewOperation(in OperationInput, acc Account, to *Account, cat *Category, kn
 		err = op.setTransfer(in, to)
 	case OpAdjustment:
 		if in.CategoryID != 0 {
-			return Operation{}, NewFieldError(errors.ErrInvalid, "category_id", "adjustments have no category")
+			return Operation{}, NewError(errors.ErrInvalid, "category: adjustments have no category")
 		}
 		if in.Amount.IsZero() {
-			return Operation{}, NewFieldError(errors.ErrInvalid, "amount", "must not be zero")
+			return Operation{}, NewError(errors.ErrInvalid, "amount: must not be zero")
 		}
 	case OpExpense, OpIncome:
 		err = op.setCategory(in, cat)
@@ -191,18 +190,17 @@ func NewOperation(in OperationInput, acc Account, to *Account, cat *Category, kn
 // newTags trims names, drops empty ones and duplicates ignoring case, and sorts them.
 // A name matching a known tag ignoring case takes its spelling.
 func newTags(names, known []string) ([]string, error) {
-	const maxLen = 50
 	var tags []string
 	for _, n := range names {
 		n = strings.Join(strings.Fields(n), " ")
 		if n == "" {
 			continue
 		}
-		if utf8.RuneCountInString(n) > maxLen {
-			return nil, NewFieldError(errors.ErrInvalid, "tags", "%q: longer than %d characters", n, maxLen)
+		if utf8.RuneCountInString(n) > MaxTagLen {
+			return nil, NewError(errors.ErrInvalid, "tags: %q: longer than %d characters", n, MaxTagLen)
 		}
 		if strings.Contains(n, ",") {
-			return nil, NewFieldError(errors.ErrInvalid, "tags", "%q: must not contain a comma", n)
+			return nil, NewError(errors.ErrInvalid, "tags: %q: must not contain a comma", n)
 		}
 		if i := slices.IndexFunc(known, func(k string) bool { return strings.EqualFold(k, n) }); i >= 0 {
 			n = known[i]
@@ -211,8 +209,8 @@ func newTags(names, known []string) ([]string, error) {
 			tags = append(tags, n)
 		}
 	}
-	if len(tags) > _maxTags {
-		return nil, NewFieldError(errors.ErrInvalid, "tags", "at most %d", _maxTags)
+	if len(tags) > MaxTags {
+		return nil, NewError(errors.ErrInvalid, "tags: at most %d", MaxTags)
 	}
 	slices.Sort(tags)
 	return tags, nil
@@ -233,20 +231,20 @@ func ValidMCC(s string) bool {
 
 func (o *Operation) setTransfer(in OperationInput, to *Account) error {
 	if in.CategoryID != 0 {
-		return NewFieldError(errors.ErrInvalid, "category_id", "transfers have no category")
+		return NewError(errors.ErrInvalid, "category: transfers have no category")
 	}
 	if !in.Amount.IsPositive() {
-		return NewFieldError(errors.ErrInvalid, "amount", "must be positive")
+		return NewError(errors.ErrInvalid, "amount: must be positive")
 	}
 	if in.ToAccountID == o.AccountID {
-		return NewFieldError(errors.ErrInvalid, "to_account_id", "must differ from the source account")
+		return NewError(errors.ErrInvalid, "destination account: must differ from the source account")
 	}
 	if to == nil {
-		return NewFieldError(errors.ErrInvalid, "to_account_id", "destination account not found")
+		return NewError(errors.ErrInvalid, "destination account: destination account not found")
 	}
 	if to.Currency != o.Currency {
-		return NewFieldError(
-			errors.ErrInvalid, "to_account_id", "cannot transfer %s to a %s account", o.Currency, to.Currency,
+		return NewError(
+			errors.ErrInvalid, "cannot transfer %s to a %s account", o.Currency, to.Currency,
 		)
 	}
 	o.ToAccountID = to.ID
@@ -255,16 +253,16 @@ func (o *Operation) setTransfer(in OperationInput, to *Account) error {
 
 func (o *Operation) setCategory(in OperationInput, cat *Category) error {
 	if in.CategoryID == 0 {
-		return NewFieldError(errors.ErrInvalid, "category_id", "required")
+		return NewError(errors.ErrInvalid, "category: required")
 	}
 	if cat == nil || cat.ID != in.CategoryID {
-		return NewFieldError(errors.ErrInvalid, "category_id", "category not found")
+		return NewError(errors.ErrInvalid, "category: category not found")
 	}
 	if cat.Kind != o.Kind() {
-		return NewFieldError(errors.ErrInvalid, "category_id", "category %q is not an %s category", cat.Name, Msg(o.Kind()))
+		return NewError(errors.ErrInvalid, "category: category %q is not an %s category", cat.Name, Msg(o.Kind()))
 	}
 	if !in.Amount.IsPositive() {
-		return NewFieldError(errors.ErrInvalid, "amount", "must be positive")
+		return NewError(errors.ErrInvalid, "amount: must be positive")
 	}
 	o.CategoryID = cat.ID
 	return nil
@@ -285,13 +283,13 @@ type SplitPart struct {
 func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([]Operation, error) {
 	const maxParts = 50
 	if op.Type != OpExpense && op.Type != OpIncome {
-		return nil, NewFieldError(errors.ErrInvalid, "type", "only expenses and income can be split")
+		return nil, NewError(errors.ErrInvalid, "type: only expenses and income can be split")
 	}
 	if len(parts) < 2 {
-		return nil, NewFieldError(errors.ErrInvalid, "parts", "at least 2 parts")
+		return nil, NewError(errors.ErrInvalid, "parts: at least 2 parts")
 	}
 	if len(parts) > maxParts {
-		return nil, NewFieldError(errors.ErrInvalid, "parts", "at most %d parts", maxParts)
+		return nil, NewError(errors.ErrInvalid, "parts: at most %d parts", maxParts)
 	}
 	origin := op.OriginID
 	if origin == 0 {
@@ -300,25 +298,24 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 	sum := money.Amount{}
 	out := make([]Operation, len(parts))
 	for i, p := range parts {
-		field := "parts[" + strconv.Itoa(i) + "]."
 		c, ok := cats[p.CategoryID]
 		if !ok {
-			return nil, NewFieldError(errors.ErrInvalid, field+"category_id", "category not found")
+			return nil, NewError(errors.ErrInvalid, "part %d: category not found", i+1)
 		}
 		if c.Kind != op.Kind() {
-			return nil, NewFieldError(
+			return nil, NewError(
 				errors.ErrInvalid,
-				field+"category_id",
-				"category %q is not an %s category",
+				"part %d: category %q is not an %s category",
+				i+1,
 				c.Name,
 				Msg(op.Kind()),
 			)
 		}
 		if _, err := p.Amount.ToMinor(op.Currency); err != nil {
-			return nil, NewFieldError(errors.ErrInvalid, field+"amount", "not a valid amount in %s", op.Currency)
+			return nil, NewError(errors.ErrInvalid, "part %d: not a valid amount in %s", i+1, op.Currency)
 		}
 		if !p.Amount.IsPositive() {
-			return nil, NewFieldError(errors.ErrInvalid, field+"amount", "must be positive")
+			return nil, NewError(errors.ErrInvalid, "part %d: amount must be positive", i+1)
 		}
 		part := op
 		if i > 0 {
@@ -326,8 +323,8 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 		}
 		part.CategoryID, part.Amount, part.OriginID = c.ID, p.Amount, origin
 		if note := strings.TrimSpace(p.Note); note != "" {
-			if utf8.RuneCountInString(note) > _maxTextLen {
-				return nil, NewFieldError(errors.ErrInvalid, field+"note", "too long")
+			if utf8.RuneCountInString(note) > MaxTextLen {
+				return nil, NewError(errors.ErrInvalid, "part %d: note too long", i+1)
 			}
 			part.Note = note
 		}
@@ -335,9 +332,9 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 		out[i] = part
 	}
 	if !sum.Equal(op.Amount) {
-		return nil, NewFieldError(
+		return nil, NewError(
 			errors.ErrInvalid,
-			"parts", "add up to %s, not %s",
+			"parts add up to %s, not %s",
 			sum.Fixed(op.Currency),
 			op.Amount.Fixed(op.Currency),
 		)
@@ -347,14 +344,14 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 
 func parseDateTime(date time.Time, tm string) (time.Time, string, error) {
 	if date.IsZero() {
-		return time.Time{}, "", NewFieldError(errors.ErrInvalid, "date", "required")
+		return time.Time{}, "", NewError(errors.ErrInvalid, "date: required")
 	}
 	if strings.TrimSpace(tm) == "" {
 		return timex.Date(date), "", nil
 	}
 	clock, err := timex.ParseClock(tm)
 	if err != nil {
-		return time.Time{}, "", NewFieldError(errors.ErrInvalid, "time", "must be HH:MM")
+		return time.Time{}, "", NewError(errors.ErrInvalid, "time: must be HH:MM")
 	}
 	return timex.Date(date), clock, nil
 }
@@ -385,13 +382,13 @@ func (f Filter) Filtered() bool {
 // Validate checks that amount bounds are not negative and min is not above max.
 func (f Filter) Validate() error {
 	if f.AmountMin.Valid && f.AmountMin.Amount.IsNegative() {
-		return NewFieldError(errors.ErrInvalid, "amount min", "must not be negative")
+		return NewError(errors.ErrInvalid, "amount min: must not be negative")
 	}
 	if f.AmountMax.Valid && f.AmountMax.Amount.IsNegative() {
-		return NewFieldError(errors.ErrInvalid, "amount max", "must not be negative")
+		return NewError(errors.ErrInvalid, "amount max: must not be negative")
 	}
 	if f.AmountMin.Valid && f.AmountMax.Valid && f.AmountMin.Amount.Cmp(f.AmountMax.Amount) > 0 {
-		return NewFieldError(errors.ErrInvalid, "amount min", "must not be above max")
+		return NewError(errors.ErrInvalid, "amount min: must not be above max")
 	}
 	return nil
 }

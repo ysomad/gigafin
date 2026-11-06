@@ -101,39 +101,10 @@ func (r *Rules) Delete(ctx context.Context, userID, id int64) error {
 	return affected(n, err, "delete rule")
 }
 
-// DeleteAll deletes all rules of the user and their settings.
+// DeleteAll deletes all rules of the user.
 func (r *Rules) DeleteAll(ctx context.Context, userID int64) error {
 	if err := r.q.DeleteUserRules(ctx, userID); err != nil {
 		return fmt.Errorf("delete rules: %w", err)
-	}
-	if err := r.q.DeleteUserRuleSettings(ctx, userID); err != nil {
-		return fmt.Errorf("delete rule settings: %w", err)
-	}
-	return nil
-}
-
-// Settings returns the user's rule settings, the defaults if the user never changed
-// them.
-func (r *Rules) Settings(ctx context.Context, userID int64) (domain.RuleSettings, error) {
-	s, err := r.q.GetRuleSettings(ctx, userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DefaultRuleSettings(), nil
-	}
-	if err != nil {
-		return domain.RuleSettings{}, fmt.Errorf("get rule settings: %w", err)
-	}
-	return domain.RuleSettings{Learning: s.IsLearning}, nil
-}
-
-// SetSettings stores the user's rule settings.
-func (r *Rules) SetSettings(ctx context.Context, userID int64, s domain.RuleSettings, now time.Time) error {
-	err := r.q.UpsertRuleSettings(ctx, sqlc.UpsertRuleSettingsParams{
-		UserID:     userID,
-		IsLearning: s.Learning,
-		CreatedAt:  now.Unix(),
-	})
-	if err != nil {
-		return fmt.Errorf("set rule settings: %w", err)
 	}
 	return nil
 }

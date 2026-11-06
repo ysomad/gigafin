@@ -1,6 +1,7 @@
 {{define "content"}}
 {{$d := .Data}}
 <h1>{{if $d.ID}}{{t "Edit %s" (t (print $d.Type))}}{{else}}{{t "New %s" (t (print $d.Type))}}{{end}}</h1>
+{{if and $d.ID $d.ImportID}}<p class="text-light mb-4">{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a></p>{{end}}
 {{if not $d.ID}}
 <div class="hstack mb-4">
   <a class="button{{if ne $d.Type "expense"}} outline{{end}}"{{if eq $d.Type "expense"}} aria-current="page"{{end}} href="/operations/new?type=expense" data-variant="secondary">− {{t "Expense"}}</a>
@@ -8,18 +9,21 @@
   <a class="button{{if ne $d.Type "transfer"}} outline{{end}}"{{if eq $d.Type "transfer"}} aria-current="page"{{end}} href="/operations/new?type=transfer" data-variant="secondary">⇄ {{t "Transfer"}}</a>
 </div>
 {{end}}
-<form id="op-form-{{$d.Type}}" class="form-compact" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-select-oob="#toasts" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
+<form id="{{if $d.ID}}form-operation{{else}}op-form-{{$d.Type}}{{end}}" class="form-compact" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-select-oob="#toasts" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
+  {{with $.Errors.Form "operation"}}<p class="error" role="alert">{{.}}</p>{{end}}
   <input type="hidden" name="type" value="{{$d.Type}}">
   {{if $d.ImportID}}<input type="hidden" name="import_id" value="{{$d.ImportID}}">{{end}}
   {{if $d.OriginID}}<input type="hidden" name="origin_id" value="{{$d.OriginID}}">{{end}}
   <fieldset class="row mb-4" aria-label="{{t "Operation details"}}">
-    <label data-field class="col-6">{{if eq $d.Type "transfer"}}{{t "From"}}{{else}}{{t "Account"}}{{end}}
-      <select name="account">
+    {{$e := $.Errors.Get "account"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{if eq $d.Type "transfer"}}{{t "From"}}{{else}}{{t "Account"}}{{end}}
+      <select name="account"{{if $e}} aria-invalid="true" aria-describedby="account-error-{{$d.Type}}"{{end}}>
         {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.AccountID}} selected{{end}}>{{.Name}} ({{if $d.ID}}{{.Currency}}{{else}}{{money .Balance .Currency}} {{.Currency}}{{end}})</option>{{end}}
       </select>
+      {{if $e}}<div id="account-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{if eq $d.Type "transfer"}}
-    {{$e := $.Errors.Get "to_account_id"}}
+    {{$e := $.Errors.Get "to_account"}}
     <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "To"}}
       <select name="to_account"{{if $e}} aria-invalid="true" aria-describedby="to-account-error-{{$d.Type}}"{{end}}>
         <option value="">—</option>
@@ -29,7 +33,7 @@
     </label>
     {{end}}
     {{if or (eq $d.Type "expense") (eq $d.Type "income")}}
-    {{$e := $.Errors.Get "category_id"}}
+    {{$e := $.Errors.Get "category"}}
     <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Category"}}
       <select name="category"{{if $e}} aria-invalid="true" aria-describedby="category-error-{{$d.Type}}"{{end}}>
         <option value="">—</option>
@@ -45,7 +49,7 @@
     </label>
   </fieldset>
   <fieldset class="row mb-4" aria-label="{{t "Date and payee"}}">
-    {{$e := or ($.Errors.Get "date") ($.Errors.Get "time")}}
+    {{$e := $.Errors.Get "date"}}
     <div data-field class="col-12"{{if $e}} aria-invalid="true"{{end}}>
       <label for="date-{{$d.Type}}">{{t "Date"}}</label>
       <fieldset class="group">
@@ -88,6 +92,5 @@
 </form>
 {{if $d.ID}}
 <form id="op-delete" method="post" action="/operations/{{$d.ID}}/delete" hx-confirm="{{t "Delete this operation?"}}"></form>
-{{if $d.ImportID}}<p class="text-light mt-4">{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a></p>{{end}}
 {{end}}
 {{end}}

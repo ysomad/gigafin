@@ -3,9 +3,11 @@ package ui
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -32,6 +34,7 @@ func (u *UI) renderAccounts(
 	if err != nil {
 		return err
 	}
+
 	for _, a := range accounts {
 		if a.Kind.Liability() {
 			d.Liabilities = append(d.Liabilities, a)
@@ -39,14 +42,7 @@ func (u *UI) renderAccounts(
 			d.Assets = append(d.Assets, a)
 		}
 	}
-	d.Currencies = money.Currencies()
-	d.Kinds = domain.AccountKinds()
-	if d.Currency == "" {
-		d.Currency = domain.DefaultCurrency
-	}
-	if d.Kind == "" {
-		d.Kind = string(domain.AccountDebit)
-	}
+
 	return u.render(
 		w,
 		r,
@@ -56,25 +52,70 @@ func (u *UI) renderAccounts(
 	)
 }
 
-// accountInput converts the decoded account form.
-func accountInput(d accountsData) (domain.AccountInput, error) {
+// renderNewAccount renders the new account form with the values of d.
+func (u *UI) renderNewAccount(
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, d accountsData, viewErr error,
+) error {
+	d.Currencies = money.Currencies()
+	d.Kinds = domain.AccountKinds()
+
+	if d.Currency == "" {
+		d.Currency = domain.DefaultCurrency
+	}
+
+	if d.Kind == "" {
+		d.Kind = string(domain.AccountDebit)
+	}
+
+	return u.render(
+		w,
+		r,
+		status,
+		"account_new",
+		view{User: &user, Nav: "settings", Title: "New account", Error: viewErr, Form: "account", Data: d},
+	)
+}
+
+// accountInput validates the decoded account form, of a new account if create, and
+// returns the messages of its invalid inputs translated to lang.
+func (u *UI) accountInput(d accountsData, lang string, create bool) (domain.AccountInput, fieldsError) {
+	errs := fieldsError{}
 	in := domain.AccountInput{
-		Name:     d.Name,
+		Name:     strings.TrimSpace(d.Name),
 		Currency: d.Currency,
 		Kind:     domain.AccountKind(d.Kind),
 	}
-	if d.CreditLimit == "" {
-		return in, nil
+	switch {
+	case in.Name == "":
+		errs["name"] = u.dicts.T(lang, "required")
+	case utf8.RuneCountInString(in.Name) > domain.MaxTextLen:
+		errs["name"] = u.dicts.T(lang, "too long")
+	}
+	if in.Kind != "" && !slices.Contains(domain.AccountKinds(), in.Kind) {
+		errs["kind"] = u.dicts.T(lang, "choose from the list")
+	}
+	if create && !money.ValidCurrency(in.Currency) {
+		errs["currency"] = u.dicts.T(lang, "choose from the list")
+	}
+	if d.CreditLimit == "" || in.Kind != domain.AccountCredit {
+		return in, errs
 	}
 	var err error
-	if in.CreditLimit, err = money.Parse(d.CreditLimit); err != nil {
-		return in, domain.NewFieldError(errors.ErrInvalid, "credit limit", "enter a number")
+	switch in.CreditLimit, err = money.Parse(d.CreditLimit); {
+	case err != nil:
+		errs["credit_limit"] = u.dicts.T(lang, "enter a number")
+	case !in.CreditLimit.IsPositive():
+		errs["credit_limit"] = u.dicts.T(lang, "must be positive")
 	}
-	return in, nil
+	return in, errs
 }
 
 func (u *UI) accounts(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	return u.renderAccounts(w, r, user, http.StatusOK, accountsData{}, nil)
+}
+
+func (u *UI) newAccount(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	return u.renderNewAccount(w, r, user, http.StatusOK, accountsData{}, nil)
 }
 
 func (u *UI) createAccount(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -86,18 +127,21 @@ func (u *UI) createAccount(w http.ResponseWriter, r *http.Request, user domain.U
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	d.CreditLimit, d.Balance = strings.TrimSpace(d.CreditLimit), strings.TrimSpace(d.Balance)
-	in, err := accountInput(d)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	in, errs := u.accountInput(d, p.lang, true)
 	var balance money.Amount
-	if err == nil && d.Balance != "" {
+	if d.Balance != "" {
+		var err error
 		if balance, err = money.Parse(d.Balance); err != nil {
-			err = domain.NewFieldError(errors.ErrInvalid, "balance", "enter a number")
+			errs["balance"] = u.dicts.T(p.lang, "enter a number")
 		}
 	}
-	if err == nil {
-		_, err = u.svc.Accounts.CreateWithBalance(r.Context(), user.ID, in, balance, u.svc.Today(user))
+	if len(errs) > 0 {
+		return u.renderNewAccount(w, r, user, http.StatusUnprocessableEntity, d, errs)
 	}
+	_, err := u.svc.Accounts.CreateWithBalance(r.Context(), user.ID, in, balance, u.svc.Today(user))
 	if isUserError(err) {
-		return u.renderAccounts(w, r, user, http.StatusUnprocessableEntity, d, err)
+		return u.renderNewAccount(w, r, user, http.StatusUnprocessableEntity, d, err)
 	}
 	if err != nil {
 		return err
@@ -128,7 +172,11 @@ func (u *UI) renderAccount(
 		return err
 	}
 	if d == nil {
-		d = &accountData{Target: a.Balance.Fixed(a.Currency), Date: timex.FormatDate(u.svc.Today(user))}
+		d = &accountData{}
+	}
+	// the balance input always posts with its form
+	if !r.PostForm.Has("balance") {
+		d.Target, d.Date = a.Balance.Fixed(a.Currency), timex.FormatDate(u.svc.Today(user))
 	}
 	// the kind select always posts
 	if d.Edit.Kind == "" {
@@ -138,8 +186,12 @@ func (u *UI) renderAccount(
 		}
 	}
 	d.Account, d.Kinds = a, domain.AccountKinds()
+	form := "edit"
+	if r.PostForm.Has("balance") {
+		form = "balance"
+	}
 	return u.render(w, r, status, "account", view{
-		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{a.Name}, Error: viewErr, Data: *d,
+		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{a.Name}, Error: viewErr, Form: form, Data: *d,
 	})
 }
 
@@ -164,10 +216,12 @@ func (u *UI) updateAccount(w http.ResponseWriter, r *http.Request, user domain.U
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	d.CreditLimit = strings.TrimSpace(d.CreditLimit)
-	in, err := accountInput(d)
-	if err == nil {
-		err = u.svc.Accounts.Update(r.Context(), user.ID, id, in)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	in, errs := u.accountInput(d, p.lang, false)
+	if len(errs) > 0 {
+		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &accountData{Edit: d}, errs)
 	}
+	err = u.svc.Accounts.Update(r.Context(), user.ID, id, in)
 	if isUserError(err) {
 		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &accountData{Edit: d}, err)
 	}
@@ -190,18 +244,22 @@ func (u *UI) setBalance(w http.ResponseWriter, r *http.Request, user domain.User
 	if err := u.formDecoder.Decode(&d, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var date time.Time
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
 	target, err := money.Parse(d.Target)
 	if err != nil {
-		err = domain.NewFieldError(errors.ErrInvalid, "balance", "enter a number")
-	} else if d.Date != "" {
+		errs["balance"] = u.dicts.T(p.lang, "enter a number")
+	}
+	var date time.Time
+	if d.Date != "" {
 		if date, err = timex.ParseDate(d.Date); err != nil {
-			err = domain.NewFieldError(errors.ErrInvalid, "date", "must be YYYY-MM-DD")
+			errs["date"] = u.dicts.T(p.lang, "must be YYYY-MM-DD")
 		}
 	}
-	if err == nil {
-		_, err = u.svc.Accounts.SetBalance(r.Context(), user.ID, id, target, date)
+	if len(errs) > 0 {
+		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &d, errs)
 	}
+	_, err = u.svc.Accounts.SetBalance(r.Context(), user.ID, id, target, date)
 	if isUserError(err) {
 		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &d, err)
 	}

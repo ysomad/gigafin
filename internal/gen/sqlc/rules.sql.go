@@ -68,15 +68,6 @@ func (q *Queries) DeleteRule(ctx context.Context, arg DeleteRuleParams) (int64, 
 	return result.RowsAffected()
 }
 
-const deleteUserRuleSettings = `-- name: DeleteUserRuleSettings :exec
-DELETE FROM rule_settings WHERE user_id = ?
-`
-
-func (q *Queries) DeleteUserRuleSettings(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUserRuleSettings, userID)
-	return err
-}
-
 const deleteUserRules = `-- name: DeleteUserRules :exec
 DELETE FROM rules WHERE user_id = ?
 `
@@ -106,22 +97,6 @@ func (q *Queries) GetRule(ctx context.Context, arg GetRuleParams) (Rule, error) 
 		&i.Conditions,
 		&i.Actions,
 		&i.Origin,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getRuleSettings = `-- name: GetRuleSettings :one
-SELECT user_id, is_learning, created_at, updated_at FROM rule_settings WHERE user_id = ?
-`
-
-func (q *Queries) GetRuleSettings(ctx context.Context, userID int64) (RuleSetting, error) {
-	row := q.db.QueryRowContext(ctx, getRuleSettings, userID)
-	var i RuleSetting
-	err := row.Scan(
-		&i.UserID,
-		&i.IsLearning,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -207,23 +182,4 @@ func (q *Queries) UpdateRule(ctx context.Context, arg UpdateRuleParams) (Rule, e
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const upsertRuleSettings = `-- name: UpsertRuleSettings :exec
-INSERT INTO rule_settings (user_id, is_learning, created_at)
-VALUES (?, ?, ?)
-ON CONFLICT (user_id) DO UPDATE SET
-    is_learning = excluded.is_learning,
-    updated_at = excluded.created_at
-`
-
-type UpsertRuleSettingsParams struct {
-	UserID     int64
-	IsLearning bool
-	CreatedAt  int64
-}
-
-func (q *Queries) UpsertRuleSettings(ctx context.Context, arg UpsertRuleSettingsParams) error {
-	_, err := q.db.ExecContext(ctx, upsertRuleSettings, arg.UserID, arg.IsLearning, arg.CreatedAt)
-	return err
 }

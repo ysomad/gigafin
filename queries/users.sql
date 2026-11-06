@@ -56,7 +56,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: ListAPIKeys :many
-SELECT * FROM api_keys WHERE user_id = ? ORDER BY id DESC;
+SELECT * FROM api_keys WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC;
 
 -- name: GetAPIKeyByPrefix :one
 SELECT * FROM api_keys WHERE prefix = ?;

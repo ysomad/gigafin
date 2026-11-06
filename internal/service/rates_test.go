@@ -75,7 +75,8 @@ func TestRates(t *testing.T) {
 	_, err = svc.Rates.Import(ctx, userID, strings.NewReader("date,from,to,rate\n2026-10-01,USD,RUB,90\n"))
 	require.ErrorIs(t, err, errors.ErrConflict, "no manual rates while rates are off")
 
-	require.NoError(t, svc.Settings.SetRates(ctx, userID, domain.RateSourceCBR, "EUR"))
+	err = svc.Settings.Set(ctx, userID, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "EUR"})
+	require.NoError(t, err)
 	n, err = svc.Rates.Sync(ctx)
 	require.NoError(t, err)
 	// EUR as the primary currency and USD of the account, RUB is the pivot; 5 to 11 October

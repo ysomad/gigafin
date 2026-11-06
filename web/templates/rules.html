@@ -5,14 +5,6 @@
 </div>
 <p class="text-light">{{t "Rules run when importing or creating operations."}}</p>
 
-<form method="post" action="/rules/learning">
-  <div class="row mb-4">
-    <label data-field class="col-4"><input type="checkbox" role="switch" name="learning"{{if $d.Settings.Learning}} checked{{end}}> {{t "Learn from my categories"}}</label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
-  </div>
-  <p class="text-light">{{t "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee."}}</p>
-</form>
-
 {{range $d.Stages}}
 <h2>{{template "rule-stage" .Stage}}</h2>
 <ul class="vstack">

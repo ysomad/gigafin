@@ -12,10 +12,14 @@ import (
 
 type dashboardData struct {
 	Dash domain.Dashboard
-	Prev string
-	Next string
-	From string
-	To   string
+	// Prev, Next, ComparePrev and CompareNext are adjacent months within Months,
+	// empty when there is none.
+	Prev        string
+	Next        string
+	ComparePrev string
+	CompareNext string
+	From        string
+	To          string
 	// Charts are income vs expense with net worth per currency, ordered by currency.
 	Charts []trendChart
 	// Months are the months with operations, latest first, to pick Month and CompareMonth from.
@@ -57,11 +61,31 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	}
 	d := dashboardData{
 		Dash:   dash,
-		Prev:   month.Prev().String(),
-		Next:   month.Next().String(),
 		From:   timex.FormatDate(month.First()),
 		To:     timex.FormatDate(month.Last()),
 		Months: months,
+	}
+	// months is a contiguous range, latest first, always holding month and compareMonth
+	newest, oldest := months[0].String(), months[len(months)-1].String()
+	if month.String() != oldest {
+		d.Prev = month.Prev().String()
+	}
+	if month.String() != newest {
+		d.Next = month.Next().String()
+	}
+	// compare options leave out month, so its buttons step over it
+	ci := slices.IndexFunc(months, func(m timex.Month) bool { return m.String() == compareMonth.String() })
+	for _, m := range months[ci+1:] {
+		if m.String() != month.String() {
+			d.ComparePrev = m.String()
+			break
+		}
+	}
+	for _, m := range slices.Backward(months[:ci]) {
+		if m.String() != month.String() {
+			d.CompareNext = m.String()
+			break
+		}
 	}
 	// trends and net worth share TrendMonths but not always currencies
 	n := len(dash.TrendMonths)

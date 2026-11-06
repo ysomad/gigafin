@@ -1,0 +1,24 @@
+{{define "content"}}
+{{$d := .Data}}
+<h1>{{t "New category"}} <span class="text-light">{{if eq $d.Kind "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</span></h1>
+<form id="form-category" class="form-compact" method="post" action="/categories">
+  {{with $.Errors.Form "category"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <input type="hidden" name="kind" value="{{$d.Kind}}">
+  <fieldset class="row mb-4" aria-label="{{t "Category"}}">
+    {{$e := $.Errors.Get "name"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    <label data-field class="col-6">{{t "Inside"}}
+      <select name="parent">
+        <option value="0">{{t "Top level"}}</option>
+        {{range byKind $d.Categories $d.Kind}}{{if not .Archived}}<option value="{{.ID}}"{{if eq .ID $d.Parent}} selected{{end}}>{{.Name}}</option>{{end}}{{end}}
+      </select>
+    </label>
+  </fieldset>
+  <div class="hstack">
+    <button type="submit">{{t "Create"}}</button>
+    <a class="button outline" href="/categories?kind={{$d.Kind}}" data-variant="secondary">{{t "Cancel"}}</a>
+  </div>
+</form>
+{{end}}

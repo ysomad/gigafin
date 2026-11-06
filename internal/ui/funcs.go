@@ -22,6 +22,7 @@ var _funcs = template.FuncMap{
 	"min":     func(a, b int64) int64 { return min(a, b) },
 
 	"ruleStages":      domain.RuleStages,
+	"planKey":         planKey,
 	"ruleActionTypes": domain.ActionTypes,
 }
 
@@ -89,7 +90,7 @@ func langFuncs(d i18n.Dicts, lang string) template.FuncMap {
 	}
 }
 
-// errText returns the message of err translated to lang by d: the field, format and
+// errText returns the message of err translated to lang by d: the format and
 // domain.Msg args of domain.Error translated, the error kinds ending them dropped,
 // other errors as is.
 func errText(d i18n.Dicts, lang string, err error) string {
@@ -111,9 +112,6 @@ func errText(d i18n.Dicts, lang string, err error) string {
 	}
 
 	msg := d.T(lang, e.Format, args...)
-	if e.Field != "" {
-		msg = d.T(lang, e.Field+i18n.ContextSep+"field") + ": " + msg
-	}
 
 	if _, ok := e.Cause.(errors.Error); ok {
 		return msg
@@ -204,5 +202,5 @@ func opAmount(op domain.Operation, format func(money.Amount, string) string) str
 	if d.IsPositive() && op.Type != domain.OpTransfer {
 		s = "+" + s
 	}
-	return s + " " + op.Currency
+	return s
 }

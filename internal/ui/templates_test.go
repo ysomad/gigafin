@@ -79,12 +79,18 @@ func TestTemplatesWithoutDatabase(t *testing.T) {
 		{name: "categories", page: "categories", data: categoriesData{
 			Kind: "expense", Categories: []domain.Category{category},
 		}},
+		{name: "category-new", page: "category_new", data: categoriesData{
+			Kind: "expense", Categories: []domain.Category{category},
+		}},
 		{name: "category", page: "category", data: categoryData{Category: category}},
 		{name: "plans", page: "plans", data: plansData{
-			Kind: "expense", Day: 15, Days: 30, Pace: 50,
-			Totals: []planItem{{Row: plan}}, Planned: []planItem{{Row: plan, Includes: []domain.PlanRow{plan}}},
-			Unplanned: []planItem{{Row: plan}},
+			Day: 15, Days: 30, Pace: 50,
+			Sections: []planSection{
+				{Kind: "income", Totals: []domain.PlanRow{plan}, Planned: []planItem{{Row: plan}}},
+				{Kind: "expense", Totals: []domain.PlanRow{plan}, Planned: []planItem{{Row: plan}}},
+			},
 		}},
+		{name: "plan-new", page: "plan_new", data: planNewData{Currencies: []string{"RUB"}}},
 		{name: "imports", page: "imports", data: importsData{Imports: []domain.Import{preview.Import}}},
 		{name: "import-accounts", page: "import", data: importData{Step: "accounts", Preview: preview}},
 		{name: "import-categories", page: "import", data: importData{Step: "categories", Preview: preview}},

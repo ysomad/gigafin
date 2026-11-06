@@ -131,7 +131,9 @@ func TestLoginRequired(t *testing.T) {
 
 	status, body = b.post("/login", url.Values{"login": {"alice"}, "password": {"wrong"}})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "invalid login or password")
+	assert.Contains(t, body, `<p class="error" role="alert">invalid login or password</p>`,
+		"a business error is shown on its form")
+	assert.NotContains(t, body, `class="toast"`)
 
 	b.login()
 	status, body = b.get("/")
@@ -159,7 +161,7 @@ func TestPagesAndFlows(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `value="1000.50"`, "inputs keep non-zero minor units when they are hidden")
 
-	status, body = b.post("/settings/display", url.Values{"show_minor_units": {"on"}})
+	status, body = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}, "show_minor_units": {"on"}})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `name="show_minor_units" checked`)
 	status, body = b.get("/accounts")
@@ -190,7 +192,7 @@ func TestPagesAndFlows(t *testing.T) {
 	salary := tree[1]
 
 	// a tampered id is a form error shown on the page, not a silent 0
-	status, body = b.postFrom("/categories", "/categories", url.Values{"parent": {"abc"}, "name": {"Bad"}})
+	status, body = b.postFrom("/categories", "/categories/new", url.Values{"parent": {"abc"}, "name": {"Bad"}})
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "invalid integer value")
 	tree, err = f.Categories.Tree(t.Context(), userID)
@@ -217,7 +219,7 @@ func TestPagesAndFlows(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Market")
-	assert.Contains(t, body, "-150.25 RUB")
+	assert.Contains(t, body, `-150.25 <span class="text-light">RUB</span>`)
 
 	status, body = b.post("/operations", url.Values{
 		"type": {"expense"}, "account": {strconv.FormatInt(card.ID, 10)}, "date": {"2026-10-31"},
@@ -227,11 +229,22 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(
 		t,
 		body,
-		`<div id="category-error-expense" class="error" role="status">`+
-			`category &#34;Salary&#34; is not an expense category</div>`,
-		"a field error is shown under its input",
+		`<p class="error" role="alert">category: category &#34;Salary&#34; is not an expense category</p>`,
+		"a business error is shown on its form",
 	)
-	assert.NotContains(t, body, `class="toast"`, "a field error shown under its input is not a toast")
+	assert.NotContains(t, body, `class="toast"`, "an error shown on its form is not a toast")
+
+	status, body = b.post("/operations", url.Values{
+		"type": {"expense"}, "account": {strconv.FormatInt(card.ID, 10)}, "date": {"31.10.2026"}, "amount": {"ten"},
+	})
+	assert.Equal(t, http.StatusUnprocessableEntity, status)
+	for _, e := range []string{
+		`<div id="category-error-expense" class="error" role="status">required</div>`,
+		`<div id="amount-error-expense" class="error" role="status">enter a number</div>`,
+		`<div id="date-error-expense" class="error" role="status">must be YYYY-MM-DD</div>`,
+	} {
+		assert.Contains(t, body, e, "every invalid input is shown at once")
+	}
 
 	ops, _, err := f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})
 	require.NoError(t, err)
@@ -254,8 +267,8 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(
 		t,
 		body,
-		`<output class="toast" data-variant="danger"><p>parts: add up to 101.00, not 150.25</p></output>`,
-		"an error of no input on the page is a toast",
+		`<p class="error" role="alert">parts add up to 101.00, not 150.25</p>`,
+		"an error of no input is shown on the form",
 	)
 	assert.Contains(t, body, `value="100"`, "rows are kept")
 
@@ -301,8 +314,10 @@ func TestPagesAndFlows(t *testing.T) {
 
 	cardPath := "/accounts/" + strconv.FormatInt(card.ID, 10)
 	for _, path := range []string{
-		"/accounts", cardPath, "/categories", "/categories/" + strconv.FormatInt(cafe.ID, 10),
-		"/plans", "/plans?month=2026-10&kind=income", "/imports", "/imports/new", "/settings",
+		"/accounts", "/accounts/new", cardPath,
+		"/categories", "/categories/new", "/categories/" + strconv.FormatInt(cafe.ID, 10),
+		"/plans", "/plans?month=2026-10", "/plans/new?month=2026-10",
+		"/imports", "/imports/new", "/settings",
 		"/operations?type=expense&q=Mark", "/operations?min=1&max=1+000,50", "/operations/new?type=transfer",
 	} {
 		status, body := b.get(path)
@@ -313,18 +328,18 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status)
 
 	status, body = b.post("/plans", url.Values{
-		"month": {"2026-10"}, "kind": {"expense"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
+		"month": {"2026-10"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
 		"amount": {"300"}, "repeating": {"true"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "149.75", "left of food plan")
 	// an empty amount removes only the month's plan, it does not stop carrying
 	status, body = b.post("/plans", url.Values{
-		"month": {"2026-11"}, "kind": {"expense"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
+		"month": {"2026-11"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
 		"amount": {""}, "repeating": {"true"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
-	status, body = b.post("/plans/fill", url.Values{"month": {"2026-11"}, "kind": {"expense"}})
+	status, body = b.post("/plans/fill", url.Values{"month": {"2026-11"}})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `value="300`, "food plan carried into 2026-11")
 
@@ -366,20 +381,126 @@ func TestPagesAndFlows(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "contains")
 
+	// an htmx action of no form leaves the page as it is and gets the error as a toast
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, b.srv.URL+foodPath+"/delete", nil)
+	require.NoError(t, err)
+	req.Header.Set("HX-Request", "true")
+	resp, err = b.client.Do(req)
+	require.NoError(t, err)
+	toast, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	assert.Equal(t, "none", resp.Header.Get("HX-Reswap"))
+	assert.True(t, strings.HasPrefix(string(toast), `<div id="toasts" hidden hx-swap-oob="true">`+
+		`<output class="toast" data-variant="danger"><p>`), string(toast))
+	assert.Contains(t, string(toast), "contains")
+	assert.NotContains(t, string(toast), "<html")
+
 	status, body = b.postFrom("/settings/api-keys", "/settings",
 		url.Values{"name": {"script"}, "scope": {"read"}, "expires": {"30"}, "password": {"wrong"}})
 	require.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "invalid login or password", "key needs the current password")
+	assert.Contains(t, body, `<p class="col-12 error" role="alert">wrong password</p>`,
+		"key needs the current password, a business error of the form")
 	assert.NotContains(t, body, "not shown again")
 
 	status, body = b.post("/settings/api-keys",
 		url.Values{"name": {"script"}, "scope": {"read"}, "expires": {"never"}, "password": {"password1234"}})
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "gf_")
-	assert.Contains(t, body, "not shown again")
-	assert.Contains(t, body, "<code>/mcp</code>")
+	assert.Contains(t, body, "be shown again")
 	assert.Contains(t, body, "this browser", "current session listed")
 	assert.Contains(t, body, `<td data-label="Expires">never</td>`)
+}
+
+func TestChangePassword(t *testing.T) {
+	t.Parallel()
+
+	b, _, _ := newBrowser(t)
+	b.login()
+	status, body := b.postFrom("/settings/password", "/settings",
+		url.Values{"current": {""}, "password": {"password5678"}})
+	require.Equal(t, http.StatusUnprocessableEntity, status)
+	assert.Contains(t, body, `id="current-password-error" class="error" role="status">required<`)
+	status, body = b.postFrom("/settings/password", "/settings",
+		url.Values{"current": {"wrong"}, "password": {"password5678"}})
+	require.Equal(t, http.StatusUnprocessableEntity, status)
+	assert.Contains(t, body, `id="current-password-error" class="error" role="status">wrong password<`)
+	assert.NotContains(t, body, "invalid login or password", "not the login error")
+	assert.Contains(t, body, `name="timezone" value="Europe/Moscow"`, "other forms keep their values")
+	status, body = b.postFrom("/settings/password", "/settings",
+		url.Values{"current": {"password1234"}, "password": {"password1234"}})
+	require.Equal(t, http.StatusUnprocessableEntity, status)
+	assert.Contains(t, body, `id="new-password-error" class="error" role="status">must differ from the current password<`)
+
+	// a boosted post keeps the URL of the form
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, b.srv.URL+"/settings/password",
+		strings.NewReader(url.Values{"current": {"wrong"}, "password": {"password5678"}}.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Boosted", "true")
+	resp, err := b.client.Do(req)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	assert.Equal(t, "false", resp.Header.Get("HX-Push-Url"))
+	assert.Equal(t, "outerHTML show:none", resp.Header.Get("HX-Reswap"), "no scroll to the top")
+	assert.Equal(t, "#form-password", resp.Header.Get("HX-Retarget"), "just the form is replaced")
+	assert.Equal(t, "#form-password", resp.Header.Get("HX-Reselect"))
+	assert.Contains(t, body, `<form id="form-password"`)
+	assert.NotContains(t, body, `class="toast"`, "shown at the field, not as a toast")
+
+	status, body = b.postFrom("/settings/password", "/settings",
+		url.Values{"current": {"password1234"}, "password": {"password5678"}})
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, `<output class="toast" data-variant="success"><p>Password changed.`)
+	_, body = b.get("/settings")
+	assert.NotContains(t, body, "Password changed.", "shown once")
+}
+
+func TestSettingsHtmx(t *testing.T) {
+	t.Parallel()
+
+	b, _, _ := newBrowser(t)
+	b.login()
+	hxPost := func(path string, form url.Values) (int, http.Header, string) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, b.srv.URL+path,
+			strings.NewReader(form.Encode()))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("HX-Request", "true")
+		resp, err := b.client.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		return resp.StatusCode, resp.Header, string(body)
+	}
+
+	// a saved setting answers with the page, of which the form swaps in its card
+	status, header, body := hxPost("/settings", url.Values{"timezone": {"Europe/Moscow"}, "show_minor_units": {"on"}})
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Empty(t, header.Get("HX-Location"), "no reload of the whole page")
+	assert.Contains(t, body, `name="show_minor_units" checked`, "not the settings read before the change")
+
+	status, header, body = hxPost("/settings", url.Values{"timezone": {"Asia/Tokyo"}, "show_minor_units": {"on"}})
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Empty(t, header.Get("HX-Location"))
+	assert.Contains(t, body, `name="timezone" value="Asia/Tokyo"`, "not the user read before the change")
+
+	status, header, body = hxPost("/settings/password",
+		url.Values{"current": {"password1234"}, "password": {"password5678"}})
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Empty(t, header.Get("HX-Location"))
+	assert.Contains(t, body, `<output class="toast" data-variant="success"><p>Password changed.`)
+	assert.Contains(t, body, `id="settings-access"`)
+
+	// the whole page changes language, so it is loaded again
+	status, header, body = hxPost("/settings", url.Values{"timezone": {"Asia/Tokyo"}, "language": {"ru"}})
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Equal(t, "/settings", header.Get("HX-Location"))
 }
 
 func TestRevokeSession(t *testing.T) {
@@ -410,6 +531,23 @@ func TestRevokeSession(t *testing.T) {
 	require.ErrorIs(t, err, errors.ErrUnauthorized)
 }
 
+func TestRevokeAPIKey(t *testing.T) {
+	t.Parallel()
+
+	b, svc, userID := newBrowser(t)
+	b.login()
+	_, key, err := svc.Auth.CreateAPIKey(t.Context(), userID, "password1234", "script", domain.ScopeRead, "never")
+	require.NoError(t, err)
+
+	status, body := b.get("/settings")
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, "gf_"+key.Prefix)
+
+	status, body = b.post("/settings/api-keys/"+strconv.FormatInt(key.ID, 10)+"/revoke", nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.NotContains(t, body, "gf_"+key.Prefix, "revoked key is not listed")
+}
+
 func TestCreditAccount(t *testing.T) {
 	t.Parallel()
 
@@ -437,7 +575,7 @@ func TestCreditAccount(t *testing.T) {
 	status, body = b.get(cardPath)
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `value="50000"`, "inputs drop zero minor units when they are hidden")
-	status, _ = b.post("/settings/display", url.Values{"show_minor_units": {"on"}})
+	status, _ = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}, "show_minor_units": {"on"}})
 	require.Equal(t, http.StatusOK, status)
 	status, body = b.get(cardPath)
 	require.Equal(t, http.StatusOK, status, body)
@@ -519,7 +657,7 @@ func TestImportUpload(t *testing.T) {
 
 	status, body = b.get("/operations")
 	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "-1\u202f040 RUB")
+	assert.Contains(t, body, "-1\u202f040 <span class=\"text-light\">RUB</span>")
 	assert.Contains(t, body, "Food / Groceries", `"Parent / Child" created a nested category`)
 }
 
@@ -539,8 +677,9 @@ func TestImportPaste(t *testing.T) {
 	assert.Contains(t, body, "Create new account")
 
 	status, body = b.upload(map[string]string{"source": "tbank"}, "")
-	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "choose a CSV file or paste its content")
+	require.Equal(t, http.StatusUnprocessableEntity, status, body)
+	assert.Contains(t, body,
+		`<div id="file-error" class="error" role="status">choose a CSV file or paste its content</div>`)
 
 	status, body = b.upload(map[string]string{"content": csv}, "")
 	require.Equal(t, http.StatusOK, status, body)
@@ -583,8 +722,9 @@ func TestImportSources(t *testing.T) {
 	assert.Contains(t, body, "Create new account", "lands on the accounts step")
 
 	status, body = b.upload(map[string]string{"source": "zenmoney", "content": gigafin}, "")
-	require.Equal(t, http.StatusOK, status, body)
+	require.Equal(t, http.StatusUnprocessableEntity, status, body)
 	assert.Contains(t, body, "not a Zenmoney CSV export")
+	assert.Contains(t, body, "2026-10-29;18:48;Card", "the pasted content is kept")
 }
 
 func TestDeleteAllData(t *testing.T) {
@@ -602,7 +742,7 @@ func TestDeleteAllData(t *testing.T) {
 
 	status, body = b.postFrom("/settings/delete-data", "/settings", url.Values{"password": {"wrong"}})
 	require.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "invalid login or password")
+	assert.Contains(t, body, `<p class="col-12 error" role="alert">wrong password</p>`)
 	accounts, err := f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
 	assert.Len(t, accounts, 1, "nothing deleted on a wrong password")
@@ -631,8 +771,8 @@ func TestBackup(t *testing.T) {
 
 		status, body = b.postFrom("/settings/backup", "/settings",
 			url.Values{"password": {"password1234"}, "passphrase": {passphrase}})
-		require.Equal(t, http.StatusUnprocessableEntity, status)
-		assert.Contains(t, body, "forbidden")
+		require.Equal(t, http.StatusOK, status, "back to the settings page")
+		assert.Contains(t, body, `<output class="toast" data-variant="danger"><p>backups are forbidden`)
 		assert.NotContains(t, body, "age-encryption.org/v1")
 	})
 
@@ -648,9 +788,21 @@ func TestBackup(t *testing.T) {
 		assert.Contains(t, body, "Download backup")
 
 		status, body = b.postFrom("/settings/backup", "/settings",
+			url.Values{"password": {""}, "passphrase": {""}})
+		require.Equal(t, http.StatusUnprocessableEntity, status)
+		assert.Contains(t, body, `id="backup-password-error" class="error" role="status">required<`)
+		assert.Contains(t, body, `id="backup-passphrase-error" class="error" role="status">required<`)
+
+		status, body = b.postFrom("/settings/backup", "/settings",
+			url.Values{"password": {"password1234"}, "passphrase": {"short"}})
+		require.Equal(t, http.StatusUnprocessableEntity, status)
+		assert.Contains(t, body, `id="backup-passphrase-error" class="error" role="status">must be at least`)
+
+		status, body = b.postFrom("/settings/backup", "/settings",
 			url.Values{"password": {"wrong"}, "passphrase": {passphrase}})
 		require.Equal(t, http.StatusUnprocessableEntity, status)
-		assert.Contains(t, body, "invalid login or password")
+		assert.Contains(t, body, `id="backup-password-error" class="error" role="status">wrong password<`)
+		assert.NotContains(t, body, `class="toast"`, "shown at the field, not as a toast")
 
 		form := url.Values{"password": {"password1234"}, "passphrase": {passphrase}}
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, b.srv.URL+"/settings/backup",
@@ -726,7 +878,8 @@ func TestImportRates(t *testing.T) {
 	_, body = b.postFrom("/imports/rates", "/imports/new?source=rates", url.Values{"content": {file}})
 	assert.Contains(t, body, "exchange rates are off", "rates must be on")
 
-	require.NoError(t, svc.Settings.SetRates(ctx, userID, domain.RateSourceCBR, "RUB"))
+	err := svc.Settings.Set(ctx, userID, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "RUB"})
+	require.NoError(t, err)
 	require.NoError(t, svc.Rates.Set(ctx, userID, "USD", "2026-10-02", "85"))
 
 	status, body = b.postFrom("/imports/rates", "/imports/new?source=rates", url.Values{"content": {file}})
@@ -764,19 +917,16 @@ func TestLanguage(t *testing.T) {
 	_, body = b.get("/settings")
 	assert.Contains(t, body, `<html lang="en">`, "English by default")
 
-	_, body = b.post("/settings/language", url.Values{"language": {"ru"}})
+	_, body = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}, "language": {"ru"}})
 	assert.Contains(t, body, `<html lang="ru">`)
 	assert.Contains(t, body, "Настройки")
 
-	_, body = b.post("/settings/language", url.Values{"language": {"xx"}})
+	_, body = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}, "language": {"xx"}})
 	assert.Contains(t, body,
-		`<div id="language-error" class="error" role="status">неизвестное значение &#34;xx&#34;</div>`,
+		`<div id="language-error" class="error" role="status">выберите из списка</div>`,
 		"errors are translated")
 
-	_, body = b.post("/settings/language", url.Values{"language": {"Save"}})
-	assert.Contains(t, body, "неизвестное значение &#34;Save&#34;", "user input in errors is not translated")
-
-	_, body = b.post("/settings/language", url.Values{"language": {""}})
+	_, body = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}, "language": {""}})
 	assert.Contains(t, body, `<html lang="en">`, "empty follows the browser")
 }
 
@@ -803,7 +953,9 @@ func TestRulesFlow(t *testing.T) {
 	status, body := b.get("/rules")
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "No rules yet")
-	assert.Contains(t, body, `name="learning" checked`)
+	status, body = b.get("/settings")
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Contains(t, body, `name="auto_category_rules" checked`, "rules are learned by default")
 
 	status, body = b.get("/rules/new?payee=Coffee+Like&category=" + cafeID)
 	require.Equal(t, http.StatusOK, status, body)
@@ -870,9 +1022,9 @@ func TestRulesFlow(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Rules changed 0 operations.")
 
-	status, body = b.post("/rules/learning", nil)
+	status, body = b.post("/settings", url.Values{"timezone": {"Europe/Moscow"}})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.NotContains(t, body, `name="learning" checked`)
+	assert.NotContains(t, body, `name="auto_category_rules" checked`)
 
 	status, body = b.post("/rules/"+ruleID+"/delete", nil)
 	require.Equal(t, http.StatusOK, status, body)

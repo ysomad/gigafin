@@ -5,21 +5,25 @@
 <form method="get" action="/imports/new">
   <fieldset class="w-100">
     <legend>{{t "What are you importing?"}}</legend>
-    <div class="row">
-    <label class="col-6 card vstack"><span class="w-100 hstack justify-between"><strong>{{t "Gigafin operations"}}</strong><input type="radio" name="source" value="gigafin" checked></span><span class="text-light">CSV</span></label>
-    <label class="col-6 card vstack"><span class="w-100 hstack justify-between"><strong>{{t "T-Bank operations"}}</strong><input type="radio" name="source" value="tbank"></span><span class="text-light">CSV</span></label>
-    <label class="col-6 card vstack"><span class="w-100 hstack justify-between"><strong>{{t "Zenmoney operations"}}</strong><input type="radio" name="source" value="zenmoney"></span><span class="text-light">CSV</span></label>
-    <label class="col-6 card vstack"><span class="w-100 hstack justify-between"><strong>{{t "Exchange rates"}}</strong><input type="radio" name="source" value="rates"></span><span class="text-light">CSV</span></label>
+    <div class="vstack gap-2">
+    <label><input type="radio" name="source" value="gigafin" checked> {{t "Gigafin operations"}} <span class="text-light">CSV</span></label>
+    <label><input type="radio" name="source" value="tbank"> {{t "T-Bank operations"}} <span class="text-light">CSV</span></label>
+    <label><input type="radio" name="source" value="zenmoney"> {{t "Zenmoney operations"}} <span class="text-light">CSV</span></label>
+    <label><input type="radio" name="source" value="rates"> {{t "Exchange rates"}} <span class="text-light">CSV</span></label>
     </div>
   </fieldset>
   <div class="hstack mb-4">
+    <a class="button outline" href="/imports" data-variant="secondary">{{t "Cancel"}}</a>
     <button type="submit">{{t "Next"}}</button>
   </div>
 </form>
 {{else if .Data.Rates}}
-<form method="post" action="/imports/rates" enctype="multipart/form-data">
-  <label data-field>{{t "CSV file"}} <span class="text-light">{{t "exchange rates"}}</span>
-    <input type="file" name="file" accept=".csv,text/csv">
+{{$e := $.Errors.Get "file"}}
+<form id="form-import-rates" method="post" action="/imports/rates" enctype="multipart/form-data" hx-disable="find button">
+  {{with $.Errors.Form "import-rates"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <label data-field>{{t "CSV file"}}
+    <input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>
+    <small data-hint>{{t "exchange rates"}}</small>
   </label>
   <div class="mb-4">
     <p class="text-light">UTF-8, <code>,</code>{{t "-separated, header row, the format of Actual Budget. Columns:"}}</p>
@@ -33,30 +37,35 @@
     </table></div>
     <p class="text-light">{{t "Days missing between rows of a currency carry the previous rate. Imported rates replace stored ones and are kept by updates."}}</p>
   </div>
-  <label data-field>{{t "Or paste the file content"}}
-    <textarea name="content" rows="8" placeholder="{{.Data.Header}}"></textarea>
+  <label data-field{{if $e}} aria-invalid="true"{{end}}>{{t "Or paste the file content"}}
+    <textarea name="content" rows="8" placeholder="{{.Data.Header}}"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>{{.Data.Content}}</textarea>
+    {{if $e}}<div id="file-error" class="error" role="status">{{$e}}</div>{{end}}
   </label>
   <div class="hstack mb-4">
+    <a class="button outline" href="/imports" data-variant="secondary">{{t "Cancel"}}</a>
     <a class="button outline" href="/imports/new" data-variant="secondary">{{t "Back"}}</a>
-    <button type="submit">{{t "Upload"}}</button>
+    <button type="submit" data-spinner>{{t "Upload"}}</button>
   </div>
 </form>
 {{else}}
-<form method="post" action="/imports" enctype="multipart/form-data">
+{{$e := $.Errors.Get "file"}}
+<form id="form-import" method="post" action="/imports" enctype="multipart/form-data" hx-disable="find button">
+  {{with $.Errors.Form "import"}}<p class="error" role="alert">{{.}}</p>{{end}}
   <input type="hidden" name="source" value="{{.Data.Source}}">
   {{if eq .Data.Source "tbank"}}
   <label data-field>{{t "T-Bank CSV export"}}
-    <input type="file" name="file" accept=".csv,text/csv">
+    <input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>
+    <small data-hint>{{t "T-Bank app or site: Operations → Export → CSV."}}</small>
   </label>
-  <p class="text-light">{{t "T-Bank app or site: Operations → Export → CSV."}}</p>
   {{else if eq .Data.Source "zenmoney"}}
   <label data-field>{{t "Zenmoney CSV export"}}
-    <input type="file" name="file" accept=".csv,text/csv">
+    <input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>
   </label>
   <p class="text-light">{{t "Times are read in your"}} <a href="/settings">{{t "time zone"}}</a>{{t ", keep it equal to Zenmoney's. Cross-currency transfers are skipped."}}</p>
   {{else}}
-  <label data-field>{{t "CSV file"}} <span class="text-light">{{t "gigafin format"}}</span>
-    <input type="file" name="file" accept=".csv,text/csv">
+  <label data-field>{{t "CSV file"}}
+    <input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>
+    <small data-hint>{{t "gigafin format"}}</small>
   </label>
   <div class="mb-4">
     <p class="text-light">UTF-8, <code>;</code>{{t "-separated, header row. Columns:"}}</p>
@@ -77,13 +86,15 @@
     </table></div>
   </div>
   {{end}}
-  <label data-field>{{t "Or paste the file content"}}
-    <textarea name="content" rows="8" placeholder="{{.Data.Header}}"></textarea>
+  <label data-field{{if $e}} aria-invalid="true"{{end}}>{{t "Or paste the file content"}}
+    <textarea name="content" rows="8" placeholder="{{.Data.Header}}"{{if $e}} aria-invalid="true" aria-describedby="file-error"{{end}}>{{.Data.Content}}</textarea>
+    {{if $e}}<div id="file-error" class="error" role="status">{{$e}}</div>{{end}}
   </label>
   <p class="text-light">{{t "Rows imported before are skipped."}}</p>
   <div class="hstack mb-4">
+    <a class="button outline" href="/imports" data-variant="secondary">{{t "Cancel"}}</a>
     <a class="button outline" href="/imports/new" data-variant="secondary">{{t "Back"}}</a>
-    <button type="submit">{{t "Upload"}}</button>
+    <button type="submit" data-spinner>{{t "Upload"}}</button>
   </div>
 </form>
 {{end}}

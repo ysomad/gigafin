@@ -1,36 +1,26 @@
 {{define "content"}}
 {{$d := .Data}}
-<ul class="unstyled hstack mb-4">
-  {{range kinds}}<li><a href="/categories?kind={{.}}"{{if eq . $d.Kind}} aria-current="page"{{end}}>{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</a></li>{{end}}
-</ul>
-<details class="mb-6"{{if .Error}} open{{end}}>
-<summary>+ {{t "New category"}}</summary>
-<form method="post" action="/categories">
-<div class="row mb-4">
-  <input type="hidden" name="kind" value="{{$d.Kind}}">
-  {{$e := $.Errors.Get "name"}}
-  <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}}<input name="name" placeholder="{{t "Name"}}" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
-    {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
-  </label>
-  {{$e = $.Errors.Get "parent_id"}}
-  <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Inside"}}<select name="parent"{{if $e}} aria-invalid="true" aria-describedby="parent-error"{{end}}>
-    <option value="0">{{t "Top level"}}</option>
-    {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}<option value="{{.ID}}"{{if eq .ID $d.Parent}} selected{{end}}>{{t "in %s" .Name}}</option>{{end}}{{end}}
-  </select>
-    {{if $e}}<div id="parent-error" class="error" role="status">{{$e}}</div>{{end}}
-  </label>
-  <div class="col-12 hstack"><button type="submit">{{t "Create"}}</button></div>
+<div class="hstack justify-between mb-4">
+  <a class="button" href="/categories/new?kind={{$d.Kind}}">+ {{t "New category"}}</a>
+  <div class="hstack">
+    {{range kinds}}<a class="button{{if ne . $d.Kind}} outline{{end}}"{{if eq . $d.Kind}} aria-current="page"{{end}} href="/categories?kind={{.}}" data-variant="secondary">{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</a>{{end}}
+  </div>
 </div>
-</form>
-</details>
-<ul class="vstack">
-  {{range $d.Categories}}{{if eq .Kind $d.Kind}}
-  <li>
-    <a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}
-    {{if .Children}}<ul>{{range .Children}}
-      <li><a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</li>
-    {{end}}</ul>{{end}}
-  </li>
-  {{end}}{{end}}
-</ul>
+<div class="table">
+<table>
+  <thead><tr><th>{{t "Name"}}</th></tr></thead>
+  <tbody>
+  {{range $parent := byKind $d.Categories $d.Kind}}
+    <tr><td><a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</td></tr>
+    {{range .Children}}
+    <tr><td><span class="text-light">{{$parent.Name}} › </span><a href="/categories/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</td></tr>
+    {{end}}
+  {{else}}
+    <tr><td class="text-light">{{t "No categories yet."}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
 {{end}}
+
+{{define "to-top"}}<a class="button to-top" href="#top" hx-boost="false" hidden aria-label="{{t "Scroll to top"}}">↑ {{t "Top"}}</a>{{end}}

@@ -13,7 +13,7 @@
       <td><a href="/imports/{{.ID}}">#{{.ID}}</a></td>
       <td>{{.Filename}}</td>
       <td>{{datetime .CreatedAt $.User}}</td>
-      <td><span class="badge" data-variant="secondary">{{t (print .Status)}}</span></td>
+      <td><span class="badge"{{if eq .Status "committed"}} data-variant="success"{{else if ne .Status "staged"}} data-variant="secondary"{{end}}>{{t (print .Status)}}</span></td>
       <td class="align-right">{{.RowsNew}}</td>
       <td class="align-right">{{.RowsDup}}</td>
       <td class="align-right">{{.RowsSkip}}</td>

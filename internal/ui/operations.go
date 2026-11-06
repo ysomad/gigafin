@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -167,7 +168,7 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 		d.MoreURL = "/operations?" + q.Encode()
 	}
 	if !p.After.IsZero() && r.Header.Get("HX-Request") == "true" {
-		return u.fragment(w, r, "op-rows", d)
+		return u.fragment(w, r, http.StatusOK, "op-rows", d)
 	}
 	if d.Tags, err = u.svc.Operations.Tags(r.Context(), user.ID); err != nil {
 		return err
@@ -253,7 +254,7 @@ func (u *UI) renderForm(
 		title = "Edit " + string(f.Type)
 	}
 	return u.render(w, r, status, "operation_form", view{
-		User: &user, Nav: "operations", Title: title, Error: viewErr, Data: f,
+		User: &user, Nav: "operations", Title: title, Error: viewErr, Form: "operation", Data: f,
 	})
 }
 
@@ -276,51 +277,100 @@ func (u *UI) operationSplit(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		return err
 	}
-	return u.fragment(w, r, "split", map[string]any{"Categories": domain.ByKind(tree, kind), "Split": splitForm{}})
+	return u.fragment(w, r, http.StatusOK, "split", map[string]any{
+		"Categories": domain.ByKind(tree, kind), "Split": splitForm{},
+	})
 }
 
 // parseOpForm reads the form into both the raw form, for re-rendering, and the
-// domain input. Parse errors are returned as validation errors.
-func (u *UI) parseOpForm(r *http.Request) (opForm, domain.OperationInput, error) {
+// domain input, and returns the messages of its invalid inputs translated to lang.
+//
+//nolint:cyclop // every input of the form is checked here, so the checks stay together
+func (u *UI) parseOpForm(r *http.Request, lang string) (opForm, domain.OperationInput, fieldsError, error) {
 	if err := r.ParseForm(); err != nil {
-		return opForm{}, domain.OperationInput{}, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+		return opForm{}, domain.OperationInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	var f opForm
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
-		return f, domain.OperationInput{}, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+		return f, domain.OperationInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 
-	var date time.Time
-	if f.Date != "" {
-		var err error
-		if date, err = timex.ParseDate(f.Date); err != nil {
-			return f, domain.OperationInput{}, domain.NewFieldError(errors.ErrInvalid, "date", "must be YYYY-MM-DD")
-		}
-	}
+	errs := fieldsError{}
 	in := domain.OperationInput{
 		Type:        f.Type,
 		AccountID:   f.AccountID,
 		ToAccountID: f.ToAccountID,
 		CategoryID:  f.CategoryID,
-		Date:        date,
-		Time:        f.Time,
-		Payee:       f.Payee,
-		Note:        f.Note,
+		Time:        strings.TrimSpace(f.Time),
+		Payee:       strings.TrimSpace(f.Payee),
+		Note:        strings.TrimSpace(f.Note),
 		Tags:        strings.Split(f.Tags, ","),
 	}
-	d, err := money.Parse(f.Amount)
-	if err != nil {
-		return f, in, domain.NewFieldError(errors.ErrInvalid, "amount", "enter a number")
+	if in.AccountID == 0 {
+		errs["account"] = u.dicts.T(lang, "required")
 	}
-	in.Amount = d
-	return f, in, nil
+	switch {
+	case f.Type == domain.OpTransfer && in.ToAccountID == 0:
+		errs["to_account"] = u.dicts.T(lang, "required")
+	case f.Type == domain.OpTransfer && in.ToAccountID == in.AccountID:
+		errs["to_account"] = u.dicts.T(lang, "must differ from the source account")
+	case (f.Type == domain.OpExpense || f.Type == domain.OpIncome) && in.CategoryID == 0:
+		errs["category"] = u.dicts.T(lang, "required")
+	}
+	var err error
+	switch in.Amount, err = money.Parse(f.Amount); {
+	case strings.TrimSpace(f.Amount) == "":
+		errs["amount"] = u.dicts.T(lang, "required")
+	case err != nil:
+		errs["amount"] = u.dicts.T(lang, "enter a number")
+	case f.Type == domain.OpAdjustment && in.Amount.IsZero():
+		errs["amount"] = u.dicts.T(lang, "must not be zero")
+	case f.Type != domain.OpAdjustment && !in.Amount.IsPositive():
+		errs["amount"] = u.dicts.T(lang, "must be positive")
+	}
+	switch in.Date, err = timex.ParseDate(f.Date); {
+	case f.Date == "":
+		errs["date"] = u.dicts.T(lang, "required")
+	case err != nil:
+		errs["date"] = u.dicts.T(lang, "must be YYYY-MM-DD")
+	}
+	if in.Time != "" {
+		if _, err := timex.ParseClock(in.Time); err != nil {
+			errs["date"] = u.dicts.T(lang, "time must be HH:MM")
+		}
+	}
+	if utf8.RuneCountInString(in.Payee) > domain.MaxTextLen {
+		errs["payee"] = u.dicts.T(lang, "too long")
+	}
+	if utf8.RuneCountInString(in.Note) > domain.MaxTextLen {
+		errs["note"] = u.dicts.T(lang, "too long")
+	}
+	var tags int
+	for _, t := range in.Tags {
+		if t = strings.TrimSpace(t); t == "" {
+			continue
+		}
+		tags++
+		if utf8.RuneCountInString(t) > domain.MaxTagLen {
+			errs["tags"] = u.dicts.T(lang, "%q: longer than %d characters", t, domain.MaxTagLen)
+		}
+	}
+	if tags > domain.MaxTags {
+		errs["tags"] = u.dicts.T(lang, "at most %d", domain.MaxTags)
+	}
+	return f, in, errs, nil
 }
 
 func (u *UI) createOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	f, in, err := u.parseOpForm(r)
-	if err == nil {
-		_, err = u.svc.Operations.Create(r.Context(), user.ID, in)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	f, in, errs, err := u.parseOpForm(r, p.lang)
+	if err != nil {
+		return err
 	}
+	if len(errs) > 0 {
+		return u.renderForm(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	_, err = u.svc.Operations.Create(r.Context(), user.ID, in)
 	if isUserError(err) {
 		return u.renderForm(w, r, user, http.StatusUnprocessableEntity, f, err)
 	}
@@ -393,7 +443,7 @@ func (u *UI) renderSplit(
 		parts = []splitForm{{CategoryID: op.CategoryID, Amount: amount}, {}}
 	}
 	return u.render(w, r, status, "operation_split", view{
-		User: &user, Nav: "operations", Title: "Split", Error: splitErr, Data: opForm{
+		User: &user, Nav: "operations", Title: "Split", Error: splitErr, Form: "split", Data: opForm{
 			ID:         op.ID,
 			OriginID:   op.OriginID,
 			Type:       op.Type,
@@ -423,7 +473,7 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	if len(in.Amounts) != len(in.Categories) || len(in.Notes) != len(in.Categories) {
-		return domain.NewFieldError(errors.ErrInvalid, "form", "split parts do not match")
+		return domain.NewError(errors.ErrInvalid, "split parts do not match")
 	}
 	var rows []splitForm
 	for i, cat := range in.Categories {
@@ -433,18 +483,32 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 		}
 		rows = append(rows, row)
 	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
 	parts := make([]domain.SplitPart, len(rows))
 	for i, row := range rows {
-		d, perr := money.Parse(row.Amount)
-		if perr != nil {
-			err = domain.NewFieldError(errors.ErrInvalid, "parts["+strconv.Itoa(i)+"].amount", "enter a number")
-			break
+		// keys index the rows as re-rendered, which drops the empty ones
+		n := "[" + strconv.Itoa(i) + "]"
+		if row.CategoryID == 0 {
+			errs["split_category"+n] = u.dicts.T(p.lang, "required")
 		}
-		parts[i] = domain.SplitPart{CategoryID: row.CategoryID, Amount: d, Note: row.Note}
+		switch d, err := money.Parse(row.Amount); {
+		case err != nil:
+			errs["split_amount"+n] = u.dicts.T(p.lang, "enter a number")
+		case !d.IsPositive():
+			errs["split_amount"+n] = u.dicts.T(p.lang, "must be positive")
+		default:
+			parts[i].Amount = d
+		}
+		if utf8.RuneCountInString(strings.TrimSpace(row.Note)) > domain.MaxTextLen {
+			errs["split_note"+n] = u.dicts.T(p.lang, "too long")
+		}
+		parts[i].CategoryID, parts[i].Note = row.CategoryID, row.Note
 	}
-	if err == nil {
-		_, err = u.svc.Operations.Split(r.Context(), user.ID, id, parts)
+	if len(errs) > 0 {
+		return u.renderSplit(w, r, user, id, http.StatusUnprocessableEntity, rows, errs)
 	}
+	_, err = u.svc.Operations.Split(r.Context(), user.ID, id, parts)
 	if isUserError(err) {
 		return u.renderSplit(w, r, user, id, http.StatusUnprocessableEntity, rows, err)
 	}
@@ -460,11 +524,16 @@ func (u *UI) updateOperation(w http.ResponseWriter, r *http.Request, user domain
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	f, in, err := u.parseOpForm(r)
-	f.ID = id
-	if err == nil {
-		_, err = u.svc.Operations.Update(r.Context(), user.ID, id, in)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	f, in, errs, err := u.parseOpForm(r, p.lang)
+	if err != nil {
+		return err
 	}
+	f.ID = id
+	if len(errs) > 0 {
+		return u.renderForm(w, r, user, http.StatusUnprocessableEntity, f, errs)
+	}
+	_, err = u.svc.Operations.Update(r.Context(), user.ID, id, in)
 	if isUserError(err) {
 		return u.renderForm(w, r, user, http.StatusUnprocessableEntity, f, err)
 	}

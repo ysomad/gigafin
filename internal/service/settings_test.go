@@ -21,34 +21,33 @@ func TestSettings(t *testing.T) {
 
 	s, err := svc.Settings.Get(ctx, u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, domain.Settings{}, s, "defaults before the first change, rates off")
+	assert.Equal(t, domain.DefaultSettings(), s, "defaults before the first change, rates off")
+	assert.True(t, s.AutoCategoryRules, "rules are learned by default")
 
-	require.NoError(t, svc.Settings.SetDisplay(ctx, u.ID, true))
+	want := domain.Settings{
+		ShowMinorUnits: true, RateSource: domain.RateSourceCBR, PrimaryCurrency: "USD", Language: "ru",
+	}
+	require.NoError(t, svc.Settings.Set(ctx, u.ID, want))
 	s, err = svc.Settings.Get(ctx, u.ID)
 	require.NoError(t, err)
-	assert.True(t, s.ShowMinorUnits)
+	assert.Equal(t, want, s, "stored as a whole")
 
-	require.NoError(t, svc.Settings.SetRates(ctx, u.ID, domain.RateSourceCBR, "USD"))
+	want = domain.Settings{AutoCategoryRules: true}
+	require.NoError(t, svc.Settings.Set(ctx, u.ID, want))
 	s, err = svc.Settings.Get(ctx, u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, domain.Settings{ShowMinorUnits: true, RateSource: domain.RateSourceCBR, PrimaryCurrency: "USD"}, s,
-		"rates keep the display settings")
+	assert.Equal(t, want, s, "fields left out are reset")
 
-	require.NoError(t, svc.Settings.SetDisplay(ctx, u.ID, false))
-	s, err = svc.Settings.Get(ctx, u.ID)
-	require.NoError(t, err)
-	assert.Equal(t, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "USD"}, s,
-		"display keeps the rate settings")
-
-	err = svc.Settings.SetRates(ctx, u.ID, domain.RateSourceCBR, "")
+	err = svc.Settings.Set(ctx, u.ID, domain.Settings{RateSource: domain.RateSourceCBR})
 	require.ErrorIs(t, err, errors.ErrInvalid, "rates need a primary currency")
-	err = svc.Settings.SetRates(ctx, u.ID, domain.RateSourceCBR, "XXX")
+	err = svc.Settings.Set(ctx, u.ID, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "XXX"})
 	require.ErrorIs(t, err, errors.ErrInvalid)
-	err = svc.Settings.SetRates(ctx, u.ID, "ecb", "USD")
+	err = svc.Settings.Set(ctx, u.ID, domain.Settings{RateSource: "ecb", PrimaryCurrency: "USD"})
+	require.ErrorIs(t, err, errors.ErrInvalid)
+	err = svc.Settings.Set(ctx, u.ID, domain.Settings{Language: "not a tag!"})
 	require.ErrorIs(t, err, errors.ErrInvalid)
 
-	require.NoError(t, svc.Settings.SetRates(ctx, u.ID, domain.RateSourceNone, "USD"))
 	s, err = svc.Settings.Get(ctx, u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, domain.RateSourceNone, s.RateSource)
+	assert.Equal(t, want, s, "invalid settings are not stored")
 }

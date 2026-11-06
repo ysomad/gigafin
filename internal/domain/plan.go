@@ -26,17 +26,17 @@ func NewPlan(
 	categoryID int64, month timex.Month, currency string, amount money.Amount, repeating bool,
 ) (Plan, error) {
 	if month.IsZero() {
-		return Plan{}, NewFieldError(errors.ErrInvalid, "month", "required")
+		return Plan{}, NewError(errors.ErrInvalid, "month: required")
 	}
 	cur := strings.ToUpper(strings.TrimSpace(currency))
 	if !money.ValidCurrency(cur) {
-		return Plan{}, NewFieldError(errors.ErrInvalid, "currency", "unsupported currency %q", cur)
+		return Plan{}, NewError(errors.ErrInvalid, "currency: unsupported currency %q", cur)
 	}
 	if _, err := amount.ToMinor(cur); err != nil {
 		return Plan{}, fmt.Errorf("amount: %w", err)
 	}
 	if amount.IsNegative() {
-		return Plan{}, NewFieldError(errors.ErrInvalid, "amount", "must not be negative")
+		return Plan{}, NewError(errors.ErrInvalid, "amount: must not be negative")
 	}
 	return Plan{CategoryID: categoryID, Month: month, Currency: cur, Amount: amount, Repeating: repeating}, nil
 }

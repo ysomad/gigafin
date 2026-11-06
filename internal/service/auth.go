@@ -13,7 +13,10 @@ import (
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-var errInvalidCredentials = domain.NewError(errors.ErrUnauthorized, "invalid login or password")
+var (
+	errInvalidCredentials = domain.NewError(errors.ErrUnauthorized, "invalid login or password")
+	errWrongPassword      = domain.NewError(errors.ErrUnauthorized, "wrong password")
+)
 
 // Auth manages users, browser sessions and API keys.
 type Auth struct {
@@ -36,7 +39,7 @@ func (s *Auth) CreateUser(ctx context.Context, login, pass, timezone, role strin
 	}
 
 	if err := domain.CheckPasswordPolicy(pass); err != nil {
-		return domain.User{}, err
+		return domain.User{}, domain.NewError(err, "password")
 	}
 
 	tz, err := domain.ParseTimezone(timezone)
@@ -96,7 +99,7 @@ func (s *Auth) SetPasswordByLogin(ctx context.Context, login, pass string) error
 // SetPassword sets the password of a user and ends all their sessions.
 func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error {
 	if err := domain.CheckPasswordPolicy(pass); err != nil {
-		return err
+		return domain.NewError(err, "password")
 	}
 
 	hash, err := password.Hash(pass)
@@ -118,7 +121,7 @@ func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error
 	return nil
 }
 
-// CheckPassword returns errInvalidCredentials unless password is the user's
+// CheckPassword returns errWrongPassword unless password is the user's
 // current password.
 func (s *Auth) CheckPassword(ctx context.Context, userID int64, pass string) error {
 	c, err := s.store.Read().Users.Credentials(ctx, userID)
@@ -131,7 +134,7 @@ func (s *Auth) CheckPassword(ctx context.Context, userID int64, pass string) err
 		return err
 	}
 	if !ok {
-		return errInvalidCredentials
+		return errWrongPassword
 	}
 
 	return nil
@@ -146,7 +149,7 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 	}
 
 	if err := domain.CheckPasswordPolicy(pass); err != nil {
-		return "", err
+		return "", domain.NewError(err, "password")
 	}
 
 	hash, err := password.Hash(pass)

@@ -1,9 +1,16 @@
 {{define "content"}}
 <div class="row"><article class="card col-6 offset-3">
   <h1>{{t "Sign in"}}</h1>
-  <form method="post" action="/login">
-    <label data-field>{{t "Login"}} <input name="login" autocomplete="username" value="{{.Data.Login}}" autofocus></label>
-    <label data-field>{{t "Password"}} <input type="password" name="password" autocomplete="current-password"></label>
+  <form id="form-login" method="post" action="/login">
+    {{with $.Errors.Form "login"}}<p class="error" role="alert">{{.}}</p>{{end}}
+    {{$e := $.Errors.Get "login"}}
+    <label data-field{{if $e}} aria-invalid="true"{{end}}>{{t "Login"}} <input name="login" autocomplete="username" value="{{.Data.Login}}" autofocus{{if $e}} aria-invalid="true" aria-describedby="login-error"{{end}}>
+      {{if $e}}<div id="login-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "password"}}
+    <label data-field{{if $e}} aria-invalid="true"{{end}}>{{t "Password"}} <input type="password" name="password" autocomplete="current-password"{{if $e}} aria-invalid="true" aria-describedby="password-error"{{end}}>
+      {{if $e}}<div id="password-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <button type="submit">{{t "Sign in"}}</button>
   </form>
 </article></div>

@@ -1,42 +1,8 @@
 {{define "content"}}
 {{$d := .Data}}
-<details class="mb-6"{{if .Error}} open{{end}}>
-<summary>+ {{t "New account"}}</summary>
-<form method="post" action="/accounts">
-  <div class="row mb-4">
-    {{$e := $.Errors.Get "name"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
-      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    {{$e = $.Errors.Get "kind"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Kind"}}
-      <select name="kind"{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
-        {{range $d.Kinds}}<option value="{{.}}"{{if eq (print .) $d.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
-      </select>
-      {{if $e}}<div id="kind-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    {{$e = $.Errors.Get "currency"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
-      <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="currency-error"{{end}}>
-        {{range $d.Currencies}}<option{{if eq . $d.Currency}} selected{{end}}>{{.}}</option>{{end}}
-      </select>
-      {{if $e}}<div id="currency-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-  </div>
-  <div class="row mb-4">
-    {{$e = $.Errors.Get "balance"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Opening balance"}} <input name="balance" inputmode="decimal" placeholder="0" value="{{amountInput $d.Balance}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
-      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    {{$e = $.Errors.Get "credit limit"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}" value="{{amountInput $d.CreditLimit}}"{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
-      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{else}}<small data-hint>{{t "credit only"}}</small>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Create"}}</button></div>
-  </div>
-</form>
-<p class="text-light">{{t "Credit card and loan balances are negative when you owe. Pay a card with a transfer to it."}}</p>
-</details>
+<div class="hstack mb-4">
+  <a class="button" href="/accounts/new">+ {{t "New account"}}</a>
+</div>
 <div class="table">
 <table>
   <thead><tr><th>{{t "Name"}}</th><th>{{t "Kind"}}</th><th>{{t "Currency"}}</th><th class="align-right">{{t "Balance"}}</th></tr></thead>
@@ -46,7 +12,7 @@
       <td><a href="/accounts/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</td>
       <td>{{t (print .Kind)}}</td>
       <td>{{.Currency}}</td>
-      <td class="align-right"><span class="badge" data-variant="{{if .Balance.IsNegative}}danger{{end}}">{{money .Balance .Currency}}</span></td>
+      <td class="align-right">{{money .Balance .Currency}}</td>
     </tr>
   {{else}}
     <tr><td colspan="4" class="text-light">{{t "No accounts yet."}}</td></tr>
@@ -66,7 +32,7 @@
       <td><a href="/accounts/{{.ID}}">{{.Name}}</a>{{if .Archived}} <span class="badge" data-variant="secondary">{{t "archived"}}</span>{{end}}</td>
       <td>{{t (print .Kind)}}</td>
       <td>{{.Currency}}</td>
-      <td class="align-right"><span class="badge" data-variant="{{if .Owed.IsPositive}}danger{{end}}">{{money .Owed .Currency}}</span></td>
+      <td class="align-right">{{money .Owed .Currency}}</td>
       <td class="align-right">{{if not .CreditLimit.IsZero}}{{money .Available .Currency}}{{end}}</td>
     </tr>
   {{end}}

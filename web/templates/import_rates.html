@@ -12,10 +12,11 @@
 {{template "import-steps" (dict "Step" "preview" "Rates" true)}}
 <p>{{t "%d daily rates" (len $d.Changes)}} · {{t "%d new" $d.New}} · {{t "%d change a stored rate" $d.Changed}}</p>
 <div class="hstack mb-4">
+  <a class="button outline" href="/imports" data-variant="secondary">{{t "Cancel"}}</a>
   <a class="button outline" href="/imports/new?source=rates" data-variant="secondary">{{t "Back"}}</a>
-  <form method="post" action="/imports/rates/commit">
+  <form method="post" action="/imports/rates/commit" hx-disable="find button">
     <textarea name="content" hidden>{{$d.Content}}</textarea>
-    <button type="submit">{{t "Import %d rates" (len $d.Changes)}}</button>
+    <button type="submit" data-spinner>{{t "Import %d rates" (len $d.Changes)}}</button>
   </form>
 </div>
 <div class="table">

@@ -2,58 +2,64 @@
 {{$a := .Data.Account}}
 {{$f := .Data.Edit}}
 <h1>{{$a.Name}} <span class="text-light">{{t (print $a.Kind)}} · {{$a.Currency}}{{if $a.Archived}} · {{t "archived"}}{{end}}</span></h1>
-<p>{{t "Balance:"}} <strong class="align-right"><span class="badge" data-variant="{{if $a.Balance.IsNegative}}danger{{end}}">{{money $a.Balance $a.Currency}} {{$a.Currency}}</span></strong>
+<p class="text-light mb-4">{{t "Balance:"}} {{money $a.Balance $a.Currency}} {{$a.Currency}}
   {{if $a.Kind.Liability}}· {{t "owed %s" (money $a.Owed $a.Currency)}}{{end}}
   {{if not $a.CreditLimit.IsZero}}· {{t "available %s of %s" (money $a.Available $a.Currency) (money $a.CreditLimit $a.Currency)}}{{end}}
   · <a href="/operations?account={{$a.ID}}">{{t "Operations"}}</a></p>
 
-<h2>{{t "Set balance"}}</h2>
-<p class="text-light">{{t "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank."}}</p>
-<form method="post" action="/accounts/{{$a.ID}}/balance">
-  <div class="row mb-4">
-    {{$e := $.Errors.Get "balance"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "New balance"}} <input name="balance" inputmode="decimal" value="{{amountInput .Data.Target}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
-      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    {{$e = $.Errors.Get "date"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "As of"}} <input type="date" name="date" value="{{.Data.Date}}"{{if $e}} aria-invalid="true" aria-describedby="date-error"{{end}}>
-      {{if $e}}<div id="date-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Set"}}</button></div>
-  </div>
-</form>
-
-<h2>{{t "Edit"}}</h2>
-<form method="post" action="/accounts/{{$a.ID}}">
-  <div class="row mb-4">
+<form id="form-edit" class="form-compact" method="post" action="/accounts/{{$a.ID}}">
+  {{with $.Errors.Form "edit"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <fieldset class="row mb-4" aria-label="{{t "Account"}}">
     {{$e := $.Errors.Get "name"}}
     <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$f.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
       {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{$e = $.Errors.Get "kind"}}
     <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Kind"}}
-      <select name="kind"{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
+      <select name="kind" data-account-kind{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
         {{range .Data.Kinds}}<option value="{{.}}"{{if eq (print .) $f.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
       </select>
       {{if $e}}<div id="kind-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    {{$e = $.Errors.Get "credit limit"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}"
-      value="{{amountInput $f.CreditLimit}}"{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
-      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{else}}<small data-hint>{{t "credit only"}}</small>{{end}}
+    {{$e = $.Errors.Get "credit_limit"}}
+    {{$credit := eq $f.Kind "credit"}}
+    <label data-field data-credit-limit class="col-4"{{if not $credit}} hidden{{end}}{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" value="{{amountInput $f.CreditLimit}}"{{if not $credit}} disabled{{end}}{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
+      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
+  </fieldset>
+  <div class="hstack justify-between">
+    <div class="hstack">
+      <button type="submit">{{t "Save"}}</button>
+      <a class="button outline" href="/accounts" data-variant="secondary">{{t "Cancel"}}</a>
+    </div>
+    <div class="hstack">
+      <button type="submit" form="account-archive" class="outline" data-variant="secondary">{{if $a.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
+      <button type="submit" form="account-delete" class="outline" data-variant="danger">{{t "Delete"}}</button>
+    </div>
+  </div>
+  <p class="text-light">{{t "Accounts with operations can only be archived."}}</p>
+</form>
+<form id="account-archive" method="post" action="/accounts/{{$a.ID}}/archive">
+  <input type="hidden" name="archived" value="{{if $a.Archived}}0{{else}}1{{end}}">
+</form>
+<form id="account-delete" method="post" action="/accounts/{{$a.ID}}/delete" hx-confirm="{{t "Delete account %s?" $a.Name}}"></form>
+
+<h2 class="mt-6">{{t "Set balance"}}</h2>
+<form id="form-balance" class="form-compact" method="post" action="/accounts/{{$a.ID}}/balance">
+  {{with $.Errors.Form "balance"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <p class="text-light">{{t "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank."}}</p>
+  <fieldset class="row mb-4" aria-label="{{t "Set balance"}}">
+    {{$e := $.Errors.Get "balance"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "New balance"}} <input name="balance" inputmode="decimal" value="{{amountInput .Data.Target}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
+      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "date"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "As of"}} <input type="date" name="date" value="{{.Data.Date}}"{{if $e}} aria-invalid="true" aria-describedby="date-error"{{end}}>
+      {{if $e}}<div id="date-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+  </fieldset>
+  <div class="hstack">
+    <button type="submit">{{t "Set"}}</button>
   </div>
 </form>
-
-<div class="hstack mb-4">
-  <form method="post" action="/accounts/{{$a.ID}}/archive">
-    <input type="hidden" name="archived" value="{{if $a.Archived}}0{{else}}1{{end}}">
-    <button type="submit" data-variant="secondary">{{if $a.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
-  </form>
-  <form method="post" action="/accounts/{{$a.ID}}/delete" hx-confirm="{{t "Delete account %s?" $a.Name}}">
-    <button type="submit" class="outline" data-variant="secondary">{{t "Delete"}}</button>
-  </form>
-</div>
-<p class="text-light">{{t "Accounts with operations can only be archived."}}</p>
 {{end}}

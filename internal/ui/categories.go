@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 )
 
-// categoriesData is the categories page with the values of its new category form.
+// categoriesData is the categories page of Kind, or the new category page with the
+// values of its form.
 type categoriesData struct {
 	Categories []domain.Category
 	Kind       domain.Kind `form:"kind"`
@@ -17,8 +20,9 @@ type categoriesData struct {
 	Name       string      `form:"name"`
 }
 
+// renderCategories renders page "categories" or "category_new" of d.
 func (u *UI) renderCategories(
-	w http.ResponseWriter, r *http.Request, user domain.User, status int, d categoriesData, viewErr error,
+	w http.ResponseWriter, r *http.Request, user domain.User, page string, status int, d categoriesData, viewErr error,
 ) error {
 	if _, err := domain.ParseKind(string(d.Kind)); err != nil {
 		d.Kind = domain.KindExpense
@@ -27,14 +31,38 @@ func (u *UI) renderCategories(
 	if d.Categories, err = u.svc.Categories.Tree(r.Context(), user.ID); err != nil {
 		return err
 	}
-	return u.render(w, r, status, "categories", view{
-		User: &user, Nav: "settings", Title: "Categories", Error: viewErr, Data: d,
+	title := "Categories"
+	if page == "category_new" {
+		title = "New category"
+	}
+	return u.render(w, r, status, page, view{
+		User: &user, Nav: "settings", Title: title, Error: viewErr, Form: "category", Data: d,
 	})
+}
+
+// categoryNameError returns the message about the category name input translated to
+// lang, empty if name is valid.
+func (u *UI) categoryNameError(name, lang string) string {
+	name = strings.TrimSpace(name)
+	switch {
+	case name == "":
+		return u.dicts.T(lang, "required")
+	case utf8.RuneCountInString(name) > domain.MaxTextLen:
+		return u.dicts.T(lang, "too long")
+	case strings.Contains(name, " / "):
+		return u.dicts.T(lang, "must not contain %q", " / ")
+	}
+	return ""
 }
 
 func (u *UI) categories(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
-	return u.renderCategories(w, r, user, http.StatusOK, d, nil)
+	return u.renderCategories(w, r, user, "categories", http.StatusOK, d, nil)
+}
+
+func (u *UI) newCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
+	return u.renderCategories(w, r, user, "category_new", http.StatusOK, d, nil)
 }
 
 func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -45,9 +73,13 @@ func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.
 	if err := u.formDecoder.Decode(&d, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	if msg := u.categoryNameError(d.Name, p.lang); msg != "" {
+		return u.renderCategories(w, r, user, "category_new", http.StatusUnprocessableEntity, d, fieldsError{"name": msg})
+	}
 	c, err := u.svc.Categories.Create(r.Context(), user.ID, d.Parent, d.Kind, d.Name)
 	if isUserError(err) {
-		return u.renderCategories(w, r, user, http.StatusUnprocessableEntity, d, err)
+		return u.renderCategories(w, r, user, "category_new", http.StatusUnprocessableEntity, d, err)
 	}
 	if err != nil {
 		return err
@@ -80,7 +112,8 @@ func (u *UI) renderCategory(
 	}
 	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
 	return u.render(w, r, status, "category", view{
-		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name}, Error: viewErr, Data: d,
+		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name}, Error: viewErr, Form: "category",
+		Data: d,
 	})
 }
 
@@ -103,6 +136,10 @@ func (u *UI) updateCategory(w http.ResponseWriter, r *http.Request, user domain.
 	var f categoryData
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	if msg := u.categoryNameError(f.Name, p.lang); msg != "" {
+		return u.renderCategory(w, r, user, id, http.StatusUnprocessableEntity, &f, fieldsError{"name": msg})
 	}
 	err = u.svc.Categories.Update(r.Context(), user.ID, id, f.Name, f.Parent)
 	if isUserError(err) {

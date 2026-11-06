@@ -52,7 +52,7 @@
       const axis = { stroke: palette['muted-foreground'], grid: { stroke: palette.border, width: 1 }, ticks: { show: false } };
       // With no cursor over the chart the legend shows the last (current) month.
       const current = (u) => { if (u.cursor.idx == null) u.setLegend({ idx: u.data[0].length - 1 }); };
-      charts.push(new uPlot({
+      const chart = new uPlot({
         width: fig.clientWidth,
         height: 220,
         cursor: { points: { show: false }, drag: { x: false, y: false } },
@@ -67,12 +67,15 @@
           ...(networth ? [{ ...axis, scale: 'networth', side: 1, size: 70, grid: { show: false }, values: (u, vs) => vs.map((v) => compact.format(v)) }] : []),
         ],
         series: [
-          { label: label.labelMonth || 'Month', value: (u, t) => (t == null ? '' : new Date(t * 1000).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) },
+          {},
           { label: label.labelIncome || 'Income', ...bars(palette.success, -1, full) },
           { label: label.labelExpense || 'Expense', ...bars(palette.danger, 1, full) },
           ...(networth ? [{ label: label.labelBalance || 'Net worth', scale: 'networth', stroke: palette.primary, width: 2, points: { size: 5 }, value: (u, v) => (v == null ? '' : full.format(v)) }] : []),
         ],
-      }, networth ? [d.months, d.income, d.expense, d.balance] : [d.months, d.income, d.expense], fig));
+      }, networth ? [d.months, d.income, d.expense, d.balance] : [d.months, d.income, d.expense], fig);
+      // the x axis already names the months: drop the month row from the legend
+      chart.root.querySelector('.u-legend .u-series')?.remove();
+      charts.push(chart);
     });
   }
 

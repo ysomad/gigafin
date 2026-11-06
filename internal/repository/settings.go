@@ -20,28 +20,30 @@ type Settings struct {
 func (r *Settings) Get(ctx context.Context, userID int64) (domain.Settings, error) {
 	s, err := r.q.GetUserSettings(ctx, userID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Settings{}, nil
+		return domain.DefaultSettings(), nil
 	}
 	if err != nil {
 		return domain.Settings{}, fmt.Errorf("get settings: %w", err)
 	}
 	return domain.Settings{
-		ShowMinorUnits:  s.ShowMinorUnits,
-		RateSource:      domain.RateSource(s.RateSource),
-		PrimaryCurrency: s.PrimaryCurrency,
-		Language:        s.Language,
+		ShowMinorUnits:    s.ShowMinorUnits,
+		RateSource:        domain.RateSource(s.RateSource),
+		PrimaryCurrency:   s.PrimaryCurrency,
+		Language:          s.Language,
+		AutoCategoryRules: s.AutoCategoryRules,
 	}, nil
 }
 
 // Set stores the user's settings.
 func (r *Settings) Set(ctx context.Context, userID int64, s domain.Settings, now time.Time) error {
 	err := r.q.UpsertUserSettings(ctx, sqlc.UpsertUserSettingsParams{
-		UserID:          userID,
-		ShowMinorUnits:  s.ShowMinorUnits,
-		PrimaryCurrency: s.PrimaryCurrency,
-		RateSource:      string(s.RateSource),
-		Language:        s.Language,
-		CreatedAt:       now.Unix(),
+		UserID:            userID,
+		ShowMinorUnits:    s.ShowMinorUnits,
+		PrimaryCurrency:   s.PrimaryCurrency,
+		RateSource:        string(s.RateSource),
+		Language:          s.Language,
+		AutoCategoryRules: s.AutoCategoryRules,
+		CreatedAt:         now.Unix(),
 	})
 	if err != nil {
 		return fmt.Errorf("set settings: %w", err)

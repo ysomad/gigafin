@@ -213,25 +213,16 @@ func TestLearnCategory(t *testing.T) {
 	require.Len(t, rules, 1)
 	assert.True(t, rules[0].UsesCategory(f.cafe.ID))
 
-	require.NoError(t, f.svc.Rules.SetLearning(ctx, f.userID, false))
-	settings, err := f.svc.Rules.Settings(ctx, f.userID)
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: false}))
+	settings, err := f.svc.Settings.Get(ctx, f.userID)
 	require.NoError(t, err)
-	assert.False(t, settings.Learning)
+	assert.False(t, settings.AutoCategoryRules)
 	create("2026-10-08", f.groceries.ID)
 	create("2026-10-09", f.groceries.ID)
 	create("2026-10-10", f.groceries.ID)
 	rules = learned()
 	require.Len(t, rules, 1)
 	assert.True(t, rules[0].UsesCategory(f.cafe.ID), "learning is off")
-}
-
-func TestRulesSettingsDefault(t *testing.T) {
-	t.Parallel()
-	f := newFixture(t)
-
-	s, err := f.svc.Rules.Settings(t.Context(), f.userID)
-	require.NoError(t, err)
-	assert.True(t, s.Learning)
 }
 
 func TestRulesRun(t *testing.T) {
@@ -249,7 +240,7 @@ func TestRulesRun(t *testing.T) {
 		require.NoError(t, err)
 		ids[i] = op.ID
 	}
-	require.NoError(t, f.svc.Rules.SetLearning(ctx, f.userID, false))
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: false}))
 	rule, err := f.svc.Rules.Create(ctx, f.userID, payeeRule(domain.CondIs, "samokat", f.groceries.ID))
 	require.NoError(t, err)
 
@@ -298,7 +289,7 @@ func TestRulesInvalidStoredRuleSkipped(t *testing.T) {
 	require.NoError(t, err)
 	food, err := svc.Categories.Create(ctx, uid, 0, domain.KindExpense, "Food")
 	require.NoError(t, err)
-	require.NoError(t, svc.Rules.SetLearning(ctx, uid, false))
+	require.NoError(t, svc.Settings.Set(ctx, uid, domain.Settings{AutoCategoryRules: false}))
 	_, err = svc.Rules.Create(ctx, uid, payeeRule(domain.CondIs, "samokat", food.ID))
 	require.NoError(t, err)
 	// stored as is, as a rule that a later version stopped accepting would be
@@ -322,7 +313,7 @@ func TestRulesPreviewSkipsSplits(t *testing.T) {
 	f := newFixture(t)
 	ctx := t.Context()
 
-	require.NoError(t, f.svc.Rules.SetLearning(ctx, f.userID, false))
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: false}))
 	op, err := f.svc.Operations.Create(ctx, f.userID, domain.OperationInput{
 		Type: domain.OpExpense, AccountID: f.card.ID, CategoryID: f.cafe.ID, Amount: dec("10"),
 		Date: day(t, "2026-10-01"), Payee: "Market",
@@ -366,7 +357,7 @@ func TestLearnCategoryOldOperation(t *testing.T) {
 		return op
 	}
 
-	require.NoError(t, f.svc.Rules.SetLearning(ctx, f.userID, false))
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: false}))
 	create("2026-01-01", f.groceries.ID)
 	create("2026-01-02", f.groceries.ID)
 	old := create("2026-01-03", f.cafe.ID)
@@ -374,7 +365,7 @@ func TestLearnCategoryOldOperation(t *testing.T) {
 	for _, date := range []string{"2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"} {
 		create(date, f.cafe.ID)
 	}
-	require.NoError(t, f.svc.Rules.SetLearning(ctx, f.userID, true))
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: true}))
 
 	_, err := f.svc.Operations.Update(ctx, f.userID, old.ID, domain.OperationInput{
 		Type: domain.OpExpense, AccountID: f.card.ID, CategoryID: f.groceries.ID, Amount: dec("100"),

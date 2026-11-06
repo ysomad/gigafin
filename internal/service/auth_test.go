@@ -152,10 +152,9 @@ func TestAPIKeys(t *testing.T) {
 
 	keys, err := svc.ListAPIKeys(ctx, u.ID)
 	require.NoError(t, err)
-	require.Len(t, keys, 2)
+	require.Len(t, keys, 1, "revoked key is not listed")
 	assert.Equal(t, writeKey.ID, keys[0].ID)
-	assert.True(t, keys[1].Revoked)
-	assert.False(t, keys[1].LastUsedAt.IsZero())
+	assert.False(t, keys[0].LastUsedAt.IsZero())
 }
 
 func TestListRevokeSessions(t *testing.T) {

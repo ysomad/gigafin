@@ -22,7 +22,6 @@ func TestCheckPasswordPolicy(t *testing.T) {
 		require.ErrorIs(t, err, errors.ErrInvalid, pwd)
 		e, ok := errors.AsType[Error](err)
 		require.True(t, ok, pwd)
-		require.Equal(t, "password", e.Field, pwd)
 		require.Equal(t, format, e.Format, pwd)
 	}
 	require.NoError(t, CheckPasswordPolicy("correct horse"), "spaces allowed, no composition rules")

@@ -17,5 +17,5 @@ sql:
             go_type: bool
           - column: exchange_rates.is_manual
             go_type: bool
-          - column: rule_settings.is_learning
+          - column: user_settings.auto_category_rules
             go_type: bool

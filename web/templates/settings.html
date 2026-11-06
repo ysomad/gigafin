@@ -1,253 +1,279 @@
 {{define "content"}}
 {{$d := .Data}}
-<form method="post" action="/logout" class="hstack mb-4">
-  <span>{{t "Signed in as"}} <strong>{{$.User.Login}}</strong></span>
-  <button type="submit" class="outline small" data-variant="secondary">{{t "Sign out"}}</button>
-</form>
-
-<div class="hstack mb-4">
-  <a class="button outline" href="/accounts" data-variant="secondary">{{t "Accounts"}}</a>
-  <a class="button outline" href="/categories" data-variant="secondary">{{t "Categories"}}</a>
-  <a class="button outline" href="/rules" data-variant="secondary">{{t "Rules"}}</a>
-  <a class="button outline" href="/imports" data-variant="secondary">{{t "Import"}}</a>
+<div class="hstack justify-between mb-4">
+  <div class="hstack">
+    <a class="button outline" href="/accounts" data-variant="secondary">{{t "Accounts"}}</a>
+    <a class="button outline" href="/categories" data-variant="secondary">{{t "Categories"}}</a>
+    <a class="button outline" href="/rules" data-variant="secondary">{{t "Rules"}}</a>
+    <a class="button outline" href="/imports" data-variant="secondary">{{t "Import"}}</a>
+  </div>
+  <form method="post" action="/logout" class="hstack">
+    <span>{{t "Signed in as"}} <strong>{{$.User.Login}}</strong></span>
+    <button type="submit" class="outline small" data-variant="secondary">{{t "Sign out"}}</button>
+  </form>
 </div>
 
-<h2>{{t "Time zone"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/timezone">
-  <div class="row mb-4">
-    {{$e := $.Errors.Get "timezone.time zone"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "IANA time zone"}} <input name="timezone" value="{{with $d.Posted}}{{.Get "timezone"}}{{else}}{{$.User.Timezone}}{{end}}" placeholder="Europe/Moscow"{{if $e}} aria-invalid="true" aria-describedby="timezone-error"{{end}}>
-      {{if $e}}<div id="timezone-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
-  </div>
-  <p class="text-light">{{t "Used for imported times and today's date."}}</p>
-</form></article>
+{{/* Settings are one form, saved as a whole on change; it swaps in its card of the
+     page the server answers with, the cards showing what it changes, and the toasts.
+     Every action form is one row, its button in the last column under an empty caption,
+     spaced as an input under its label, and swaps in just its own card. */}}
+<article id="settings-general" class="card mb-4 form-compact">
+  <h3>{{t "General"}}</h3>
+  {{/* the values of a failed post fill the inputs again */}}
+  {{$s := $d.Settings}}
+  {{$tz := $.User.Timezone}}
+  {{if eq $.Form "settings"}}{{$tz = $d.Posted.Get "timezone"}}{{end}}
+  <form id="form-settings" method="post" action="/settings" class="vstack" hx-post="/settings" hx-trigger="change" hx-target="#settings-general" hx-select="#settings-general" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts,#settings-rates,#settings-access">
+    {{with $.Errors.Form "settings"}}<p class="error" role="alert">{{.}}</p>{{end}}
+    <div class="row">
+      {{$e := $.Errors.Get "settings.timezone"}}
+      <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Time zone"}} <input name="timezone" value="{{$tz}}" placeholder="Europe/Moscow"{{if $e}} aria-invalid="true" aria-describedby="timezone-error"{{end}}>
+        {{if $e}}<div id="timezone-error" class="error" role="status">{{$e}}</div>{{end}}
+      </label>
+      {{$e = $.Errors.Get "settings.language"}}
+      {{$lang := $s.Language}}{{if eq $.Form "settings"}}{{$lang = $d.Posted.Get "language"}}{{end}}
+      <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Language"}}
+        <select name="language"{{if $e}} aria-invalid="true" aria-describedby="language-error"{{end}}>
+          <option value=""{{if eq $lang ""}} selected{{end}}>{{t "Default"}}</option>
+          {{- range $d.Languages}}
+          <option value="{{.Code}}"{{if eq $lang .Code}} selected{{end}}>{{.Name}}</option>
+          {{- end}}
+        </select>
+        {{if $e}}<div id="language-error" class="error" role="status">{{$e}}</div>{{end}}
+      </label>
+      {{$e = $.Errors.Get "settings.rate_source"}}
+      {{$src := print $s.RateSource}}{{if eq $.Form "settings"}}{{$src = $d.Posted.Get "rate_source"}}{{end}}
+      <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Exchange rates"}}
+        <select name="rate_source"{{if $e}} aria-invalid="true" aria-describedby="rate-source-error"{{end}}>
+          {{range $d.RateSources}}<option value="{{.}}"{{if eq (print .) $src}} selected{{end}}>{{if eq . ""}}{{t "Off"}}{{else if eq . "cbr"}}{{t "Central Bank of Russia"}}{{else}}{{.}}{{end}}</option>{{end}}
+        </select>
+        {{if $e}}<div id="rate-source-error" class="error" role="status">{{$e}}</div>{{end}}
+      </label>
+      {{$e = $.Errors.Get "settings.primary_currency"}}
+      {{$cur := $s.PrimaryCurrency}}{{if eq $.Form "settings"}}{{$cur = $d.Posted.Get "primary_currency"}}{{end}}
+      <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Primary currency"}}
+        <select name="primary_currency"{{if $e}} aria-invalid="true" aria-describedby="primary-currency-error"{{end}}>
+          <option value=""></option>
+          {{range $d.Currencies}}<option value="{{.}}"{{if eq . $cur}} selected{{end}}>{{.}}</option>{{end}}
+        </select>
+        {{if $e}}<div id="primary-currency-error" class="error" role="status">{{$e}}</div>{{end}}
+      </label>
+    </div>
+    {{$minor := $s.ShowMinorUnits}}{{$auto := $s.AutoCategoryRules}}
+    {{if eq $.Form "settings"}}{{$minor = eq ($d.Posted.Get "show_minor_units") "on"}}{{$auto = eq ($d.Posted.Get "auto_category_rules") "on"}}{{end}}
+    <div class="row">
+      <label data-field class="col-3"><input type="checkbox" role="switch" name="show_minor_units"{{if $minor}} checked{{end}}> {{t "Show minor units"}}</label>
+      <label data-field class="col-6" title="{{t "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee."}}"><input type="checkbox" role="switch" name="auto_category_rules"{{if $auto}} checked{{end}}> {{t "Learn from my categories"}}</label>
+    </div>
+  </form>
+</article>
 
-<h2>{{t "Display"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/display">
-  <div class="row mb-4">
-    <label data-field class="col-4"><input type="checkbox" role="switch" name="show_minor_units"{{if showMinorUnits}} checked{{end}}> {{t "Show minor units"}}</label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
-  </div>
-  <p class="text-light">{{t "Off rounds amounts to whole units, such as rubles without kopecks."}}</p>
-</form></article>
+<article id="settings-password" class="card mb-4 form-compact">
+  <h3>{{t "Password"}}</h3>
+  <form id="form-password" method="post" action="/settings/password" class="row" hx-post="/settings/password" hx-target="#settings-password" hx-select="#settings-password" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts,#settings-access">
+    {{with $.Errors.Form "password"}}<p class="col-12 error" role="alert">{{.}}</p>{{end}}
+    {{$e := $.Errors.Get "password.current"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Current password"}} <input type="password" name="current" autocomplete="current-password"{{if $e}} aria-invalid="true" aria-describedby="current-password-error"{{end}}>
+      {{if $e}}<div id="current-password-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "password.password"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "New password"}} <input type="password" name="password" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="new-password-error"{{end}}>
+      {{if $e}}<div id="new-password-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    <div class="col-3 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit">{{t "Change password"}}</button></div></div>
+  </form>
+</article>
 
-<h2>{{t "Language"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/language">
-  <div class="row mb-4">
-    {{$e := $.Errors.Get "language.language"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>
-      <select name="language" aria-label="{{t "Language"}}"{{if $e}} aria-invalid="true" aria-describedby="language-error"{{end}}>
-        <option value=""{{if eq $d.Settings.Language ""}} selected{{end}}>{{t "Default"}}</option>
-        {{- range $d.Languages}}
-        <option value="{{.Code}}"{{if eq $d.Settings.Language .Code}} selected{{end}}>{{.Name}}</option>
-        {{- end}}
-      </select>
-      {{if $e}}<div id="language-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
+<article id="settings-rates" class="card mb-4 form-compact"{{if not $d.Settings.RateSource}} hidden{{end}}>
+  <div class="hstack justify-between">
+    <h3>{{t "Exchange rates"}}</h3>
+    {{if $d.Settings.RateSource}}
+    <div class="hstack">
+      <a class="button outline small" href="/imports/new?source=rates" data-variant="secondary">{{t "Import from CSV"}}</a>
+      {{if $d.RateCurrencies}}
+      <form method="post" action="/settings/rates/sync" hx-post="/settings/rates/sync" hx-target="#settings-rates" hx-select="#settings-rates" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts" hx-disable="find button"><button type="submit" class="small" data-spinner>{{t "Update rates"}}</button></form>
+      {{end}}
+    </div>
+    {{end}}
   </div>
-</form></article>
-
-<h2>{{t "Exchange rates"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/rates">
-  <div class="row mb-4">
-    {{$e := $.Errors.Get "rates.rate source"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Source"}}
-      <select name="rate_source"{{if $e}} aria-invalid="true" aria-describedby="rate-source-error"{{end}}>
-        {{range $d.RateSources}}<option value="{{.}}"{{if eq . $d.Settings.RateSource}} selected{{end}}>{{if eq . ""}}{{t "Off"}}{{else if eq . "cbr"}}{{t "Central Bank of Russia"}}{{else}}{{.}}{{end}}</option>{{end}}
-      </select>
-      {{if $e}}<div id="rate-source-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    {{$e = $.Errors.Get "rates.primary currency"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Primary currency"}}
-      <select name="primary_currency"{{if $e}} aria-invalid="true" aria-describedby="primary-currency-error"{{end}}>
-        <option value=""></option>
-        {{range $d.Currencies}}<option value="{{.}}"{{if eq . $d.Settings.PrimaryCurrency}} selected{{end}}>{{.}}</option>{{end}}
-      </select>
-      {{if $e}}<div id="primary-currency-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
+  {{if $d.Settings.RateSource}}
+  {{if not $d.RateCurrencies}}
+  <p class="text-light">{{t "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate." $d.Settings.RateSource.Pivot}}</p>
+  {{else}}
+  {{if $d.Rates}}
+  <div class="table">
+  <table>
+    <thead><tr><th>{{t "Currency"}}</th><th>{{t "Last date"}}</th><th>{{t "Rate, %s" $d.Settings.RateSource.Pivot}}</th><th></th></tr></thead>
+    <tbody>
+    {{range $d.Rates}}
+      <tr>
+        <td>{{.Currency}}</td>
+        <td>{{date .Date}}</td>
+        <td>{{.Rate}}</td>
+        <td>{{if .Manual}}
+          <form method="post" action="/settings/rates/reset" hx-post="/settings/rates/reset" hx-target="#settings-rates" hx-select="#settings-rates" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts" hx-confirm="{{t "Replace the manual %s rate of %s with the source one?" .Currency (date .Date)}}">
+            <input type="hidden" name="currency" value="{{.Currency}}">
+            <input type="hidden" name="date" value="{{date .Date}}">
+            <button type="submit" class="outline small" data-variant="secondary">{{t "Reset"}}</button>
+          </form>{{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
   </div>
-  <p class="text-light">{{t "Converts other currencies to the primary one."}} {{t "Applies when an exchange-rate source is enabled."}}</p>
-</form></article>
-{{if $d.Settings.RateSource}}
-{{if not $d.RateCurrencies}}
-<p class="text-light">{{t "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate." $d.Settings.RateSource.Pivot}}</p>
-{{else}}
-{{with $d.RatesSync}}{{if .Done}}<article class="card"><p>{{if .Updated}}{{t "Daily rates updated: %d." .Updated}}{{else}}{{t "Rates are up to date."}}{{end}}{{if .Err}} {{t "Some failed:"}} {{errText .Err}}{{end}}</p></article>{{end}}{{end}}
-{{if $d.Rates}}
-<div class="table">
-<table>
-  <thead><tr><th>{{t "Currency"}}</th><th>{{t "Last date"}}</th><th>{{t "Rate, %s" $d.Settings.RateSource.Pivot}}</th><th></th></tr></thead>
-  <tbody>
-  {{range $d.Rates}}
-    <tr>
-      <td>{{.Currency}}</td>
-      <td>{{date .Date}}</td>
-      <td>{{.Rate}}</td>
-      <td>{{if .Manual}}
-        <form method="post" action="/settings/rates/reset" hx-confirm="{{t "Replace the manual %s rate of %s with the source one?" .Currency (date .Date)}}">
-          <input type="hidden" name="currency" value="{{.Currency}}">
-          <input type="hidden" name="date" value="{{date .Date}}">
-          <button type="submit" class="outline small" data-variant="secondary">{{t "Reset"}}</button>
-        </form>{{end}}
-      </td>
-    </tr>
+  {{else}}
+  <p class="text-light">{{t "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates." $d.Settings.RateSource.Pivot}}</p>
   {{end}}
-  </tbody>
-</table>
-</div>
-{{else}}
-<p class="text-light">{{t "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates." $d.Settings.RateSource.Pivot}}</p>
-{{end}}
-<form method="post" action="/settings/rates/sync">
-  <button type="submit">{{t "Update rates"}}</button>
-</form>
-{{end}}
-<form method="post" action="/settings/rates/set">
-  <div class="row mb-4">
+  {{end}}
+  <form id="form-rate" method="post" action="/settings/rates/set" class="row" hx-post="/settings/rates/set" hx-target="#settings-rates" hx-select="#settings-rates" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts">
+    {{with $.Errors.Form "rate"}}<p class="col-12 error" role="alert">{{.}}</p>{{end}}
     {{$posted := ""}}{{with $d.Posted}}{{$posted = .Get "currency"}}{{end}}
     {{$e := $.Errors.Get "rate.currency"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
       <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="rate-currency-error"{{end}}>
         {{range $d.Currencies}}{{if ne . $d.Settings.RateSource.Pivot}}<option value="{{.}}"{{if eq . $posted}} selected{{end}}>{{.}}</option>{{end}}{{end}}
       </select>
       {{if $e}}<div id="rate-currency-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{$e = $.Errors.Get "rate.date"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Date"}} <input type="date" name="date"{{with $d.Posted}} value="{{.Get "date"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-date-error"{{end}}>
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Date"}} <input type="date" name="date"{{with $d.Posted}} value="{{.Get "date"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-date-error"{{end}}>
       {{if $e}}<div id="rate-date-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{$e = $.Errors.Get "rate.rate"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040"{{with $d.Posted}} value="{{.Get "rate"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-rate-error"{{end}}>
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040"{{with $d.Posted}} value="{{.Get "rate"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-rate-error"{{end}}>
       {{if $e}}<div id="rate-rate-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Set rate"}}</button></div>
-  </div>
-</form>
-<p><a href="/imports/new?source=rates">{{t "Import rates from CSV"}}</a></p>
-{{end}}
-
-<h2>{{t "Password"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/password">
-  <div class="row mb-4">
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="current" autocomplete="current-password"></label>
-    {{$e := $.Errors.Get "password.password"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "New password"}} <input type="password" name="password" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="new-password-error"{{end}}>
-      {{if $e}}<div id="new-password-error" class="error" role="status">{{$e}}</div>{{end}}
-    </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Change"}}</button></div>
-  </div>
-</form></article>
-
-<h2>{{t "Security & access"}}</h2>
-{{if $d.NewToken}}
-<article class="card">
-  <p>{{t "Copy the key now, it is not shown again:"}}</p>
-  <div class="table"><code>{{$d.NewToken}}</code></div>
-  <p class="text-light">{{t "Send it as"}} <code>Authorization: Bearer &lt;key&gt;</code> {{t "to"}} <code>/api</code> {{t "or to the MCP server at"}} <code>/mcp</code> {{t "on this host."}}</p>
+    <div class="col-3 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit">{{t "Set rate"}}</button></div></div>
+  </form>
+  {{end}}
 </article>
-{{end}}
-<div class="table">
-<table>
-  <thead><tr><th>{{t "Type"}}</th><th>{{t "Name"}}</th><th>{{t "Scope"}}</th><th>{{t "Last used"}}</th><th>{{t "Expires"}}</th><th></th></tr></thead>
-  <tbody>
-  {{range $d.Sessions}}
-    <tr>
-      <td>{{t "Session"}}</td>
-      <td>{{.UserAgent}}</td>
-      <td>{{t "full"}}</td>
-      <td>{{datetime .LastUsedAt $.User}}</td>
-      <td>{{datetime .ExpiresAt $.User}}</td>
-      <td>{{if .Current}}<span class="badge" data-variant="secondary">{{t "this browser"}}</span>{{else}}
-        <form method="post" action="/settings/sessions/{{.ID}}/revoke" hx-confirm="{{t "Sign out this session?"}}">
-          <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
-        </form>{{end}}
-      </td>
-    </tr>
+
+<article id="settings-access" class="card mb-4 form-compact">
+  <h3>{{t "Security & access"}}</h3>
+  {{if $d.NewToken}}
+  <div>
+    <p class="text-light">{{t "Copy this key and store it somewhere safe, like a password manager. It won't be shown again, and anyone who has it can access your data."}}</p>
+    <fieldset class="group">
+      <input readonly value="{{$d.NewToken}}" aria-label="{{t "API key"}}" autocomplete="off" spellcheck="false" autofocus>
+      <button type="button" class="icon outline" data-copy="{{$d.NewToken}}" aria-label="{{t "Copy key"}}">
+        <svg data-icon="copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+        <svg data-icon="check" hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+      </button>
+    </fieldset>
+  </div>
   {{end}}
-  {{range $d.Keys}}
-    <tr>
-      <td>{{t "API key"}}</td>
-      <td>{{.Name}} <code>gf_{{.Prefix}}_…</code></td>
-      <td>{{t (print .Scope)}}</td>
-      <td>{{if .LastUsedAt.IsZero}}{{t "never"}}{{else}}{{datetime .LastUsedAt $.User}}{{end}}</td>
-      <td>{{if .ExpiresAt.IsZero}}{{t "never"}}{{else}}{{datetime .ExpiresAt $.User}}{{end}}</td>
-      <td>{{if .Revoked}}<span class="badge" data-variant="secondary">{{t "revoked"}}</span>{{else if .Expired}}<span class="badge" data-variant="secondary">{{t "expired"}}</span>{{else}}
-        <form method="post" action="/settings/api-keys/{{.ID}}/revoke" hx-confirm="{{t "Revoke %s?" .Name}}">
-          <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
-        </form>{{end}}
-      </td>
-    </tr>
-  {{end}}
-  </tbody>
-</table>
-</div>
-<article class="card mb-4"><form method="post" action="/settings/api-keys">
-  <div class="row mb-4">
+  <div class="table">
+  <table>
+    <thead><tr><th>{{t "Type"}}</th><th>{{t "Name"}}</th><th>{{t "Scope"}}</th><th>{{t "Last used"}}</th><th>{{t "Expires"}}</th><th></th></tr></thead>
+    <tbody>
+    {{range $d.Sessions}}
+      <tr>
+        <td>{{t "Session"}}</td>
+        <td>{{.UserAgent}}</td>
+        <td>{{t "full"}}</td>
+        <td>{{datetime .LastUsedAt $.User}}</td>
+        <td>{{datetime .ExpiresAt $.User}}</td>
+        <td>{{if .Current}}<span class="badge" data-variant="success">{{t "this browser"}}</span>{{else}}
+          <form method="post" action="/settings/sessions/{{.ID}}/revoke" hx-post="/settings/sessions/{{.ID}}/revoke" hx-target="#settings-access" hx-select="#settings-access" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts" hx-confirm="{{t "Sign out this session?"}}">
+            <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
+          </form>{{end}}
+        </td>
+      </tr>
+    {{end}}
+    {{range $d.Keys}}
+      <tr>
+        <td>{{t "API key"}}</td>
+        <td>{{.Name}} <code>gf_{{.Prefix}}_…</code></td>
+        <td>{{t (print .Scope)}}</td>
+        <td>{{if .LastUsedAt.IsZero}}{{t "never"}}{{else}}{{datetime .LastUsedAt $.User}}{{end}}</td>
+        <td>{{if .ExpiresAt.IsZero}}{{t "never"}}{{else}}{{datetime .ExpiresAt $.User}}{{end}}</td>
+        <td>{{if .Expired}}<span class="badge" data-variant="secondary">{{t "expired"}}</span>{{else}}
+          <form method="post" action="/settings/api-keys/{{.ID}}/revoke" hx-post="/settings/api-keys/{{.ID}}/revoke" hx-target="#settings-access" hx-select="#settings-access" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts" hx-confirm="{{t "Revoke %s?" .Name}}">
+            <button type="submit" class="outline small" data-variant="secondary">{{t "Revoke"}}</button>
+          </form>{{end}}
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  <form id="form-apikey" method="post" action="/settings/api-keys" class="row" hx-post="/settings/api-keys" hx-target="#settings-access" hx-select="#settings-access" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts">
+    {{with $.Errors.Form "apikey"}}<p class="col-12 error" role="alert">{{.}}</p>{{end}}
     {{$e := $.Errors.Get "apikey.name"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}"{{with $d.Posted}} value="{{.Get "name"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="apikey-name-error"{{end}}>
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}"{{with $d.Posted}} value="{{.Get "name"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="apikey-name-error"{{end}}>
       {{if $e}}<div id="apikey-name-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{$e = $.Errors.Get "apikey.scope"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Scope"}}
-      <select name="scope"{{if $e}} aria-invalid="true" aria-describedby="apikey-scope-error"{{end}}><option value="read">{{t "read"}}</option><option value="write">{{t "write"}}</option></select>
+    <label data-field class="col-2"{{if $e}} aria-invalid="true"{{end}}>{{t "Scope"}}
+      <select name="scope"{{if $e}} aria-invalid="true" aria-describedby="apikey-scope-error"{{end}}>{{$scope := or ($d.Posted.Get "scope") "read"}}<option value="read"{{if eq $scope "read"}} selected{{end}}>{{t "read"}}</option><option value="write"{{if eq $scope "write"}} selected{{end}}>{{t "write"}}</option></select>
       {{if $e}}<div id="apikey-scope-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    {{$e = $.Errors.Get "apikey.expiration"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Expiration"}}
+    {{$e = $.Errors.Get "apikey.expires"}}
+    <label data-field class="col-2"{{if $e}} aria-invalid="true"{{end}}>{{t "Expiration"}}
       <select name="expires"{{if $e}} aria-invalid="true" aria-describedby="apikey-expiration-error"{{end}}>
-        <option value="7">{{t "7 days"}}</option>
-        <option value="30" selected>{{t "30 days"}}</option>
-        <option value="90">{{t "90 days"}}</option>
-        <option value="365">{{t "1 year"}}</option>
-        <option value="never">{{t "No expiration"}}</option>
+        {{$expires := or ($d.Posted.Get "expires") "30"}}
+        <option value="7"{{if eq $expires "7"}} selected{{end}}>{{t "7 days"}}</option>
+        <option value="30"{{if eq $expires "30"}} selected{{end}}>{{t "30 days"}}</option>
+        <option value="90"{{if eq $expires "90"}} selected{{end}}>{{t "90 days"}}</option>
+        <option value="365"{{if eq $expires "365"}} selected{{end}}>{{t "1 year"}}</option>
+        <option value="never"{{if eq $expires "never"}} selected{{end}}>{{t "No expiration"}}</option>
       </select>
       {{if $e}}<div id="apikey-expiration-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
-    <div class="col-12 hstack"><button type="submit">{{t "Create key"}}</button></div>
-  </div>
-</form></article>
-
-<h2>{{t "Export"}}</h2>
-<article class="card mb-4"><form method="get" action="/settings/export" hx-boost="false">
-  <div class="row mb-4">
-    <label data-field class="col-4">{{t "Format"}}
-      <select name="format"><option value="csv">CSV</option></select>
+    {{$e = $.Errors.Get "apikey.password"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"{{if $e}} aria-invalid="true" aria-describedby="apikey-password-error"{{end}}>
+      {{if $e}}<div id="apikey-password-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "From"}} <input type="date" name="from"></label>
-    <label data-field class="col-4">{{t "To"}} <input type="date" name="to"></label>
-    <div class="col-12 hstack"><button type="submit">{{t "Export"}}</button></div>
-  </div>
-  <p class="text-light">{{t "Leave dates empty to export everything."}}</p>
-</form></article>
+    <div class="col-2 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit">{{t "Create key"}}</button></div></div>
+  </form>
+</article>
+
+<article class="card mb-4 form-compact">
+  <h3>{{t "Export"}}</h3>
+  <p class="text-light">{{t "Without dates, data of all time is exported."}}</p>
+  <form method="get" action="/settings/export" hx-boost="false" class="row">
+    <input type="hidden" name="format" value="csv">
+    <label data-field class="col-3">{{t "From"}} <input type="date" name="from"></label>
+    <label data-field class="col-3">{{t "To"}} <input type="date" name="to"></label>
+    <div class="col-3 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit">{{t "Export"}} CSV</button></div></div>
+  </form>
+</article>
 
 {{if $d.CanBackup}}
-<h2>{{t "Backup"}}</h2>
-<article class="card mb-4"><form method="post" action="/settings/backup" hx-boost="false">
-  <div class="row mb-4">
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
-    {{$e := $.Errors.Get "backup.passphrase"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="passphrase-error"{{end}}>
-      {{if $e}}<div id="passphrase-error" class="error" role="status">{{$e}}</div>{{end}}
+<article class="card mb-4 form-compact">
+  <h3>{{t "Backup"}}</h3>
+  <p class="text-light">{{t "The whole database of all users, encrypted with"}} <a href="https://age-encryption.org">age</a>.</p>
+  <form method="post" action="/settings/backup" hx-boost="false" class="row">
+    {{with $.Errors.Form "backup"}}<p class="col-12 error" role="alert">{{.}}</p>{{end}}
+    {{$e := $.Errors.Get "backup.password"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"{{if $e}} aria-invalid="true" aria-describedby="backup-password-error"{{end}}>
+      {{if $e}}<div id="backup-password-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <div class="col-12 hstack"><button type="submit">{{t "Download backup"}}</button></div>
-  </div>
-  <p class="text-light">{{t "The whole database of all users, encrypted with"}} <a href="https://age-encryption.org">age</a>. {{t "Decrypt with"}} <code>age -d gigafin-DATE.db.age &gt; gigafin.db</code>.</p>
-</form></article>
-{{end}}
-
-<h2>{{t "Danger zone"}}</h2>
-<article class="card">
-  <p><strong>{{t "Delete all data"}}</strong>: {{t "every account, operation, category, plan and import, plus saved import mappings. Your login, password, time zone, sessions and API keys stay. This cannot be undone."}}</p>
-  <form method="post" action="/settings/delete-data" hx-confirm="{{t "Delete all accounts, operations, categories, plans and imports? This cannot be undone."}}">
-    <div class="row mb-4">
-      <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
-      <div class="col-12 hstack"><button type="submit" data-variant="danger">{{t "Delete all data"}}</button></div>
-    </div>
+    {{$e = $.Errors.Get "backup.passphrase"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="backup-passphrase-error"{{end}}>
+      {{if $e}}<div id="backup-passphrase-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    <div class="col-3 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit">{{t "Download backup"}}</button></div></div>
   </form>
 </article>
 {{end}}
+
+<article id="settings-delete" class="card form-compact">
+  <h3>{{t "Danger zone"}}</h3>
+  <p><strong>{{t "Delete all data"}}</strong>: {{t "every account, operation, category, plan and import, plus saved import mappings. Your login, password, time zone, sessions and API keys stay. This cannot be undone."}}</p>
+  <form id="form-delete" method="post" action="/settings/delete-data" class="row" hx-post="/settings/delete-data" hx-target="#settings-delete" hx-select="#settings-delete" hx-swap="outerHTML ignoreTitle:true show:none" hx-select-oob="#toasts" hx-confirm="{{t "Delete all accounts, operations, categories, plans and imports? This cannot be undone."}}">
+    {{with $.Errors.Form "delete"}}<p class="col-12 error" role="alert">{{.}}</p>{{end}}
+    {{$e := $.Errors.Get "delete.password"}}
+    <label data-field class="col-3"{{if $e}} aria-invalid="true"{{end}}>{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"{{if $e}} aria-invalid="true" aria-describedby="delete-password-error"{{end}}>
+      {{if $e}}<div id="delete-password-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    <div class="col-3 vstack gap-1"><label aria-hidden="true">&nbsp;</label><div><button type="submit" data-variant="danger">{{t "Delete all data"}}</button></div></div>
+  </form>
+</article>
+{{end}}
+
+{{define "toasts"}}{{with .Data.Notice}}<output class="toast" data-variant="success"><p>{{.}}</p></output>{{end}}{{with .Data.RatesSync}}{{if .Done}}
+<output class="toast" data-variant="success"><p>{{if .Updated}}{{t "Daily rates updated: %d." .Updated}}{{else}}{{t "Rates are up to date."}}{{end}}</p></output>
+{{if .Err}}<output class="toast" data-variant="danger"><p>{{t "Some failed:"}} {{errText .Err}}</p></output>{{end}}
+{{end}}{{end}}{{end}}

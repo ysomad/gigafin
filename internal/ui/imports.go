@@ -37,6 +37,8 @@ type importNewData struct {
 	Rates bool
 	// Header is the header line of a file of Source.
 	Header string
+	// Content is the pasted content of an upload that failed, to fill it again.
+	Content string
 }
 
 // _ratesSource is the source query value of a file of exchange rates; they are not
@@ -64,17 +66,20 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 		err = r.ParseForm()
 	}
 
+	// the form is lost with a body too large, so its error is a toast
 	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-		return domain.NewFieldError(errors.ErrInvalid, "file", "larger than %d MB", u.maxUpload>>20)
+		return domain.NewError(errors.ErrInvalid, "the file is larger than %d MB", u.maxUpload>>20)
 	}
 	if err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-
 	src, err := domain.ParseImportSource(r.FormValue("source"))
 	if err != nil {
-		return domain.NewFieldError(errors.ErrInvalid, "type", "choose what to import")
+		return domain.NewError(errors.ErrInvalid, "choose what to import")
 	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	d := importNewData{Step: "file", Source: src, Header: u.svc.Imports.Header(src)}
+	d.Content = strings.TrimSpace(r.FormValue("content"))
 
 	var (
 		file     io.Reader
@@ -84,11 +89,13 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 	f, hdr, err := r.FormFile("file")
 	switch {
 	case errors.Is(err, http.ErrMissingFile) || errors.Is(err, http.ErrNotMultipart):
-		content := strings.TrimSpace(r.FormValue("content"))
-		if content == "" {
-			return domain.NewFieldError(errors.ErrInvalid, "file", "choose a CSV file or paste its content")
+		if d.Content == "" {
+			msg := u.dicts.T(p.lang, "choose a CSV file or paste its content")
+			return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+				User: &user, Nav: "settings", Title: "New import", Error: fieldsError{"file": msg}, Form: "import", Data: d,
+			})
 		}
-		file, filename = strings.NewReader(content), "pasted.csv"
+		file, filename = strings.NewReader(d.Content), "pasted.csv"
 	case err != nil:
 		return fmt.Errorf("file: %w: %w", err, errors.ErrInvalid)
 	default:
@@ -97,6 +104,11 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 	}
 
 	im, err := u.svc.Imports.Upload(r.Context(), user.ID, src, filename, file, user.Location())
+	if isUserError(err) {
+		return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+			User: &user, Nav: "settings", Title: "New import", Error: err, Form: "import", Data: d,
+		})
+	}
 	if err != nil {
 		return err
 	}
@@ -199,7 +211,7 @@ func (u *UI) saveAccounts(w http.ResponseWriter, r *http.Request, user domain.Us
 	n := len(form.Names)
 	if len(form.Currencies) != n || len(form.IDs) != n || len(form.NewNames) != n || len(form.NewKinds) != n ||
 		len(form.NewLimits) != n {
-		return domain.NewFieldError(errors.ErrInvalid, "form", "account fields do not match")
+		return domain.NewError(errors.ErrInvalid, "account fields do not match")
 	}
 
 	accounts := make([]domain.AccountChoice, 0, n)
@@ -250,7 +262,7 @@ func (u *UI) saveCategories(w http.ResponseWriter, r *http.Request, user domain.
 
 	n := len(form.Names)
 	if len(form.Kinds) != n || len(form.IDs) != n || len(form.NewNames) != n {
-		return domain.NewFieldError(errors.ErrInvalid, "form", "category fields do not match")
+		return domain.NewError(errors.ErrInvalid, "category fields do not match")
 	}
 
 	categories := make([]domain.CategoryChoice, 0, n)
@@ -352,19 +364,25 @@ func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.Us
 	if errors.Is(err, http.ErrNotMultipart) {
 		err = r.ParseForm()
 	}
+	// the form is lost with a body too large, so its error is a toast
 	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-		return domain.NewFieldError(errors.ErrInvalid, "file", "larger than %d MB", u.maxUpload>>20)
+		return domain.NewError(errors.ErrInvalid, "the file is larger than %d MB", u.maxUpload>>20)
 	}
 	if err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	d := importNewData{Step: "file", Rates: true, Header: importer.RatesHeader}
+	d.Content = strings.TrimSpace(r.FormValue("content"))
 	var content string
 	f, _, err := r.FormFile("file")
 	switch {
 	case errors.Is(err, http.ErrMissingFile) || errors.Is(err, http.ErrNotMultipart):
-		content = strings.TrimSpace(r.FormValue("content"))
-		if content == "" {
-			return domain.NewFieldError(errors.ErrInvalid, "file", "choose a CSV file or paste its content")
+		if content = d.Content; content == "" {
+			msg := u.dicts.T(p.lang, "choose a CSV file or paste its content")
+			return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+				User: &user, Nav: "settings", Title: "New import", Error: fieldsError{"file": msg}, Form: "import-rates", Data: d,
+			})
 		}
 	case err != nil:
 		return fmt.Errorf("file: %w: %w", err, errors.ErrInvalid)
@@ -377,20 +395,25 @@ func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.Us
 		content = string(b)
 	}
 	changes, err := u.svc.Rates.Preview(r.Context(), user.ID, strings.NewReader(content))
+	if isUserError(err) {
+		return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+			User: &user, Nav: "settings", Title: "New import", Error: err, Form: "import-rates", Data: d,
+		})
+	}
 	if err != nil {
 		return err
 	}
-	d := importRatesData{Changes: changes, Content: content}
+	rd := importRatesData{Changes: changes, Content: content}
 	for _, c := range changes {
 		switch c.Status() {
 		case "new":
-			d.New++
+			rd.New++
 		case "changed":
-			d.Changed++
+			rd.Changed++
 		}
 	}
 	return u.render(w, r, http.StatusOK, "import_rates", view{
-		User: &user, Nav: "settings", Title: "Import exchange rates", Data: d,
+		User: &user, Nav: "settings", Title: "Import exchange rates", Data: rd,
 	})
 }
 

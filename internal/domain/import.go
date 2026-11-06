@@ -33,7 +33,7 @@ func ImportSources() []ImportSource {
 func ParseImportSource(s string) (ImportSource, error) {
 	src := ImportSource(s)
 	if !slices.Contains(ImportSources(), src) {
-		return "", NewFieldError(errors.ErrInvalid, "source", "must be gigafin, tbank or zenmoney")
+		return "", NewError(errors.ErrInvalid, "source: must be gigafin, tbank or zenmoney")
 	}
 	return src, nil
 }
@@ -332,7 +332,8 @@ type Preview struct {
 	Import     Import
 	Accounts   []AccountNeed
 	Categories []CategoryNeed
-	Rows       []ImportRow
+	// Rows are newest first, rows of the same time in file order.
+	Rows []ImportRow
 	// Skipped are rows the parser did not import, see Record.SkipReason.
 	Skipped []ImportRow
 }
@@ -465,6 +466,9 @@ func NewPreview(im Import, rows []ImportRow, m ImportMapping, rules []AccountKin
 	}
 	slices.SortFunc(p.Categories, func(a, b CategoryNeed) int {
 		return strings.Compare(CategoryKey(a.Kind, a.Name), CategoryKey(b.Kind, b.Name))
+	})
+	slices.SortStableFunc(p.Rows, func(a, b ImportRow) int {
+		return b.Row.Time.Compare(a.Row.Time)
 	})
 	return p
 }

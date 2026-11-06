@@ -138,28 +138,6 @@ func (s *Rules) Delete(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-// Settings returns the user's rule settings.
-func (s *Rules) Settings(ctx context.Context, userID int64) (domain.RuleSettings, error) {
-	return s.store.Read().Rules.Settings(ctx, userID)
-}
-
-// SetLearning turns learning rules from the user's categorization on or off.
-func (s *Rules) SetLearning(ctx context.Context, userID int64, on bool) error {
-	err := s.store.InTx(ctx, func(r repository.Repos) error {
-		rs, err := r.Rules.Settings(ctx, userID)
-		if err != nil {
-			return err
-		}
-		rs.Learning = on
-		return r.Rules.SetSettings(ctx, userID, rs, s.clock.Now())
-	})
-	if err != nil {
-		return err
-	}
-	s.log.DebugContext(ctx, "rule learning set", slog.Int64("user_id", userID), slog.Bool("learning", on))
-	return nil
-}
-
 // Preview validates in and returns up to limit of the user's operations it matches,
 // newest first, and how many it matches in all. Parts of splits are left out, as Apply
 // leaves them alone.
@@ -258,8 +236,8 @@ func learnCategory(
 	if op.Payee == "" || op.CategoryID == 0 {
 		return 0, nil
 	}
-	settings, err := r.Rules.Settings(ctx, userID)
-	if err != nil || !settings.Learning {
+	settings, err := r.Settings.Get(ctx, userID)
+	if err != nil || !settings.AutoCategoryRules {
 		return 0, err
 	}
 	history, err := r.Operations.ByPayee(

@@ -1,22 +1,12 @@
 {{define "content"}}
 {{$d := .Data}}
-<form method="get" action="/" class="hstack mb-6"
-      hx-boost="false" hx-get="/" hx-trigger="change, submit"
-      hx-target="body" hx-swap="outerSync" hx-push-url="true">
-  <fieldset class="group">
-    <button type="button" class="outline" hx-get="/?month={{$d.Prev}}" hx-target="body" hx-swap="outerSync" hx-push-url="true" aria-label="{{t "Previous month"}}" data-variant="secondary">‹</button>
-    <select name="month" aria-label="{{t "Month"}}">
-      {{range $d.Months}}<option value="{{.}}"{{if eq .String $d.Dash.Month.String}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
-    </select>
-    <button type="button" class="outline" hx-get="/?month={{$d.Next}}" hx-target="body" hx-swap="outerSync" hx-push-url="true" aria-label="{{t "Next month"}}" data-variant="secondary">›</button>
-  </fieldset>
-</form>
+<div class="mb-6">{{template "month-nav" (dict "Action" "/" "Month" $d.Dash.Month "Months" $d.Months "Prev" $d.Prev "Next" $d.Next)}}</div>
 
 {{range $d.Charts}}
 <h2>{{t "Income vs expense"}} <span class="text-light">{{.Currency}}</span></h2>
 <div class="table">
 <figure class="trend" data-locale="{{lang}}"{{if showMinorUnits}} data-minor-units{{end}} data-currency="{{.Currency}}">
-  <script type="application/json" data-label-month="{{t "Month"}}" data-label-income="{{t "Income"}}" data-label-expense="{{t "Expense"}}" data-label-balance="{{t "Net worth"}}">{{.}}</script>
+  <script type="application/json" data-label-income="{{t "Income"}}" data-label-expense="{{t "Expense"}}" data-label-balance="{{t "Net worth"}}">{{.}}</script>
 </figure>
 </div>
 {{end}}
@@ -34,11 +24,11 @@
   <div data-field>
     <label for="compare">{{t "Compare with"}}</label>
     <fieldset class="group">
-      <button type="button" class="outline" hx-get="/?month={{$d.Dash.Month}}&compare={{$d.Dash.CompareMonth.Prev}}" hx-target="body" hx-swap="outerSync" hx-push-url="true" aria-label="{{t "Previous month"}}" data-variant="secondary">‹</button>
+      <button type="button" class="outline" hx-get="/?month={{$d.Dash.Month}}&compare={{$d.ComparePrev}}" hx-target="body" hx-swap="outerSync" hx-push-url="true"{{if not $d.ComparePrev}} disabled{{end}} aria-label="{{t "Previous month"}}">‹</button>
       <select id="compare" name="compare">
-        {{range $d.Months}}<option value="{{.}}"{{if eq .String $d.Dash.CompareMonth.String}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
+        {{range $d.Months}}{{if ne .String $d.Dash.Month.String}}<option value="{{.}}"{{if eq .String $d.Dash.CompareMonth.String}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}{{end}}
       </select>
-      <button type="button" class="outline" hx-get="/?month={{$d.Dash.Month}}&compare={{$d.Dash.CompareMonth.Next}}" hx-target="body" hx-swap="outerSync" hx-push-url="true" aria-label="{{t "Next month"}}" data-variant="secondary">›</button>
+      <button type="button" class="outline" hx-get="/?month={{$d.Dash.Month}}&compare={{$d.CompareNext}}" hx-target="body" hx-swap="outerSync" hx-push-url="true"{{if not $d.CompareNext}} disabled{{end}} aria-label="{{t "Next month"}}">›</button>
     </fieldset>
   </div>
 </form>

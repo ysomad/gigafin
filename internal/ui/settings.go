@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -24,6 +26,8 @@ type settingsData struct {
 	Keys      []domain.APIKey
 	NewToken  string
 	CanBackup bool
+	// Notice is a success message of an htmx post, shown as a toast.
+	Notice string
 	// Posted are the values of a form post that failed, to fill its inputs again.
 	Posted url.Values
 
@@ -37,7 +41,7 @@ type settingsData struct {
 	RateCurrencies []string
 }
 
-// ratesSync is the result of a rate sync, shown on the settings page.
+// ratesSync is the result of a rate sync, shown on the settings page as toasts.
 type ratesSync struct {
 	Done    bool
 	Updated int
@@ -46,8 +50,8 @@ type ratesSync struct {
 }
 
 // renderSettings renders the settings page with d, of which it sets all but NewToken,
-// RatesSync and Posted. The page has several forms with the same input names, so the
-// field of viewErr, an error of the form named form, becomes form.field.
+// RatesSync and Posted. The page has several forms with the same input names, so
+// fieldsError of the form named form are keyed form.input.
 func (u *UI) renderSettings(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -57,10 +61,6 @@ func (u *UI) renderSettings(
 	form string,
 	viewErr error,
 ) error {
-	if e, ok := errors.AsType[domain.Error](viewErr); ok && e.Field != "" {
-		e.Field = form + "." + e.Field
-		viewErr = e
-	}
 	var session string
 	if c, err := r.Cookie(u.cookie(_sessionCookie, "", 0).Name); err == nil {
 		session = c.Value
@@ -89,7 +89,7 @@ func (u *UI) renderSettings(
 	d.Settings, d.Rates, d.RateCurrencies = settings, rates, rateCurrencies
 	d.Languages, d.RateSources, d.Currencies = i18n.Languages(), domain.RateSources(), money.Currencies()
 	return u.render(w, r, status, "settings", view{
-		User: &user, Nav: "settings", Title: "Settings", Error: viewErr, Data: d,
+		User: &user, Nav: "settings", Title: "Settings", Error: viewErr, Form: form, Data: d,
 	})
 }
 
@@ -97,8 +97,9 @@ func (u *UI) settings(w http.ResponseWriter, r *http.Request, user domain.User) 
 	return u.renderSettings(w, r, user, http.StatusOK, settingsData{}, "", nil)
 }
 
-// settingsDone ends a settings form post: back to the page on success, the page with
-// the form's errors and values for a user error.
+// settingsDone ends a settings form post: the page with the form's errors and values for
+// a user error. On success htmx gets the page, of which the form swaps in just its own
+// card, and a plain browser is sent back to the page.
 func (u *UI) settingsDone(w http.ResponseWriter, r *http.Request, user domain.User, form string, err error) error {
 	if isUserError(err) {
 		return u.renderSettings(w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, form, err)
@@ -106,46 +107,66 @@ func (u *UI) settingsDone(w http.ResponseWriter, r *http.Request, user domain.Us
 	if err != nil {
 		return err
 	}
-	redirect(w, r, "/settings")
-	return nil
-}
-
-func (u *UI) setTimezone(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
-	}
-	err := u.svc.Auth.SetTimezone(r.Context(), user.ID, strings.TrimSpace(r.PostFormValue("timezone")))
-	return u.settingsDone(w, r, user, "timezone", err)
-}
-
-func (u *UI) setDisplay(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
-	}
-	if err := u.svc.Settings.SetDisplay(r.Context(), user.ID, r.PostFormValue("show_minor_units") == "on"); err != nil {
-		return err
+	if r.Header.Get("HX-Request") == "true" {
+		return u.renderSettings(w, r, user, http.StatusOK, settingsData{}, "", nil)
 	}
 	redirect(w, r, "/settings")
 	return nil
 }
 
-func (u *UI) setLanguage(w http.ResponseWriter, r *http.Request, user domain.User) error {
+// saveSettings stores the general settings form as a whole: the time zone, kept with
+// the user, and every domain.Settings field.
+func (u *UI) saveSettings(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	err := u.svc.Settings.SetLanguage(r.Context(), user.ID, r.PostFormValue("language"))
-	return u.settingsDone(w, r, user, "language", err)
-}
-
-func (u *UI) setRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
+	tz := strings.TrimSpace(r.PostFormValue("timezone"))
+	if _, err := domain.ParseTimezone(tz); err != nil {
+		errs["settings.timezone"] = u.dicts.T(p.lang, "unknown time zone")
+	}
+	s := domain.Settings{
+		ShowMinorUnits:    r.PostFormValue("show_minor_units") == "on",
+		PrimaryCurrency:   r.PostFormValue("primary_currency"),
+		Language:          r.PostFormValue("language"),
+		AutoCategoryRules: r.PostFormValue("auto_category_rules") == "on",
+	}
+	known := slices.ContainsFunc(i18n.Languages(), func(l i18n.Language) bool { return l.Code == s.Language })
+	if s.Language != "" && !known {
+		errs["settings.language"] = u.dicts.T(p.lang, "choose from the list")
 	}
 	src, err := domain.ParseRateSource(r.PostFormValue("rate_source"))
-	if err == nil {
-		err = u.svc.Settings.SetRates(r.Context(), user.ID, src, r.PostFormValue("primary_currency"))
+	if err != nil {
+		errs["settings.rate_source"] = u.dicts.T(p.lang, "choose from the list")
 	}
-	return u.settingsDone(w, r, user, "rates", err)
+	s.RateSource = src
+	switch {
+	case err != nil || src == domain.RateSourceNone:
+	case s.PrimaryCurrency == "":
+		errs["settings.primary_currency"] = u.dicts.T(p.lang, "required with exchange rates on")
+	case !money.ValidCurrency(s.PrimaryCurrency):
+		errs["settings.primary_currency"] = u.dicts.T(p.lang, "choose from the list")
+	}
+	if len(errs) > 0 {
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "settings", errs,
+		)
+	}
+	if err := u.svc.Auth.SetTimezone(r.Context(), user.ID, tz); err != nil {
+		return u.settingsDone(w, r, user, "settings", err)
+	}
+	// user is read before the change, and the page shows dates in its time zone
+	user.Timezone = tz
+	if err := u.svc.Settings.Set(r.Context(), user.ID, s); err != nil {
+		return u.settingsDone(w, r, user, "settings", err)
+	}
+	if s.Language != p.settings.Language {
+		// the whole page changes language, so it is loaded again
+		redirect(w, r, "/settings")
+		return nil
+	}
+	return u.settingsDone(w, r, user, "settings", nil)
 }
 
 func (u *UI) syncRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -161,6 +182,25 @@ func (u *UI) syncRates(w http.ResponseWriter, r *http.Request, user domain.User)
 func (u *UI) setRate(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
+	if !money.ValidCurrency(r.PostFormValue("currency")) {
+		errs["rate.currency"] = u.dicts.T(p.lang, "choose from the list")
+	}
+	if _, err := timex.ParseDate(r.PostFormValue("date")); err != nil {
+		errs["rate.date"] = u.dicts.T(p.lang, "must be YYYY-MM-DD")
+	}
+	switch v, err := money.Parse(r.PostFormValue("rate")); {
+	case err != nil:
+		errs["rate.rate"] = u.dicts.T(p.lang, "enter a number")
+	case !v.IsPositive():
+		errs["rate.rate"] = u.dicts.T(p.lang, "must be positive")
+	}
+	if len(errs) > 0 {
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "rate", errs,
+		)
 	}
 	err := u.svc.Rates.Set(r.Context(), user.ID, r.PostFormValue("currency"), r.PostFormValue("date"),
 		r.PostFormValue("rate"))
@@ -179,21 +219,46 @@ func (u *UI) resetRate(w http.ResponseWriter, r *http.Request, user domain.User)
 	); err != nil {
 		return err
 	}
-	redirect(w, r, "/settings")
-	return nil
+	return u.settingsDone(w, r, user, "", nil)
 }
 
 func (u *UI) changePassword(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	token, err := u.svc.Auth.ChangePassword(r.Context(), user.ID, r.PostFormValue("current"),
-		r.PostFormValue("password"), r.UserAgent())
+	current, pass := r.PostFormValue("current"), r.PostFormValue("password")
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
+	if current == "" {
+		errs["password.current"] = u.dicts.T(p.lang, "required")
+	}
+	if err := domain.CheckPasswordPolicy(pass); err != nil {
+		errs["password.password"] = errText(u.dicts, p.lang, err)
+	} else if pass == current {
+		errs["password.password"] = u.dicts.T(p.lang, "must differ from the current password")
+	}
+	if len(errs) > 0 {
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "password", errs,
+		)
+	}
+	token, err := u.svc.Auth.ChangePassword(r.Context(), user.ID, current, pass, r.UserAgent())
+	if errors.Is(err, errors.ErrUnauthorized) {
+		errs["password.current"] = u.dicts.T(p.lang, "wrong password")
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "password", errs,
+		)
+	}
 	if err != nil {
 		return u.settingsDone(w, r, user, "password", err)
 	}
 	// all sessions end on a password change, this browser gets a new one
 	http.SetCookie(w, u.cookie(_sessionCookie, token, int(u.sessionTTL.Seconds())))
+	notice := u.dicts.T(p.lang, "Password changed. Other sessions are signed out.")
+	if r.Header.Get("HX-Request") == "true" {
+		return u.renderSettings(w, r, user, http.StatusOK, settingsData{Notice: notice}, "", nil)
+	}
+	http.SetCookie(w, u.cookie(_noticeCookie, url.QueryEscape(notice), 60))
 	redirect(w, r, "/settings")
 	return nil
 }
@@ -201,6 +266,28 @@ func (u *UI) changePassword(w http.ResponseWriter, r *http.Request, user domain.
 func (u *UI) createAPIKey(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+	}
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	errs := fieldsError{}
+	switch name := strings.TrimSpace(r.PostFormValue("name")); {
+	case name == "":
+		errs["apikey.name"] = u.dicts.T(p.lang, "required")
+	case utf8.RuneCountInString(name) > domain.MaxTextLen:
+		errs["apikey.name"] = u.dicts.T(p.lang, "too long")
+	}
+	if _, err := domain.ParseScope(r.PostFormValue("scope")); err != nil {
+		errs["apikey.scope"] = u.dicts.T(p.lang, "choose from the list")
+	}
+	if _, err := domain.ParseKeyTTL(r.PostFormValue("expires")); err != nil {
+		errs["apikey.expires"] = u.dicts.T(p.lang, "choose from the list")
+	}
+	if r.PostFormValue("password") == "" {
+		errs["apikey.password"] = u.dicts.T(p.lang, "required")
+	}
+	if len(errs) > 0 {
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "apikey", errs,
+		)
 	}
 	token, _, err := u.svc.Auth.CreateAPIKey(r.Context(), user.ID, r.PostFormValue("password"),
 		r.PostFormValue("name"), domain.Scope(r.PostFormValue("scope")), r.PostFormValue("expires"))
@@ -219,8 +306,7 @@ func (u *UI) revokeAPIKey(w http.ResponseWriter, r *http.Request, user domain.Us
 	if err := u.svc.Auth.RevokeAPIKey(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	redirect(w, r, "/settings")
-	return nil
+	return u.settingsDone(w, r, user, "", nil)
 }
 
 func (u *UI) revokeSession(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -231,14 +317,13 @@ func (u *UI) revokeSession(w http.ResponseWriter, r *http.Request, user domain.U
 	if err := u.svc.Auth.RevokeSession(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	redirect(w, r, "/settings")
-	return nil
+	return u.settingsDone(w, r, user, "", nil)
 }
 
 func (u *UI) exportData(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	q := r.URL.Query()
 	if f := q.Get("format"); f != "csv" {
-		return domain.NewFieldError(errors.ErrInvalid, "format", "unsupported %q", f)
+		return domain.NewError(errors.ErrInvalid, "format: unsupported %q", f)
 	}
 	f, err := u.filterFromQuery(q)
 	if err != nil {
@@ -263,6 +348,23 @@ func (u *UI) backup(w http.ResponseWriter, r *http.Request, user domain.User) er
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
+	pass, passphrase := r.PostFormValue("password"), r.PostFormValue("passphrase")
+	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	// the form posts without htmx, for its file, so an error page is a full page load
+	errs := fieldsError{}
+	if pass == "" {
+		errs["backup.password"] = u.dicts.T(p.lang, "required")
+	}
+	if passphrase == "" {
+		errs["backup.passphrase"] = u.dicts.T(p.lang, "required")
+	} else if err := domain.CheckPasswordPolicy(passphrase); err != nil {
+		errs["backup.passphrase"] = errText(u.dicts, p.lang, err)
+	}
+	if len(errs) > 0 {
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "backup", errs,
+		)
+	}
 	ctx := r.Context()
 	dir, err := os.MkdirTemp("", "gigafin-backup-*")
 	if err != nil {
@@ -273,9 +375,16 @@ func (u *UI) backup(w http.ResponseWriter, r *http.Request, user domain.User) er
 			u.log.ErrorContext(ctx, "remove backup dir", slog.String("dir", dir), slog.Any("error", err))
 		}
 	}()
-	f, err := u.svc.Data.Backup(ctx, user, r.PostFormValue("password"), r.PostFormValue("passphrase"), dir)
+	f, err := u.svc.Data.Backup(ctx, user, pass, passphrase, dir)
+	if errors.Is(err, errors.ErrUnauthorized) {
+		errs["backup.password"] = u.dicts.T(p.lang, "wrong password")
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "backup", errs,
+		)
+	}
 	if err != nil {
-		return u.settingsDone(w, r, user, "backup", err)
+		// forbidden goes back to the settings page as a toast, where the form is not shown
+		return err
 	}
 	defer f.Close()
 	fi, err := f.Stat()
@@ -296,6 +405,13 @@ func (u *UI) deleteAllData(w http.ResponseWriter, r *http.Request, user domain.U
 	// finish even if the browser gives up waiting, so the result does not depend on it
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 	defer cancel()
+	if r.PostFormValue("password") == "" {
+		p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+		errs := fieldsError{"delete.password": u.dicts.T(p.lang, "required")}
+		return u.renderSettings(
+			w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, "delete", errs,
+		)
+	}
 	if err := u.svc.Data.DeleteAll(ctx, user.ID, r.PostFormValue("password")); err != nil {
 		return u.settingsDone(w, r, user, "delete", err)
 	}

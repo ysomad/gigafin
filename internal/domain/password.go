@@ -13,18 +13,18 @@ const (
 	_pwdMaxLen = 128
 )
 
-// CheckPasswordPolicy returns an error about the password field if pwd is not valid
+// CheckPasswordPolicy returns an error if pwd is not valid
 // UTF-8, too short or too long.
 func CheckPasswordPolicy(pwd string) error {
 	if !utf8.ValidString(pwd) {
-		return NewFieldError(errors.ErrInvalid, "password", "must be valid UTF-8")
+		return NewError(errors.ErrInvalid, "must be valid UTF-8")
 	}
 	n := utf8.RuneCountInString(pwd)
 	if n < _pwdMinLen {
-		return NewFieldError(errors.ErrInvalid, "password", "must be at least %d characters", _pwdMinLen)
+		return NewError(errors.ErrInvalid, "must be at least %d characters", _pwdMinLen)
 	}
 	if n > _pwdMaxLen {
-		return NewFieldError(errors.ErrInvalid, "password", "must be at most %d characters", _pwdMaxLen)
+		return NewError(errors.ErrInvalid, "must be at most %d characters", _pwdMaxLen)
 	}
 	return nil
 }

@@ -46,18 +46,6 @@ const (
 	RuleOriginLearned RuleOrigin = "learned"
 )
 
-// RuleSettings are a user's preferences for rules.
-type RuleSettings struct {
-	// Learning makes LearnCategory create rules when the user sets the category of an
-	// operation by hand.
-	Learning bool
-}
-
-// DefaultRuleSettings returns the settings of a user who never changed them.
-func DefaultRuleSettings() RuleSettings {
-	return RuleSettings{Learning: true}
-}
-
 // RuleField is the operation field a condition looks at.
 type RuleField string
 
@@ -201,22 +189,22 @@ func NewRule(in RuleInput, origin RuleOrigin, cats map[int64]Category) (Rule, er
 	)
 	r := Rule{Stage: in.Stage, Match: in.Match, Origin: origin}
 	if !slices.Contains(RuleStages(), r.Stage) {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "stage", "must be pre, default or post")
+		return Rule{}, NewError(errors.ErrInvalid, "stage: must be pre, default or post")
 	}
 	if r.Match != RuleMatchAll && r.Match != RuleMatchAny {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "match", "must be all or any")
+		return Rule{}, NewError(errors.ErrInvalid, "match: must be all or any")
 	}
 	if len(in.Conditions) == 0 {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "conditions", "at least 1 condition")
+		return Rule{}, NewError(errors.ErrInvalid, "conditions: at least 1 condition")
 	}
 	if len(in.Conditions) > maxConditions {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "conditions", "at most %d conditions", maxConditions)
+		return Rule{}, NewError(errors.ErrInvalid, "conditions: at most %d conditions", maxConditions)
 	}
 	if len(in.Actions) == 0 {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "actions", "at least 1 action")
+		return Rule{}, NewError(errors.ErrInvalid, "actions: at least 1 action")
 	}
 	if len(in.Actions) > maxActions {
-		return Rule{}, NewFieldError(errors.ErrInvalid, "actions", "at most %d actions", maxActions)
+		return Rule{}, NewError(errors.ErrInvalid, "actions: at most %d actions", maxActions)
 	}
 	r.Conditions = make([]Condition, len(in.Conditions))
 	for i, c := range in.Conditions {
@@ -225,10 +213,6 @@ func NewRule(in RuleInput, origin RuleOrigin, cats map[int64]Category) (Rule, er
 			c.Values[j] = strings.TrimSpace(v)
 		}
 		if _, err := compileCondition(c, cats); err != nil {
-			if e, ok := errors.AsType[Error](err); ok && e.Field != "" {
-				e.Field = "conditions[" + strconv.Itoa(i) + "]." + e.Field
-				return Rule{}, e
-			}
 			return Rule{}, NewError(err, "condition %d", i+1)
 		}
 		r.Conditions[i] = c
@@ -238,10 +222,6 @@ func NewRule(in RuleInput, origin RuleOrigin, cats map[int64]Category) (Rule, er
 		a.Value = strings.TrimSpace(a.Value)
 		checked, err := checkAction(a, cats)
 		if err != nil {
-			if e, ok := errors.AsType[Error](err); ok && e.Field != "" {
-				e.Field = "actions[" + strconv.Itoa(i) + "]." + e.Field
-				return Rule{}, e
-			}
 			return Rule{}, NewError(err, "action %d", i+1)
 		}
 		r.Actions[i] = checked
@@ -251,21 +231,21 @@ func NewRule(in RuleInput, origin RuleOrigin, cats map[int64]Category) (Rule, er
 
 // checkAction validates a and returns it with a tag value cleaned as operation tags are.
 func checkAction(a Action, cats map[int64]Category) (Action, error) {
-	if utf8.RuneCountInString(a.Value) > _maxTextLen {
-		return Action{}, NewFieldError(errors.ErrInvalid, "value", "too long")
+	if utf8.RuneCountInString(a.Value) > MaxTextLen {
+		return Action{}, NewError(errors.ErrInvalid, "value: too long")
 	}
 	switch a.Type {
 	case ActionSetCategory:
 		id, err := strconv.ParseInt(a.Value, 10, 64)
 		if err != nil {
-			return Action{}, NewFieldError(errors.ErrInvalid, "value", "must be a category id")
+			return Action{}, NewError(errors.ErrInvalid, "value: must be a category id")
 		}
 		if _, ok := cats[id]; !ok {
-			return Action{}, NewFieldError(errors.ErrInvalid, "value", "category not found")
+			return Action{}, NewError(errors.ErrInvalid, "value: category not found")
 		}
 	case ActionSetPayee, ActionAppendNote, ActionPrependNote:
 		if a.Value == "" {
-			return Action{}, NewFieldError(errors.ErrInvalid, "value", "required")
+			return Action{}, NewError(errors.ErrInvalid, "value: required")
 		}
 	case ActionSetNote:
 	case ActionAddTag:
@@ -274,11 +254,11 @@ func checkAction(a Action, cats map[int64]Category) (Action, error) {
 			return Action{}, err
 		}
 		if len(tags) == 0 {
-			return Action{}, NewFieldError(errors.ErrInvalid, "value", "required")
+			return Action{}, NewError(errors.ErrInvalid, "value: required")
 		}
 		a.Value = tags[0]
 	default:
-		return Action{}, NewFieldError(errors.ErrInvalid, "type", "unknown action %q", a.Type)
+		return Action{}, NewError(errors.ErrInvalid, "type: unknown action %q", a.Type)
 	}
 	return a, nil
 }
@@ -297,10 +277,10 @@ func compileCondition(c Condition, cats map[int64]Category) (condition, error) {
 	const maxValues = 100
 	i := slices.IndexFunc(RuleFields(), func(f RuleFieldOps) bool { return f.Field == c.Field })
 	if i < 0 {
-		return condition{}, NewFieldError(errors.ErrInvalid, "field", "unknown field %q", c.Field)
+		return condition{}, NewError(errors.ErrInvalid, "field: unknown field %q", c.Field)
 	}
 	if !slices.Contains(RuleFields()[i].Ops, c.Op) {
-		return condition{}, NewFieldError(errors.ErrInvalid, "op", "%s does not take %s", Msg(c.Field), Msg(c.Op))
+		return condition{}, NewError(errors.ErrInvalid, "op: %s does not take %s", Msg(c.Field), Msg(c.Op))
 	}
 	want := 1
 	switch c.Op {
@@ -312,11 +292,11 @@ func compileCondition(c Condition, cats map[int64]Category) (condition, error) {
 	}
 	switch {
 	case want == 0 && len(c.Values) == 0:
-		return condition{}, NewFieldError(errors.ErrInvalid, "values", "at least 1 value")
+		return condition{}, NewError(errors.ErrInvalid, "values: at least 1 value")
 	case want == 0 && len(c.Values) > maxValues:
-		return condition{}, NewFieldError(errors.ErrInvalid, "values", "at most %d values", maxValues)
+		return condition{}, NewError(errors.ErrInvalid, "values: at most %d values", maxValues)
 	case want != 0 && len(c.Values) != want:
-		return condition{}, NewFieldError(errors.ErrInvalid, "values", "%s takes %d values", Msg(c.Op), want)
+		return condition{}, NewError(errors.ErrInvalid, "values: %s takes %d values", Msg(c.Op), want)
 	}
 	cc := condition{Condition: c}
 	for _, v := range c.Values {
@@ -325,7 +305,7 @@ func compileCondition(c Condition, cats map[int64]Category) (condition, error) {
 		}
 	}
 	if c.Op == CondBetween && cc.amounts[0].Cmp(cc.amounts[1]) > 0 {
-		return condition{}, NewFieldError(errors.ErrInvalid, "values", "the first amount must not be above the second")
+		return condition{}, NewError(errors.ErrInvalid, "values: the first amount must not be above the second")
 	}
 	return cc, nil
 }
@@ -333,25 +313,25 @@ func compileCondition(c Condition, cats map[int64]Category) (condition, error) {
 // add parses the value v for the field of the condition.
 func (c *condition) add(v string, cats map[int64]Category) error {
 	if v == "" {
-		return NewFieldError(errors.ErrInvalid, "values", "must not be empty")
+		return NewError(errors.ErrInvalid, "values: must not be empty")
 	}
-	if utf8.RuneCountInString(v) > _maxTextLen {
-		return NewFieldError(errors.ErrInvalid, "values", "too long")
+	if utf8.RuneCountInString(v) > MaxTextLen {
+		return NewError(errors.ErrInvalid, "values: too long")
 	}
 	switch c.Field {
 	case RuleFieldAmount:
 		a, err := money.Parse(v)
 		if err != nil {
-			return NewFieldError(err, "values", "%q", v)
+			return NewError(err, "values: %q", v)
 		}
 		c.amounts = append(c.amounts, a)
 	case RuleFieldAccount, RuleFieldCategory:
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			return NewFieldError(errors.ErrInvalid, "values", "%q is not an id", v)
+			return NewError(errors.ErrInvalid, "values: %q is not an id", v)
 		}
 		if _, ok := cats[id]; c.Field == RuleFieldCategory && !ok {
-			return NewFieldError(errors.ErrInvalid, "values", "category not found")
+			return NewError(errors.ErrInvalid, "values: category not found")
 		}
 		c.ids = append(c.ids, id)
 	case RuleFieldType:
@@ -363,7 +343,7 @@ func (c *condition) add(v string, cats map[int64]Category) error {
 		if c.Op == CondMatches {
 			re, err := regexp.Compile("(?i)" + v)
 			if err != nil {
-				return NewFieldError(errors.ErrInvalid, "values", "%q is not a regular expression", v)
+				return NewError(errors.ErrInvalid, "values: %q is not a regular expression", v)
 			}
 			c.re = re
 		}
@@ -590,7 +570,7 @@ func (rs RuleSet) apply(in *OperationInput, a Action) bool {
 		in.Note = strings.TrimSpace(a.Value + " " + in.Note)
 	case ActionAddTag:
 		// a tag over the limit would fail the whole operation, so it is not added
-		if len(in.Tags) >= _maxTags ||
+		if len(in.Tags) >= MaxTags ||
 			slices.ContainsFunc(in.Tags, func(t string) bool { return strings.EqualFold(t, a.Value) }) {
 			return false
 		}

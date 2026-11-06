@@ -1,33 +1,37 @@
 {{define "content"}}
 {{$c := .Data.Category}}
 <h1>{{if .Data.ParentName}}{{.Data.ParentName}} / {{end}}{{$c.Name}} <span class="text-light">{{t (print $c.Kind)}}{{if $c.Archived}} · {{t "archived"}}{{end}}</span></h1>
-<p><a href="/operations?category={{$c.ID}}">{{t "Operations"}}</a></p>
-<form method="post" action="/categories/{{$c.ID}}">
-  <div class="row mb-4">
+<p class="text-light mb-4"><a href="/operations?category={{$c.ID}}">{{t "Operations"}}</a></p>
+
+<form id="form-category" class="form-compact" method="post" action="/categories/{{$c.ID}}">
+  {{with $.Errors.Form "category"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <fieldset class="row mb-4" aria-label="{{t "Category"}}">
     {{$e := $.Errors.Get "name"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{.Data.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{.Data.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
       {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{if $c.ParentID}}
-    {{$e = $.Errors.Get "parent_id"}}
-    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Inside"}}
-      <select name="parent"{{if $e}} aria-invalid="true" aria-describedby="parent-error"{{end}}>
+    <label data-field class="col-6">{{t "Inside"}}
+      <select name="parent">
         {{range .Data.Parents}}<option value="{{.ID}}"{{if eq .ID $.Data.Parent}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
-      {{if $e}}<div id="parent-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{end}}
-    <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
+  </fieldset>
+  <div class="hstack justify-between">
+    <div class="hstack">
+      <button type="submit">{{t "Save"}}</button>
+      <a class="button outline" href="/categories?kind={{$c.Kind}}" data-variant="secondary">{{t "Cancel"}}</a>
+    </div>
+    <div class="hstack">
+      <button type="submit" form="category-archive" class="outline" data-variant="secondary">{{if $c.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
+      <button type="submit" form="category-delete" class="outline" data-variant="danger">{{t "Delete"}}</button>
+    </div>
   </div>
+  <p class="text-light">{{t "Categories that contain other categories or have operations can only be archived."}}</p>
 </form>
-<div class="hstack mb-4">
-  <form method="post" action="/categories/{{$c.ID}}/archive">
-    <input type="hidden" name="archived" value="{{if $c.Archived}}0{{else}}1{{end}}">
-    <button type="submit" data-variant="secondary">{{if $c.Archived}}{{t "Unarchive"}}{{else}}{{t "Archive"}}{{end}}</button>
-  </form>
-  <form method="post" action="/categories/{{$c.ID}}/delete" hx-confirm="{{t "Delete category %s?" $c.Name}}">
-    <button type="submit" class="outline" data-variant="secondary">{{t "Delete"}}</button>
-  </form>
-</div>
-<p class="text-light">{{t "Categories that contain other categories or have operations can only be archived."}}</p>
+<form id="category-archive" method="post" action="/categories/{{$c.ID}}/archive">
+  <input type="hidden" name="archived" value="{{if $c.Archived}}0{{else}}1{{end}}">
+</form>
+<form id="category-delete" method="post" action="/categories/{{$c.ID}}/delete" hx-confirm="{{t "Delete category %s?" $c.Name}}"></form>
 {{end}}

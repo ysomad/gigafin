@@ -1,14 +1,13 @@
 package domain
 
 import (
-	"slices"
+	"golang.org/x/text/language"
 
 	"github.com/ysomad/gigafin/internal/errors"
-	"github.com/ysomad/gigafin/internal/i18n"
 	"github.com/ysomad/gigafin/internal/money"
 )
 
-// Settings are a user's preferences; the zero value is the default.
+// Settings are a user's preferences, DefaultSettings until the user changes them.
 type Settings struct {
 	// ShowMinorUnits shows amounts with minor units, such as kopecks, instead of
 	// rounding them to whole units.
@@ -19,14 +18,22 @@ type Settings struct {
 	PrimaryCurrency string
 	// Language is the UI language code, empty to follow the browser.
 	Language string
+	// AutoCategoryRules makes LearnCategory create rules when the user sets the category
+	// of an operation by hand.
+	AutoCategoryRules bool
 }
 
-// Validate checks that s names a known language and rate source and, when rates are
+// DefaultSettings returns the settings of a user who never changed them: rates off and
+// rules learned from the user's categories.
+func DefaultSettings() Settings {
+	return Settings{AutoCategoryRules: true}
+}
+
+// Validate checks that s names a well-formed language tag, a known rate source and, when rates are
 // on, a supported primary currency. Errors are of kind errors.ErrInvalid.
 func (s Settings) Validate() error {
-	if s.Language != "" &&
-		!slices.ContainsFunc(i18n.Languages(), func(l i18n.Language) bool { return l.Code == s.Language }) {
-		return NewFieldError(errors.ErrInvalid, "language", "unknown %q", s.Language)
+	if _, err := language.Parse(s.Language); s.Language != "" && err != nil {
+		return NewError(errors.ErrInvalid, "language: unknown %q", s.Language)
 	}
 	if _, err := ParseRateSource(string(s.RateSource)); err != nil {
 		return err
@@ -35,10 +42,10 @@ func (s Settings) Validate() error {
 		return nil
 	}
 	if s.PrimaryCurrency == "" {
-		return NewFieldError(errors.ErrInvalid, "primary currency", "required with exchange rates on")
+		return NewError(errors.ErrInvalid, "primary currency: required with exchange rates on")
 	}
 	if !money.ValidCurrency(s.PrimaryCurrency) {
-		return NewFieldError(errors.ErrInvalid, "primary currency", "unknown %q", s.PrimaryCurrency)
+		return NewError(errors.ErrInvalid, "primary currency: unknown %q", s.PrimaryCurrency)
 	}
 	return nil
 }

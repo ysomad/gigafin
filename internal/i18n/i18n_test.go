@@ -212,7 +212,7 @@ func keyLits(n ast.Node) (lits []ast.Expr, field bool) {
 			name = fn.Name
 		}
 		switch {
-		case name == "NewError" && len(n.Args) >= 2:
+		case (name == "NewError" || name == "T") && len(n.Args) >= 2: // T is Dicts.T(lang, key)
 			return n.Args[1:2], false
 		case name == "NewFieldError" && len(n.Args) >= 3:
 			return n.Args[1:3], true

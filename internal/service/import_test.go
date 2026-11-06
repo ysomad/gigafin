@@ -73,8 +73,14 @@ func TestImportFlow(t *testing.T) {
 	require.Len(t, p.Categories, 2, "paired transfer rows need no category")
 	assert.Equal(t, domain.KindExpense, p.Categories[0].Kind)
 	assert.Equal(t, domain.KindIncome, p.Categories[1].Kind, "refund maps per direction")
-	assert.NotZero(t, p.Rows[2].PairID)
-	assert.Equal(t, p.Rows[3].ID, p.Rows[2].PairID)
+	assert.True(t, slices.IsSortedFunc(p.Rows, func(a, b domain.ImportRow) int {
+		return b.Row.Time.Compare(a.Row.Time)
+	}), "newest first")
+	out := slices.IndexFunc(p.Rows, func(r domain.ImportRow) bool { return r.PairID != 0 })
+	require.GreaterOrEqual(t, out, 0, "transfer is paired")
+	in := slices.IndexFunc(p.Rows, func(r domain.ImportRow) bool { return r.ID == p.Rows[out].PairID })
+	require.GreaterOrEqual(t, in, 0)
+	assert.Equal(t, p.Rows[out].ID, p.Rows[in].PairID)
 
 	_, err = e.imp.Commit(ctx, e.userID, im.ID, time.UTC)
 	require.ErrorIs(t, err, errors.ErrConflict)

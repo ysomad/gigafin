@@ -37,7 +37,7 @@ func ParseAccountKind(s string) (AccountKind, error) {
 	}
 	k := AccountKind(s)
 	if !slices.Contains(AccountKinds(), k) {
-		return "", NewFieldError(errors.ErrInvalid, "kind", "unknown account kind %q", s)
+		return "", NewError(errors.ErrInvalid, "kind: unknown account kind %q", s)
 	}
 	return k, nil
 }
@@ -87,14 +87,14 @@ type AccountInput struct {
 func NewAccount(in AccountInput) (Account, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
-		return Account{}, NewFieldError(errors.ErrInvalid, "name", "required")
+		return Account{}, NewError(errors.ErrInvalid, "name: required")
 	}
-	if utf8.RuneCountInString(name) > _maxTextLen {
-		return Account{}, NewFieldError(errors.ErrInvalid, "name", "too long")
+	if utf8.RuneCountInString(name) > MaxTextLen {
+		return Account{}, NewError(errors.ErrInvalid, "name: too long")
 	}
 	currency := strings.ToUpper(strings.TrimSpace(in.Currency))
 	if !money.ValidCurrency(currency) {
-		return Account{}, NewFieldError(errors.ErrInvalid, "currency", "unsupported currency %q", currency)
+		return Account{}, NewError(errors.ErrInvalid, "currency: unsupported currency %q", currency)
 	}
 	kind, err := ParseAccountKind(string(in.Kind))
 	if err != nil {
@@ -105,10 +105,10 @@ func NewAccount(in AccountInput) (Account, error) {
 		return a, nil
 	}
 	if !in.CreditLimit.IsPositive() {
-		return Account{}, NewFieldError(errors.ErrInvalid, "credit limit", "must be positive")
+		return Account{}, NewError(errors.ErrInvalid, "credit limit: must be positive")
 	}
 	if _, err := in.CreditLimit.ToMinor(currency); err != nil {
-		return Account{}, NewFieldError(errors.ErrInvalid, "credit limit", "not a valid amount in %s", currency)
+		return Account{}, NewError(errors.ErrInvalid, "credit limit: not a valid amount in %s", currency)
 	}
 	a.CreditLimit = in.CreditLimit
 	return a, nil
@@ -131,7 +131,7 @@ func (a Account) Edit(in AccountInput) (Account, error) {
 // balance already matches.
 func (a Account) BalanceAdjustment(target money.Amount, date time.Time) (OperationInput, bool, error) {
 	if _, err := target.ToMinor(a.Currency); err != nil {
-		return OperationInput{}, false, NewFieldError(errors.ErrInvalid, "balance", "not a valid amount in %s", a.Currency)
+		return OperationInput{}, false, NewError(errors.ErrInvalid, "balance: not a valid amount in %s", a.Currency)
 	}
 	delta := target.Sub(a.Balance)
 	if delta.IsZero() {

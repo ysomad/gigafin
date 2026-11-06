@@ -1,0 +1,43 @@
+{{define "content"}}
+{{$d := .Data}}
+{{$back := print "/plans?month=" $d.Month}}
+<h1>{{t "New plan"}}</h1>
+<form id="form-plan" class="form-compact" method="post" action="/plans">
+  {{with $.Errors.Form "plan"}}<p class="error" role="alert">{{.}}</p>{{end}}
+  <input type="hidden" name="new" value="true">
+  <fieldset class="row mb-4">
+    <label data-field class="col-6">{{t "Month"}}
+      <select name="month">
+        {{range $d.Months}}<option value="{{.}}"{{if eq .String $d.Month.String}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
+      </select>
+    </label>
+    {{$e := $.Errors.Get "category"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Category"}}
+      <select name="category"{{if $e}} aria-invalid="true" aria-describedby="category-error"{{end}}>
+        {{range kinds}}
+        <optgroup label="{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}">
+          {{template "category-options" (dict "Categories" (byKind $d.Categories .) "Selected" $d.Posted.Category)}}
+        </optgroup>
+        {{end}}
+      </select>
+      {{if $e}}<div id="category-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "currency"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
+      <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="currency-error"{{end}}>
+        {{range $d.Currencies}}<option{{if eq . $d.Posted.Currency}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      {{if $e}}<div id="currency-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "amount"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Amount"}} <input name="amount" inputmode="decimal" value="{{$d.Posted.Amount}}"{{if $e}} aria-invalid="true" aria-describedby="amount-error"{{end}}>
+      {{if $e}}<div id="amount-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    <label data-field class="col-12"><input type="checkbox" name="repeating" value="true"{{if $d.Posted.Repeating}} checked{{end}}> {{t "Repeat every month"}}</label>
+  </fieldset>
+  <div class="hstack">
+    <button type="submit">{{t "Create"}}</button>
+    <a class="button outline" href="{{$back}}" data-variant="secondary">{{t "Cancel"}}</a>
+  </div>
+</form>
+{{end}}

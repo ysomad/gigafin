@@ -2,7 +2,8 @@
 {{$d := .Data}}
 <h1>{{if $d.ID}}{{t "Rule"}}{{if eq $d.Origin "learned"}} <span class="badge" data-variant="secondary">{{t "learned"}}</span>{{end}}{{else}}{{t "New rule"}}{{end}}</h1>
 {{if ge $d.Applied 0}}<p role="status" class="badge" data-variant="success">{{t "Changed %d operations." $d.Applied}}</p>{{end}}
-<form method="post" action="{{if $d.ID}}/rules/{{$d.ID}}{{else}}/rules{{end}}">
+<form id="form-rule" method="post" action="{{if $d.ID}}/rules/{{$d.ID}}{{else}}/rules{{end}}">
+  {{with $.Errors.Form "rule"}}<p class="error" role="alert">{{.}}</p>{{end}}
   <div class="row mb-4">
     {{$e := $.Errors.Get "stage"}}
     <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Runs"}}

@@ -2,7 +2,8 @@
 {{$d := .Data}}
 <h1>{{t "Split"}}</h1>
 <p class="text-light">{{if $d.Payee}}{{$d.Payee}} · {{end}}{{amountInput $d.Amount}}</p>
-<form class="form-compact" method="post" action="/operations/{{$d.ID}}/split" data-split-total="{{$d.Amount}}">
+<form id="form-split" class="form-compact" method="post" action="/operations/{{$d.ID}}/split" data-split-total="{{$d.Amount}}">
+  {{with $.Errors.Form "split"}}<p class="error" role="alert">{{.}}</p>{{end}}
   <p class="text-light">{{t "Divide the saved amount between categories. Each part becomes an operation of its own."}}{{if $d.OriginID}} {{t "Part of a split. Splitting it again adds parts to the same split."}}{{end}}</p>
   <div id="splits" class="vstack">
     {{range $i, $p := $d.Parts}}{{template "split" (dict "Categories" $d.Categories "Split" $p "First" (eq $i 0) "Index" $i "Errors" $.Errors)}}{{end}}

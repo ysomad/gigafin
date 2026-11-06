@@ -1,3 +1,5 @@
+{{define "toast"}}<div id="toasts" hidden hx-swap-oob="true"><output class="toast" data-variant="danger"><p>{{.}}</p></output></div>{{end}}
+
 {{define "category-options"}}
   {{range $parent := .Categories}}
     {{if or (not .Archived) (eq .ID $.Selected)}}
@@ -22,9 +24,9 @@
   {{/* Errors and Index are set on the rows of a re-rendered form, not on added ones */}}
   {{$cat := ""}}{{$amount := ""}}{{$note := ""}}
   {{with .Errors}}
-    {{$cat = .Get (printf "parts[%d].category_id" $.Index)}}
-    {{$amount = .Get (printf "parts[%d].amount" $.Index)}}
-    {{$note = .Get (printf "parts[%d].note" $.Index)}}
+    {{$cat = .Get (printf "split_category[%d]" $.Index)}}
+    {{$amount = .Get (printf "split_amount[%d]" $.Index)}}
+    {{$note = .Get (printf "split_note[%d]" $.Index)}}
   {{end}}
   <label data-field class="col-6"{{if $cat}} aria-invalid="true"{{end}}>{{t "Category"}}
     <select name="split_category"{{if $cat}} aria-invalid="true"{{end}}>
@@ -34,7 +36,7 @@
     {{if $cat}}<div class="error" role="status">{{$cat}}</div>{{end}}
   </label>
   <label data-field class="col-6"{{if $amount}} aria-invalid="true"{{end}}>{{t "Amount"}}
-    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}"{{if .First}} readonly{{end}}{{if $amount}} aria-invalid="true"{{end}}>
+    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}"{{if .First}} readonly aria-disabled="true" tabindex="-1"{{end}}{{if $amount}} aria-invalid="true"{{end}}>
     {{if $amount}}<div class="error" role="status">{{$amount}}</div>{{end}}
   </label>
   <label data-field class="col-12"{{if $note}} aria-invalid="true"{{end}}>
@@ -53,7 +55,7 @@
         <div>{{opTitle . $.CatNames}}</div>
         <div class="text-light">{{opSubtitle . $.CatNames $.AccByID}}</div>
       </a>
-      <div class="align-right"><span class="badge" data-variant="{{if eq (opClass .) "income"}}success{{else if eq (opClass .) "expense"}}danger{{end}}">{{opAmount .}}</span></div>
+      <div class="align-right">{{opAmount .}} <span class="text-light">{{.Currency}}</span></div>
     </li>
     {{end}}
   {{end}}
@@ -62,42 +64,52 @@
   {{end}}
 {{end}}
 
+{{/* import-steps renders the import wizard steps as Oat tabs: the current one is selected,
+reachable ones are links, done ones are checked and unreachable ones are disabled. */}}
 {{define "import-steps"}}
 {{$step := .Step}}
-<ol class="hstack mb-6">
-  <li{{if eq $step "type"}} aria-current="step"{{else}} class="text-light"{{end}}>{{if eq $step "file"}}<a href="/imports/new">{{t "Source"}}</a>{{else}}{{t "Source"}}{{end}}</li>
-  <li{{if eq $step "file"}} aria-current="step"{{else if or .Preview .Rates}} class="text-light"{{end}}>{{t "Upload|step"}}</li>
+{{$file := ne $step "type"}}
+<div class="table mb-6">
+<nav role="tablist" aria-label="{{t "Import steps"}}">
+  {{if eq $step "file"}}<a role="tab" aria-selected="false" href="/imports/new">✓ {{t "Source"}}</a>
+  {{else}}<span role="tab" aria-selected="{{eq $step "type"}}">{{if $file}}✓{{else}}1.{{end}} {{t "Source"}}</span>{{end}}
+  <span role="tab" aria-selected="{{eq $step "file"}}"{{if not $file}} aria-disabled="true"{{end}}>{{if and $file (ne $step "file")}}✓{{else}}2.{{end}} {{t "Upload|step"}}</span>
   {{if .Rates}}
-  <li{{if eq $step "preview"}} aria-current="step"{{else if eq $step "done"}} class="text-light"{{end}}>{{t "Review"}}</li>
+  {{$review := or (eq $step "preview") (eq $step "done")}}
+  <span role="tab" aria-selected="{{$review}}"{{if not $review}} aria-disabled="true"{{end}}>{{if eq $step "done"}}✓{{else}}3.{{end}} {{t "Review"}}</span>
   {{else if .Preview}}
   {{$p := .Preview}}
   {{$base := printf "/imports/%d" $p.Import.ID}}
   {{$staged := eq $p.Import.Status "staged"}}
-  <li{{if $p.AccountsMapped}} class="text-light"{{end}}{{if eq $step "accounts"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/accounts">{{t "Accounts"}}</a>{{else}}{{t "Accounts"}}{{end}}</li>
-  <li{{if $p.CategoriesMapped}} class="text-light"{{end}}{{if eq $step "categories"}} aria-current="step"{{end}}>{{if $staged}}<a href="{{$base}}/categories">{{t "Categories"}}</a>{{else}}{{t "Categories"}}{{end}}</li>
-  <li{{if not $staged}} class="text-light"{{end}}{{if eq $step "preview"}} aria-current="step"{{end}}><a href="{{$base}}/preview">{{t "Review"}}</a></li>
+  {{if $staged}}<a role="tab" aria-selected="{{eq $step "accounts"}}" href="{{$base}}/accounts">{{else}}<span role="tab" aria-selected="false">{{end}}{{if $p.AccountsMapped}}✓{{else}}3.{{end}} {{t "Accounts"}}{{if $staged}}</a>{{else}}</span>{{end}}
+  {{if $staged}}<a role="tab" aria-selected="{{eq $step "categories"}}" href="{{$base}}/categories">{{else}}<span role="tab" aria-selected="false">{{end}}{{if $p.CategoriesMapped}}✓{{else}}4.{{end}} {{t "Categories"}}{{if $staged}}</a>{{else}}</span>{{end}}
+  <a role="tab" aria-selected="{{eq $step "preview"}}" href="{{$base}}/preview">{{if $staged}}5.{{else}}✓{{end}} {{t "Review"}}</a>
   {{else}}
-  <li>{{t "Accounts"}}</li>
-  <li>{{t "Categories"}}</li>
-  <li>{{t "Review"}}</li>
+  <span role="tab" aria-disabled="true">3. {{t "Accounts"}}</span>
+  <span role="tab" aria-disabled="true">4. {{t "Categories"}}</span>
+  <span role="tab" aria-disabled="true">5. {{t "Review"}}</span>
   {{end}}
-</ol>
+</nav>
+</div>
 {{end}}
 
-{{/* month-nav is a pager over Month with links PrevURL and NextURL and a select of
-Months that submits to Action with the optional Kind. */}}
+{{/* month-nav picks Month of Months on the page at Action, keeping the optional Kind:
+a select that loads on change, between buttons to the adjacent Prev and Next, which
+are disabled when empty. */}}
 {{define "month-nav"}}
-<form method="get" action="{{.Action}}" class="hstack mb-4">
-  <a class="button outline" href="{{.PrevURL}}" aria-label="{{t "Previous month"}}" data-variant="secondary">‹</a>
+{{$q := ""}}{{with .Kind}}{{$q = print "&kind=" .}}{{end}}
+<form method="get" action="{{.Action}}" class="hstack"
+      hx-boost="false" hx-get="{{.Action}}" hx-trigger="change, submit"
+      hx-target="body" hx-swap="outerSync" hx-push-url="true">
   {{with .Kind}}<input type="hidden" name="kind" value="{{.}}">{{end}}
-  {{$sel := .Month.String}}
-  <label data-field>{{t "Month"}}
-  <select name="month">
-    {{range .Months}}<option value="{{.}}"{{if eq .String $sel}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
-  </select>
-  </label>
-  <button type="submit">{{t "Apply"}}</button>
-  <a class="button outline" href="{{.NextURL}}" aria-label="{{t "Next month"}}" data-variant="secondary">›</a>
+  <fieldset class="group">
+    <button type="button" class="outline" hx-get="{{.Action}}?month={{.Prev}}{{$q}}" hx-target="body" hx-swap="outerSync" hx-push-url="true"{{if not .Prev}} disabled{{end}} aria-label="{{t "Previous month"}}">‹</button>
+    {{$sel := .Month.String}}
+    <select name="month" aria-label="{{t "Month"}}">
+      {{range .Months}}<option value="{{.}}"{{if eq .String $sel}} selected{{end}}>{{t (.First.Format "January")}} {{.First.Format "2006"}}</option>{{end}}
+    </select>
+    <button type="button" class="outline" hx-get="{{.Action}}?month={{.Next}}{{$q}}" hx-target="body" hx-swap="outerSync" hx-push-url="true"{{if not .Next}} disabled{{end}} aria-label="{{t "Next month"}}">›</button>
+  </fieldset>
 </form>
 {{end}}
 
@@ -149,9 +161,9 @@ Index are set on the rows of a re-rendered form, not on added ones. */}}
 {{$r := .Row}}
 {{$field := ""}}{{$op := ""}}{{$value := ""}}
 {{with .Errors}}
-  {{$field = .Get (printf "conditions[%d].field" $.Index)}}
-  {{$op = .Get (printf "conditions[%d].op" $.Index)}}
-  {{$value = or (.Get (printf "conditions[%d].value" $.Index)) (.Get (printf "conditions[%d].values" $.Index))}}
+  {{$field = .Get (printf "cond_field[%d]" $.Index)}}
+  {{$op = .Get (printf "cond_op[%d]" $.Index)}}
+  {{$value = .Get (printf "cond_value[%d]" $.Index)}}
 {{end}}
 <div class="cond row mb-4">
   <label data-field class="col-4"{{if $field}} aria-invalid="true"{{end}}>{{t "Field"}}
@@ -197,8 +209,8 @@ re-rendered form, not on added ones. */}}
 {{$r := .Row}}
 {{$type := ""}}{{$value := ""}}
 {{with .Errors}}
-  {{$type = .Get (printf "actions[%d].type" $.Index)}}
-  {{$value = .Get (printf "actions[%d].value" $.Index)}}
+  {{$type = .Get (printf "act_type[%d]" $.Index)}}
+  {{$value = .Get (printf "act_value[%d]" $.Index)}}
 {{end}}
 <div class="act row mb-4">
   <label data-field class="col-4"{{if $type}} aria-invalid="true"{{end}}>{{t "Action"}}

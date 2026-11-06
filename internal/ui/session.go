@@ -3,8 +3,10 @@ package ui
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/i18n"
 )
 
 type loginData struct {
@@ -22,8 +24,23 @@ func (u *UI) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	login := r.PostFormValue("login")
-	token, _, err := u.svc.Auth.Login(r.Context(), login, r.PostFormValue("password"), r.UserAgent())
+	login, pass := r.PostFormValue("login"), r.PostFormValue("password")
+	lang := i18n.Match(r.Header.Get("Accept-Language"))
+	errs := fieldsError{}
+	if strings.TrimSpace(login) == "" {
+		errs["login"] = u.dicts.T(lang, "required")
+	}
+	if pass == "" {
+		errs["password"] = u.dicts.T(lang, "required")
+	}
+	if len(errs) > 0 {
+		//nolint:errcheck // render logs its own errors
+		_ = u.render(w, r, http.StatusUnprocessableEntity, "login", view{
+			Title: "Sign in", Error: errs, Form: "login", Data: loginData{Login: login},
+		})
+		return
+	}
+	token, _, err := u.svc.Auth.Login(r.Context(), login, pass, r.UserAgent())
 	if err != nil && !isUserError(err) {
 		u.serverError(w, r, err)
 		return
@@ -36,7 +53,7 @@ func (u *UI) login(w http.ResponseWriter, r *http.Request) {
 		}
 		//nolint:errcheck // render logs its own errors
 		_ = u.render(w, r, http.StatusUnprocessableEntity, "login", view{
-			Title: "Sign in", Error: err, Data: loginData{Login: login},
+			Title: "Sign in", Error: err, Form: "login", Data: loginData{Login: login},
 		})
 		return
 	}
