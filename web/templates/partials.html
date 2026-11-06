@@ -12,7 +12,13 @@
 {{end}}
 
 {{define "split"}}
+{{/* the first part is the operation itself: it can't be removed and its amount is what
+     the other parts leave of the saved total, kept by app.js */}}
 <div class="split row">
+  <div class="hstack justify-between col-12">
+    <small class="text-light">{{if .First}}{{t "This operation"}}{{else}}{{t "New part"}}{{end}}</small>
+    {{if not .First}}<button type="button" class="outline small" data-split-remove data-variant="danger" aria-label="{{t "Remove part"}}" title="{{t "Remove part"}}">✕</button>{{end}}
+  </div>
   <label data-field class="col-6">{{t "Category"}}
     <select name="split_category" required>
       <option value="">—</option>
@@ -20,12 +26,11 @@
     </select>
   </label>
   <label data-field class="col-6">{{t "Amount"}}
-    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}" required>
+    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}" required{{if .First}} readonly{{end}}>
   </label>
-  <fieldset class="group col-12">
+  <label data-field class="col-12">
     <input name="split_note" value="{{.Split.Note}}" placeholder="{{t "Note"}}" aria-label="{{t "Note"}}">
-    <button type="button" class="outline" data-split-remove aria-label="{{t "Remove part"}}" data-variant="secondary">✕</button>
-  </fieldset>
+  </label>
 </div>
 {{end}}
 

@@ -28,17 +28,23 @@ for (const type of ['input', 'change']) {
 }
 
 // In the split form the first part, the operation itself, keeps what the other parts
-// leave of the total, so typing a part's amount takes it from the first one.
+// leave of the total, so typing a part's amount takes it from the first one. It counts
+// in units of the finest digit typed, so a part with more digits than the currency has
+// isn't rounded; the server reports those.
 function splitRest(form) {
   const [first, ...parts] = form.querySelectorAll('[name=split_amount]');
   const total = form.dataset.splitTotal;
-  const digits = total.split('.')[1]?.length ?? 0;
-  const scale = 10 ** digits;
-  let rest = Math.round(Number(total) * scale);
-  for (const part of parts) {
-    const v = Number(part.value.replace(',', '.'));
-    if (!Number.isNaN(v)) rest -= Math.round(v * scale);
+  const minDigits = total.split('.')[1]?.length ?? 0;
+  const values = parts.map(p => p.value.replace(',', '.')).filter(v => !Number.isNaN(Number(v)));
+  let digits = Math.max(minDigits, ...values.map(v => v.split('.')[1]?.length ?? 0));
+  let rest = Math.round(Number(total) * 10 ** digits);
+  for (const v of values) rest -= Math.round(Number(v) * 10 ** digits);
+  // drop the extra trailing zeros, keeping the currency's digits
+  while (digits > minDigits && rest % 10 === 0) {
+    rest /= 10;
+    digits--;
   }
+  const scale = 10 ** digits;
   first.value = rest % scale ? (rest / scale).toFixed(digits) : String(rest / scale);
 }
 
@@ -53,6 +59,8 @@ document.addEventListener('click', e => {
   const button = e.target.closest('[data-split-remove]');
   if (!button) return;
   const form = button.form;
-  button.closest('.split').remove();
+  const part = button.closest('.split');
+  if (part === form.querySelector('.split')) return;
+  part.remove();
   splitRest(form);
 });

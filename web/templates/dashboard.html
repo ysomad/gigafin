@@ -27,7 +27,7 @@
 
 {{/* expenses are ordered by currency: a table per currency */}}
 {{if $d.Dash.Expenses}}
-<form method="get" action="/" class="hstack mb-4"
+<form method="get" action="/" class="hstack mt-6 mb-4"
       hx-boost="false" hx-get="/" hx-trigger="change, submit"
       hx-target="body" hx-swap="outerSync" hx-push-url="true">
   <input type="hidden" name="month" value="{{$d.Dash.Month}}">

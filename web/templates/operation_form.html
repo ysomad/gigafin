@@ -79,10 +79,6 @@
 </form>
 {{if $d.ID}}
 <form id="op-delete" method="post" action="/operations/{{$d.ID}}/delete" hx-confirm="{{t "Delete this operation?"}}"></form>
-{{if or $d.Payee $d.ImportID}}<p class="text-light mt-4">
-  {{if $d.Payee}}<a href="{{$d.RuleURL}}">{{t "Create a rule for this payee"}}</a>{{end}}
-  {{if and $d.Payee $d.ImportID}} · {{end}}
-  {{if $d.ImportID}}{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a>{{end}}
-</p>{{end}}
+{{if $d.ImportID}}<p class="text-light mt-4">{{t "Imported in"}} <a href="/imports/{{$d.ImportID}}">{{t "import #%d" $d.ImportID}}</a></p>{{end}}
 {{end}}
 {{end}}

@@ -205,8 +205,6 @@ type opForm struct {
 	Note        string        `form:"note"`
 	// SourcePayee is the payee as the bank sent it.
 	SourcePayee string
-	// RuleURL starts a rule from the saved operation.
-	RuleURL string
 	// Tags are comma separated names.
 	Tags string `form:"tags"`
 	// Parts are the rows of the split page of a saved expense or income.
@@ -359,12 +357,6 @@ func (u *UI) editOperation(w http.ResponseWriter, r *http.Request, user domain.U
 		Tags:        strings.Join(op.Tags, ", "),
 		SourcePayee: op.SourcePayee,
 	}
-	rq := url.Values{}
-	rq.Set("payee", op.Payee)
-	if op.CategoryID != 0 {
-		rq.Set("category", strconv.FormatInt(op.CategoryID, 10))
-	}
-	f.RuleURL = "/rules/new?" + rq.Encode()
 	return u.renderForm(w, r, user, http.StatusOK, f, nil)
 }
 

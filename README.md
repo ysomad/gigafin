@@ -38,6 +38,9 @@
 - [x] replace / remove deprecated picocss (https://github.com/picocss/pico). Reduce amount of custom css / js
 - [x] i18n + russian
 - [x] Auto-categorisation rules. Payee is free text, and the only mapping is the bank's own category name. Other apps let you write rules like "payee contains X → category Y, rename payee."
+- [ ] UI revamp
+- [ ] rules event sourcing
+- [ ] tbank sync, balance check (if does not count - show alert)
 
 ## Extra feats
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)

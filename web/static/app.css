@@ -58,6 +58,18 @@
   }
 }
 
+/* Split page: each part is a box with its remove button, and adding one is a dashed
+   full-width button under them. */
+.split {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  padding: var(--space-3);
+}
+.split-add {
+  width: 100%;
+  border-style: dashed;
+}
+
 /* Let Oat input groups, such as a date range, shrink to narrow screens. */
 fieldset.group {
   min-inline-size: 0;
