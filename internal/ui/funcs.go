@@ -32,8 +32,10 @@ func amountFuncs(s domain.Settings) template.FuncMap {
 		if s.ShowMinorUnits {
 			return d.Format(currency)
 		}
+
 		return d.FormatWhole()
 	}
+
 	return template.FuncMap{
 		"money":          format,
 		"opAmount":       func(op domain.Operation) string { return opAmount(op, format) },
@@ -55,19 +57,30 @@ func amountFuncs(s domain.Settings) template.FuncMap {
 // langFuncs returns the funcs that translate to lang by d. Templates are parsed with
 // English and get these per request.
 func langFuncs(d i18n.Dicts, lang string) template.FuncMap {
-	t := func(key string, args ...any) string { return d.T(lang, key, args...) }
+	t := func(key string, args ...any) string {
+		return d.T(lang, key, args...)
+	}
+
 	return template.FuncMap{
 		"t":       t,
 		"lang":    func() string { return lang },
 		"errText": func(err error) string { return errText(d, lang, err) },
 		"dayTitle": func(tm time.Time) string {
-			return t(tm.Format("Mon")) + tm.Format(", 2 ") + t(tm.Format("Jan")+"|date") + tm.Format(" 2006")
+			return t(
+				tm.Format("Mon"),
+			) + tm.Format(
+				", 2 ",
+			) + t(
+				tm.Format("Jan")+i18n.ContextSep+"date",
+			) + tm.Format(
+				" 2006",
+			)
 		},
 		"datetime": func(tm time.Time, user *domain.User) string {
 			if user != nil {
 				tm = tm.In(user.Location())
 			}
-			return tm.Format("2 ") + t(tm.Format("Jan")+"|date") + tm.Format(" 2006 15:04")
+			return tm.Format("2 ") + t(tm.Format("Jan")+i18n.ContextSep+"date") + tm.Format(" 2006 15:04")
 		},
 		"opTitle": func(op domain.Operation, names map[int64]string) string { return opTitle(op, names, t) },
 		"opSubtitle": func(op domain.Operation, names map[int64]string, accounts map[int64]domain.Account) string {
@@ -76,17 +89,19 @@ func langFuncs(d i18n.Dicts, lang string) template.FuncMap {
 	}
 }
 
-// errText returns the message of err translated to lang by d: the formats and
+// errText returns the message of err translated to lang by d: the field, format and
 // domain.Msg args of domain.Error translated, the error kinds ending them dropped,
 // other errors as is.
 func errText(d i18n.Dicts, lang string, err error) string {
 	if err == nil {
 		return ""
 	}
+
 	e, ok := errors.AsType[domain.Error](err)
 	if !ok {
 		return err.Error()
 	}
+
 	args := make([]any, len(e.Args))
 	for i, a := range e.Args {
 		args[i] = a
@@ -94,10 +109,16 @@ func errText(d i18n.Dicts, lang string, err error) string {
 			args[i] = d.T(lang, string(m))
 		}
 	}
+
 	msg := d.T(lang, e.Format, args...)
+	if e.Field != "" {
+		msg = d.T(lang, e.Field+i18n.ContextSep+"field") + ": " + msg
+	}
+
 	if _, ok := e.Cause.(errors.Error); ok {
 		return msg
 	}
+
 	return msg + ": " + errText(d, lang, e.Cause)
 }
 
@@ -105,6 +126,7 @@ func dict(kv ...any) (map[string]any, error) {
 	if len(kv)%2 != 0 {
 		return nil, errors.Error("dict: odd number of arguments")
 	}
+
 	m := make(map[string]any, len(kv)/2)
 	for i := 0; i < len(kv); i += 2 {
 		k, ok := kv[i].(string)
@@ -113,6 +135,7 @@ func dict(kv ...any) (map[string]any, error) {
 		}
 		m[k] = kv[i+1]
 	}
+
 	return m, nil
 }
 

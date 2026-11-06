@@ -260,7 +260,7 @@ func (u *UI) parseRuleForm(r *http.Request) (ruleForm, domain.RuleInput, error) 
 	}
 	if len(in.CondOps) != len(in.CondFields) || len(in.CondValues) != len(in.CondFields) ||
 		len(in.ActValues) != len(in.ActTypes) {
-		return f, domain.RuleInput{}, domain.NewError(errors.ErrInvalid, "form: rule rows do not match")
+		return f, domain.RuleInput{}, domain.NewFieldError(errors.ErrInvalid, "form", "rule rows do not match")
 	}
 	f.Stage, f.Match = domain.RuleStage(in.Stage), domain.RuleMatch(in.Match)
 	rule := domain.RuleInput{Stage: f.Stage, Match: f.Match}

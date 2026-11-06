@@ -15,7 +15,10 @@
 <h2>{{t "Time zone"}}</h2>
 <article class="card mb-4"><form method="post" action="/settings/timezone">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "IANA time zone"}} <input name="timezone" value="{{$.User.Timezone}}" placeholder="Europe/Moscow" required></label>
+    {{$e := $.Errors.Get "timezone.time zone"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "IANA time zone"}} <input name="timezone" value="{{with $d.Posted}}{{.Get "timezone"}}{{else}}{{$.User.Timezone}}{{end}}" placeholder="Europe/Moscow"{{if $e}} aria-invalid="true" aria-describedby="timezone-error"{{end}}>
+      {{if $e}}<div id="timezone-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
   <p class="text-light">{{t "Used for imported times and today's date."}}</p>
@@ -33,13 +36,15 @@
 <h2>{{t "Language"}}</h2>
 <article class="card mb-4"><form method="post" action="/settings/language">
   <div class="row mb-4">
-    <label data-field class="col-4">
-      <select name="language" aria-label="{{t "Language"}}">
+    {{$e := $.Errors.Get "language.language"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>
+      <select name="language" aria-label="{{t "Language"}}"{{if $e}} aria-invalid="true" aria-describedby="language-error"{{end}}>
         <option value=""{{if eq $d.Settings.Language ""}} selected{{end}}>{{t "Default"}}</option>
         {{- range $d.Languages}}
         <option value="{{.Code}}"{{if eq $d.Settings.Language .Code}} selected{{end}}>{{.Name}}</option>
         {{- end}}
       </select>
+      {{if $e}}<div id="language-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
@@ -48,16 +53,20 @@
 <h2>{{t "Exchange rates"}}</h2>
 <article class="card mb-4"><form method="post" action="/settings/rates">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Source"}}
-      <select name="rate_source">
+    {{$e := $.Errors.Get "rates.rate source"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Source"}}
+      <select name="rate_source"{{if $e}} aria-invalid="true" aria-describedby="rate-source-error"{{end}}>
         {{range $d.RateSources}}<option value="{{.}}"{{if eq . $d.Settings.RateSource}} selected{{end}}>{{if eq . ""}}{{t "Off"}}{{else if eq . "cbr"}}{{t "Central Bank of Russia"}}{{else}}{{.}}{{end}}</option>{{end}}
       </select>
+      {{if $e}}<div id="rate-source-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Primary currency"}}
-      <select name="primary_currency">
+    {{$e = $.Errors.Get "rates.primary currency"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Primary currency"}}
+      <select name="primary_currency"{{if $e}} aria-invalid="true" aria-describedby="primary-currency-error"{{end}}>
         <option value=""></option>
         {{range $d.Currencies}}<option value="{{.}}"{{if eq . $d.Settings.PrimaryCurrency}} selected{{end}}>{{.}}</option>{{end}}
       </select>
+      {{if $e}}<div id="primary-currency-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
@@ -99,13 +108,22 @@
 {{end}}
 <form method="post" action="/settings/rates/set">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Currency"}}
-      <select name="currency">
-        {{range $d.Currencies}}{{if ne . $d.Settings.RateSource.Pivot}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}
+    {{$posted := ""}}{{with $d.Posted}}{{$posted = .Get "currency"}}{{end}}
+    {{$e := $.Errors.Get "rate.currency"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
+      <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="rate-currency-error"{{end}}>
+        {{range $d.Currencies}}{{if ne . $d.Settings.RateSource.Pivot}}<option value="{{.}}"{{if eq . $posted}} selected{{end}}>{{.}}</option>{{end}}{{end}}
       </select>
+      {{if $e}}<div id="rate-currency-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Date"}} <input type="date" name="date" required></label>
-    <label data-field class="col-4">{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040" required></label>
+    {{$e = $.Errors.Get "rate.date"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Date"}} <input type="date" name="date"{{with $d.Posted}} value="{{.Get "date"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-date-error"{{end}}>
+      {{if $e}}<div id="rate-date-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "rate.rate"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Rate, %s" $d.Settings.RateSource.Pivot}} <input name="rate" inputmode="decimal" placeholder="90.4040"{{with $d.Posted}} value="{{.Get "rate"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="rate-rate-error"{{end}}>
+      {{if $e}}<div id="rate-rate-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Set rate"}}</button></div>
   </div>
 </form>
@@ -115,8 +133,11 @@
 <h2>{{t "Password"}}</h2>
 <article class="card mb-4"><form method="post" action="/settings/password">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="current" autocomplete="current-password" required></label>
-    <label data-field class="col-4">{{t "New password"}} <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="current" autocomplete="current-password"></label>
+    {{$e := $.Errors.Get "password.password"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "New password"}} <input type="password" name="password" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="new-password-error"{{end}}>
+      {{if $e}}<div id="new-password-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Change"}}</button></div>
   </div>
 </form></article>
@@ -166,20 +187,27 @@
 </div>
 <article class="card mb-4"><form method="post" action="/settings/api-keys">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}" required></label>
-    <label data-field class="col-4">{{t "Scope"}}
-      <select name="scope"><option value="read">{{t "read"}}</option><option value="write">{{t "write"}}</option></select>
+    {{$e := $.Errors.Get "apikey.name"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "API key name"}} <input name="name" placeholder="{{t "e.g. shortcuts"}}"{{with $d.Posted}} value="{{.Get "name"}}"{{end}}{{if $e}} aria-invalid="true" aria-describedby="apikey-name-error"{{end}}>
+      {{if $e}}<div id="apikey-name-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Expiration"}}
-      <select name="expires">
+    {{$e = $.Errors.Get "apikey.scope"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Scope"}}
+      <select name="scope"{{if $e}} aria-invalid="true" aria-describedby="apikey-scope-error"{{end}}><option value="read">{{t "read"}}</option><option value="write">{{t "write"}}</option></select>
+      {{if $e}}<div id="apikey-scope-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "apikey.expiration"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Expiration"}}
+      <select name="expires"{{if $e}} aria-invalid="true" aria-describedby="apikey-expiration-error"{{end}}>
         <option value="7">{{t "7 days"}}</option>
         <option value="30" selected>{{t "30 days"}}</option>
         <option value="90">{{t "90 days"}}</option>
         <option value="365">{{t "1 year"}}</option>
         <option value="never">{{t "No expiration"}}</option>
       </select>
+      {{if $e}}<div id="apikey-expiration-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
     <div class="col-12 hstack"><button type="submit">{{t "Create key"}}</button></div>
   </div>
 </form></article>
@@ -201,8 +229,11 @@
 <h2>{{t "Backup"}}</h2>
 <article class="card mb-4"><form method="post" action="/settings/backup" hx-boost="false">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
-    <label data-field class="col-4">{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password" minlength="12" required></label>
+    <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
+    {{$e := $.Errors.Get "backup.passphrase"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Backup passphrase"}} <input type="password" name="passphrase" autocomplete="new-password"{{if $e}} aria-invalid="true" aria-describedby="passphrase-error"{{end}}>
+      {{if $e}}<div id="passphrase-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Download backup"}}</button></div>
   </div>
   <p class="text-light">{{t "The whole database of all users, encrypted with"}} <a href="https://age-encryption.org">age</a>. {{t "Decrypt with"}} <code>age -d gigafin-DATE.db.age &gt; gigafin.db</code>.</p>
@@ -214,7 +245,7 @@
   <p><strong>{{t "Delete all data"}}</strong>: {{t "every account, operation, category, plan and import, plus saved import mappings. Your login, password, time zone, sessions and API keys stay. This cannot be undone."}}</p>
   <form method="post" action="/settings/delete-data" hx-confirm="{{t "Delete all accounts, operations, categories, plans and imports? This cannot be undone."}}">
     <div class="row mb-4">
-      <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password" required></label>
+      <label data-field class="col-4">{{t "Current password"}} <input type="password" name="password" autocomplete="current-password"></label>
       <div class="col-12 hstack"><button type="submit" data-variant="danger">{{t "Delete all data"}}</button></div>
     </div>
   </form>

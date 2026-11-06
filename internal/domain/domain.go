@@ -14,12 +14,14 @@ const _maxTags = 10
 // Error is a message meant for the user, kept as a format and its arguments so
 // the UI can translate it. Args of type Msg are translated too, others, such as user
 // input, are shown as is. Cause is either an error kind, such as errors.ErrInvalid,
-// which ends the message, or another error, whose message follows.
+// which ends the message, or another error, whose message follows. Field, if set, is
+// the input the message is about; the UI shows the message next to it.
 //
-//	domain.NewError(errors.ErrInvalid, "name: too long")
+//	domain.NewFieldError(errors.ErrInvalid, "name", "too long")
 //	domain.NewError(err, "line %d", line)
 //	domain.NewError(errors.ErrConflict, "import is %s", domain.Msg(i.Status))
 type Error struct {
+	Field  string
 	Format string
 	Args   []any
 	Cause  error
@@ -34,12 +36,21 @@ func NewError(cause error, format string, args ...any) error {
 	return Error{Format: format, Args: args, Cause: cause}
 }
 
+// NewFieldError returns an Error about field of format and args with cause.
+func NewFieldError(cause error, field, format string, args ...any) error {
+	return Error{Field: field, Format: format, Args: args, Cause: cause}
+}
+
 // type check
 var _ error = Error{}
 
 // Error implements the error interface for Error.
 func (err Error) Error() (msg string) {
-	return fmt.Sprintf(err.Format, err.Args...) + ": " + err.Cause.Error()
+	msg = fmt.Sprintf(err.Format, err.Args...) + ": " + err.Cause.Error()
+	if err.Field != "" {
+		msg = err.Field + ": " + msg
+	}
+	return msg
 }
 
 // Unwrap returns the cause of err.

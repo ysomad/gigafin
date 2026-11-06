@@ -174,7 +174,7 @@ func (u *UI) setPlan(w http.ResponseWriter, r *http.Request, user domain.User) e
 	if f.Amount != "" {
 		var err error
 		if amount, err = money.Parse(f.Amount); err != nil {
-			return domain.NewError(errors.ErrInvalid, "amount: enter a number")
+			return domain.NewFieldError(errors.ErrInvalid, "amount", "enter a number")
 		}
 	} else {
 		f.Repeating = false

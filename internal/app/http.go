@@ -30,7 +30,7 @@ func newServer(cfg config.Config, svc *service.Services, log *slog.Logger) (*htt
 	}
 	web, err := ui.New(ui.Config{
 		Services: svc, Log: log, SecureCookies: cfg.HTTP.SecureCookies,
-		SessionTTL: cfg.Session.TTL, MaxUpload: cfg.HTTP.MaxUploadBytes, StaticCacheTTL: cfg.HTTP.StaticCacheTTL,
+		SessionTTL: cfg.Session.TTL, MaxUploadSize: cfg.HTTP.MaxUploadBytes, StaticCacheTTL: cfg.HTTP.StaticCacheTTL,
 	})
 	if err != nil {
 		return nil, err

@@ -68,7 +68,7 @@ func accountInput(d accountsData) (domain.AccountInput, error) {
 	}
 	var err error
 	if in.CreditLimit, err = money.Parse(d.CreditLimit); err != nil {
-		return in, domain.NewError(errors.ErrInvalid, "credit limit: enter a number")
+		return in, domain.NewFieldError(errors.ErrInvalid, "credit limit", "enter a number")
 	}
 	return in, nil
 }
@@ -90,7 +90,7 @@ func (u *UI) createAccount(w http.ResponseWriter, r *http.Request, user domain.U
 	var balance money.Amount
 	if err == nil && d.Balance != "" {
 		if balance, err = money.Parse(d.Balance); err != nil {
-			err = domain.NewError(errors.ErrInvalid, "opening balance: enter a number")
+			err = domain.NewFieldError(errors.ErrInvalid, "balance", "enter a number")
 		}
 	}
 	if err == nil {
@@ -106,11 +106,41 @@ func (u *UI) createAccount(w http.ResponseWriter, r *http.Request, user domain.U
 	return nil
 }
 
+// accountData is the account page: the account and the values of its forms.
 type accountData struct {
 	Account domain.Account
 	Kinds   []domain.AccountKind
-	Today   string
-	Target  string
+	// Edit is the edit form.
+	Edit accountsData
+	// Target and Date are the set balance form.
+	Target string `form:"balance"`
+	Date   string `form:"date"`
+}
+
+// renderAccount renders the page of account id. A nil d shows the account's values in
+// the forms, otherwise d holds the values of a form post that failed with viewErr; the
+// edit form, if not the one posted, shows the account's values.
+func (u *UI) renderAccount(
+	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, d *accountData, viewErr error,
+) error {
+	a, err := u.svc.Accounts.Get(r.Context(), user.ID, id)
+	if err != nil {
+		return err
+	}
+	if d == nil {
+		d = &accountData{Target: a.Balance.Fixed(a.Currency), Date: timex.FormatDate(u.svc.Today(user))}
+	}
+	// the kind select always posts
+	if d.Edit.Kind == "" {
+		d.Edit = accountsData{Name: a.Name, Kind: string(a.Kind)}
+		if !a.CreditLimit.IsZero() {
+			d.Edit.CreditLimit = a.CreditLimit.Fixed(a.Currency)
+		}
+	}
+	d.Account, d.Kinds = a, domain.AccountKinds()
+	return u.render(w, r, status, "account", view{
+		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{a.Name}, Error: viewErr, Data: *d,
+	})
 }
 
 func (u *UI) account(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -118,17 +148,7 @@ func (u *UI) account(w http.ResponseWriter, r *http.Request, user domain.User) e
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	a, err := u.svc.Accounts.Get(r.Context(), user.ID, id)
-	if err != nil {
-		return err
-	}
-	return u.render(w, r, http.StatusOK, "account", view{
-		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{a.Name},
-		Data: accountData{
-			Account: a, Kinds: domain.AccountKinds(), Today: timex.FormatDate(u.svc.Today(user)),
-			Target: a.Balance.Fixed(a.Currency),
-		},
-	})
+	return u.renderAccount(w, r, user, id, http.StatusOK, nil, nil)
 }
 
 func (u *UI) updateAccount(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -145,10 +165,13 @@ func (u *UI) updateAccount(w http.ResponseWriter, r *http.Request, user domain.U
 	}
 	d.CreditLimit = strings.TrimSpace(d.CreditLimit)
 	in, err := accountInput(d)
-	if err != nil {
-		return err
+	if err == nil {
+		err = u.svc.Accounts.Update(r.Context(), user.ID, id, in)
 	}
-	if err := u.svc.Accounts.Update(r.Context(), user.ID, id, in); err != nil {
+	if isUserError(err) {
+		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &accountData{Edit: d}, err)
+	}
+	if err != nil {
 		return err
 	}
 	redirect(w, r, "/accounts/"+r.PathValue("id"))
@@ -163,24 +186,26 @@ func (u *UI) setBalance(w http.ResponseWriter, r *http.Request, user domain.User
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f struct {
-		Balance string `form:"balance"`
-		Date    string `form:"date"`
-	}
-	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
+	var d accountData
+	if err := u.formDecoder.Decode(&d, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	target, err := money.Parse(f.Balance)
-	if err != nil {
-		return domain.NewError(errors.ErrInvalid, "balance: enter a number")
-	}
 	var date time.Time
-	if f.Date != "" {
-		if date, err = timex.ParseDate(f.Date); err != nil {
-			return fmt.Errorf("date: %w", err)
+	target, err := money.Parse(d.Target)
+	if err != nil {
+		err = domain.NewFieldError(errors.ErrInvalid, "balance", "enter a number")
+	} else if d.Date != "" {
+		if date, err = timex.ParseDate(d.Date); err != nil {
+			err = domain.NewFieldError(errors.ErrInvalid, "date", "must be YYYY-MM-DD")
 		}
 	}
-	if _, err := u.svc.Accounts.SetBalance(r.Context(), user.ID, id, target, date); err != nil {
+	if err == nil {
+		_, err = u.svc.Accounts.SetBalance(r.Context(), user.ID, id, target, date)
+	}
+	if isUserError(err) {
+		return u.renderAccount(w, r, user, id, http.StatusUnprocessableEntity, &d, err)
+	}
+	if err != nil {
 		return err
 	}
 	redirect(w, r, "/accounts/"+r.PathValue("id"))

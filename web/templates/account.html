@@ -1,5 +1,6 @@
 {{define "content"}}
 {{$a := .Data.Account}}
+{{$f := .Data.Edit}}
 <h1>{{$a.Name}} <span class="text-light">{{t (print $a.Kind)}} · {{$a.Currency}}{{if $a.Archived}} · {{t "archived"}}{{end}}</span></h1>
 <p>{{t "Balance:"}} <strong class="align-right"><span class="badge" data-variant="{{if $a.Balance.IsNegative}}danger{{end}}">{{money $a.Balance $a.Currency}} {{$a.Currency}}</span></strong>
   {{if $a.Kind.Liability}}· {{t "owed %s" (money $a.Owed $a.Currency)}}{{end}}
@@ -10,8 +11,14 @@
 <p class="text-light">{{t "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank."}}</p>
 <form method="post" action="/accounts/{{$a.ID}}/balance">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "New balance"}} <input name="balance" inputmode="decimal" value="{{amountInput .Data.Target}}" required></label>
-    <label data-field class="col-4">{{t "As of"}} <input type="date" name="date" value="{{.Data.Today}}" required></label>
+    {{$e := $.Errors.Get "balance"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "New balance"}} <input name="balance" inputmode="decimal" value="{{amountInput .Data.Target}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
+      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "date"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "As of"}} <input type="date" name="date" value="{{.Data.Date}}"{{if $e}} aria-invalid="true" aria-describedby="date-error"{{end}}>
+      {{if $e}}<div id="date-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Set"}}</button></div>
   </div>
 </form>
@@ -19,14 +26,22 @@
 <h2>{{t "Edit"}}</h2>
 <form method="post" action="/accounts/{{$a.ID}}">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Name"}} <input name="name" value="{{$a.Name}}" required></label>
-    <label data-field class="col-4">{{t "Kind"}}
-      <select name="kind">
-        {{range .Data.Kinds}}<option value="{{.}}"{{if eq . $a.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
-      </select>
+    {{$e := $.Errors.Get "name"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$f.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}"
-      value="{{if not $a.CreditLimit.IsZero}}{{amountInput ($a.CreditLimit.Fixed $a.Currency)}}{{end}}"><small data-hint>{{t "credit only"}}</small></label>
+    {{$e = $.Errors.Get "kind"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Kind"}}
+      <select name="kind"{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
+        {{range .Data.Kinds}}<option value="{{.}}"{{if eq (print .) $f.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
+      </select>
+      {{if $e}}<div id="kind-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "credit limit"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}"
+      value="{{amountInput $f.CreditLimit}}"{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
+      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{else}}<small data-hint>{{t "credit only"}}</small>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>
 </form>

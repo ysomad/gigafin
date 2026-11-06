@@ -30,7 +30,7 @@ func RateSources() []RateSource {
 func ParseRateSource(s string) (RateSource, error) {
 	src := RateSource(strings.TrimSpace(s))
 	if !slices.Contains(RateSources(), src) {
-		return "", NewError(errors.ErrInvalid, "rate source: unknown %q", s)
+		return "", NewFieldError(errors.ErrInvalid, "rate source", "unknown %q", s)
 	}
 	return src, nil
 }
@@ -84,24 +84,24 @@ type Rate struct {
 func NewRate(source RateSource, from, to string, date time.Time, rate decimal.Decimal) (Rate, error) {
 	pivot := source.Pivot()
 	if pivot == "" {
-		return Rate{}, NewError(errors.ErrInvalid, "rate source: required")
+		return Rate{}, NewFieldError(errors.ErrInvalid, "rate source", "required")
 	}
 	if !rate.IsPositive() {
-		return Rate{}, NewError(errors.ErrInvalid, "rate: %s must be positive", rate)
+		return Rate{}, NewFieldError(errors.ErrInvalid, "rate", "%s must be positive", rate)
 	}
 	if from == pivot && to != pivot {
 		from, rate = to, decimal.NewFromInt(1).DivRound(rate, _rateDecimals)
 		if rate.IsZero() {
-			return Rate{}, NewError(errors.ErrInvalid, "rate: too large to invert")
+			return Rate{}, NewFieldError(errors.ErrInvalid, "rate", "too large to invert")
 		}
 	} else if to != pivot {
-		return Rate{}, NewError(errors.ErrInvalid, "rate: %s/%s: one side must be %s", from, to, pivot)
+		return Rate{}, NewFieldError(errors.ErrInvalid, "rate", "%s/%s: one side must be %s", from, to, pivot)
 	}
 	if from == pivot {
-		return Rate{}, NewError(errors.ErrInvalid, "rate: %s/%s: same currency", from, to)
+		return Rate{}, NewFieldError(errors.ErrInvalid, "rate", "%s/%s: same currency", from, to)
 	}
 	if !money.ValidCurrency(from) {
-		return Rate{}, NewError(errors.ErrInvalid, "rate: unknown currency %q", from)
+		return Rate{}, NewFieldError(errors.ErrInvalid, "rate", "unknown currency %q", from)
 	}
 	return Rate{Source: source, Currency: from, Date: date, Rate: rate}, nil
 }

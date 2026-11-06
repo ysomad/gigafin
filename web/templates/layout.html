@@ -31,9 +31,10 @@
     </nav>
   </header>
   <main class="container mb-8">
-    {{if .Error}}<p role="alert" data-variant="danger">{{errText .Error}}</p>{{end}}
     {{template "content" .}}
     {{block "to-top" .}}{{end}}
+    {{/* after the content, whose inputs take their field messages first */}}
+    <div id="toasts" hidden>{{range .Errors.Toasts}}<output class="toast" data-variant="danger"><p>{{.}}</p></output>{{end}}</div>
   </main>
 </body>
 </html>{{end}}

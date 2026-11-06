@@ -1,6 +1,6 @@
 module github.com/ysomad/gigafin
 
-go 1.27.3
+go 1.27
 
 tool (
 	github.com/air-verse/air

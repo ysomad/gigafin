@@ -4,22 +4,26 @@
 {{if ge $d.Applied 0}}<p role="status" class="badge" data-variant="success">{{t "Changed %d operations." $d.Applied}}</p>{{end}}
 <form method="post" action="{{if $d.ID}}/rules/{{$d.ID}}{{else}}/rules{{end}}">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Runs"}}
-      <select name="stage">
+    {{$e := $.Errors.Get "stage"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Runs"}}
+      <select name="stage"{{if $e}} aria-invalid="true"{{end}}>
         {{range $s := ruleStages}}<option value="{{$s}}"{{if eq $s $d.Stage}} selected{{end}}>{{template "rule-stage" $s}}</option>{{end}}
       </select>
+      {{if $e}}<div class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Match"}}
-      <select name="match">
+    {{$e = $.Errors.Get "match"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Match"}}
+      <select name="match"{{if $e}} aria-invalid="true"{{end}}>
         <option value="all"{{if eq $d.Match "all"}} selected{{end}}>{{t "all conditions"}}</option>
         <option value="any"{{if eq $d.Match "any"}} selected{{end}}>{{t "any condition"}}</option>
       </select>
+      {{if $e}}<div class="error" role="status">{{$e}}</div>{{end}}
     </label>
   </div>
 
   <h2>{{t "If"}}</h2>
   <div id="conditions">
-    {{range $d.Conditions}}{{template "rule-condition" (dict "Row" . "Fields" $d.Fields "Categories" $d.Categories "Accounts" $d.Accounts)}}{{end}}
+    {{range $i, $c := $d.Conditions}}{{template "rule-condition" (dict "Row" $c "Fields" $d.Fields "Categories" $d.Categories "Accounts" $d.Accounts "Index" $i "Errors" $.Errors)}}{{end}}
   </div>
   <div class="hstack mb-4">
     <button type="button" class="outline small" hx-get="/rules/condition" hx-target="#conditions" hx-swap="beforeend" data-variant="secondary">+ {{t "Add condition"}}</button>
@@ -27,7 +31,7 @@
 
   <h2>{{t "Then"}}</h2>
   <div id="rule-actions">
-    {{range $d.Actions}}{{template "rule-action" (dict "Row" . "Categories" $d.Categories)}}{{end}}
+    {{range $i, $a := $d.Actions}}{{template "rule-action" (dict "Row" $a "Categories" $d.Categories "Index" $i "Errors" $.Errors)}}{{end}}
   </div>
   <div class="hstack mb-4">
     <button type="button" class="outline small" hx-get="/rules/action" hx-target="#rule-actions" hx-swap="beforeend" data-variant="secondary">+ {{t "Add action"}}</button>

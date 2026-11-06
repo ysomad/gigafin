@@ -114,7 +114,8 @@ func TestMatch(t *testing.T) {
 }
 
 // TestRussianCoverage checks that ru.json translates every key of the templates and of
-// the Go code: t calls, page titles, domain.NewError formats and domain.Msg constants.
+// the Go code: t calls, page titles, domain.NewError and domain.NewFieldError formats and
+// fields and domain.Msg constants.
 func TestRussianCoverage(t *testing.T) {
 	t.Parallel()
 
@@ -157,7 +158,8 @@ func templateKeys(t *testing.T) map[string]string {
 }
 
 // goKeys returns the literal keys of the Go code, mapped to their position: formats
-// of NewError, keys of t calls, page titles and Msg constants.
+// of NewError and NewFieldError, fields of NewFieldError with the "|field" context,
+// keys of t calls, page titles and Msg constants.
 func goKeys(t *testing.T) map[string]string {
 	t.Helper()
 	keys := map[string]string{}
@@ -177,10 +179,14 @@ func goKeys(t *testing.T) map[string]string {
 			return err
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
-			for _, e := range keyLits(n) {
+			lits, field := keyLits(n)
+			for i, e := range lits {
 				if b, ok := e.(*ast.BasicLit); ok && b.Kind == token.STRING {
 					k, err := strconv.Unquote(b.Value)
 					require.NoError(t, err)
+					if field && i == 0 {
+						k += i18n.ContextSep + "field"
+					}
 					keys[k] = fset.Position(b.Pos()).String()
 				}
 			}
@@ -192,9 +198,10 @@ func goKeys(t *testing.T) map[string]string {
 	return keys
 }
 
-// keyLits returns the key arguments of n if n is a NewError, t or Msg call, a Title
-// field or a declaration of Msg constants.
-func keyLits(n ast.Node) []ast.Expr {
+// keyLits returns the key arguments of n if n is a NewError, NewFieldError, t or Msg
+// call, a Title field or a declaration of Msg constants. field reports that the first
+// of them is the field of a NewFieldError.
+func keyLits(n ast.Node) (lits []ast.Expr, field bool) {
 	switch n := n.(type) {
 	case *ast.CallExpr:
 		var name string
@@ -206,23 +213,25 @@ func keyLits(n ast.Node) []ast.Expr {
 		}
 		switch {
 		case name == "NewError" && len(n.Args) >= 2:
-			return n.Args[1:2]
+			return n.Args[1:2], false
+		case name == "NewFieldError" && len(n.Args) >= 3:
+			return n.Args[1:3], true
 		case (name == "t" || name == "Msg") && len(n.Args) >= 1:
-			return n.Args[:1]
+			return n.Args[:1], false
 		}
 	case *ast.KeyValueExpr:
 		if k, ok := n.Key.(*ast.Ident); ok && k.Name == "Title" {
-			return []ast.Expr{n.Value}
+			return []ast.Expr{n.Value}, false
 		}
 	case *ast.ValueSpec:
 		if s, ok := n.Type.(*ast.SelectorExpr); ok && s.Sel.Name == "Msg" {
-			return n.Values
+			return n.Values, false
 		}
 		if id, ok := n.Type.(*ast.Ident); ok && id.Name == "Msg" {
-			return n.Values
+			return n.Values, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // _runtimeGroups hold keys that TestUnused cannot find in the code: built at runtime,
@@ -290,7 +299,7 @@ func TestRuntimeKeys(t *testing.T) {
 	add(domain.ImportStaged, domain.ImportCommitted, domain.ImportUndone, domain.ScopeRead, domain.ScopeWrite)
 	for m := time.January; m <= time.December; m++ {
 		tm := time.Date(2026, m, 1, 0, 0, 0, 0, time.UTC)
-		add(tm.Format("January"), tm.Format("Jan"), tm.Format("Jan")+"|date")
+		add(tm.Format("January"), tm.Format("Jan"), tm.Format("Jan")+i18n.ContextSep+"date")
 	}
 	for wd := time.Sunday; wd <= time.Saturday; wd++ {
 		add(wd.String()[:3])

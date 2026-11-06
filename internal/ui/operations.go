@@ -209,7 +209,6 @@ type opForm struct {
 	Tags string `form:"tags"`
 	// Parts are the rows of the split page of a saved expense or income.
 	Parts      []splitForm
-	SplitError error
 	Accounts   []domain.Account
 	Categories []domain.Category
 	// AllTags are the user's tags to pick from.
@@ -295,7 +294,7 @@ func (u *UI) parseOpForm(r *http.Request) (opForm, domain.OperationInput, error)
 	if f.Date != "" {
 		var err error
 		if date, err = timex.ParseDate(f.Date); err != nil {
-			return f, domain.OperationInput{}, fmt.Errorf("date: %w", err)
+			return f, domain.OperationInput{}, domain.NewFieldError(errors.ErrInvalid, "date", "must be YYYY-MM-DD")
 		}
 	}
 	in := domain.OperationInput{
@@ -311,7 +310,7 @@ func (u *UI) parseOpForm(r *http.Request) (opForm, domain.OperationInput, error)
 	}
 	d, err := money.Parse(f.Amount)
 	if err != nil {
-		return f, in, domain.NewError(errors.ErrInvalid, "amount: enter a number")
+		return f, in, domain.NewFieldError(errors.ErrInvalid, "amount", "enter a number")
 	}
 	in.Amount = d
 	return f, in, nil
@@ -393,16 +392,17 @@ func (u *UI) renderSplit(
 	if len(parts) == 0 {
 		parts = []splitForm{{CategoryID: op.CategoryID, Amount: amount}, {}}
 	}
-	return u.render(w, r, status, "operation_split", view{User: &user, Nav: "operations", Title: "Split", Data: opForm{
-		ID:         op.ID,
-		OriginID:   op.OriginID,
-		Type:       op.Type,
-		Amount:     amount,
-		Payee:      op.Payee,
-		Parts:      parts,
-		SplitError: splitErr,
-		Categories: domain.ByKind(tree, kind),
-	}})
+	return u.render(w, r, status, "operation_split", view{
+		User: &user, Nav: "operations", Title: "Split", Error: splitErr, Data: opForm{
+			ID:         op.ID,
+			OriginID:   op.OriginID,
+			Type:       op.Type,
+			Amount:     amount,
+			Payee:      op.Payee,
+			Parts:      parts,
+			Categories: domain.ByKind(tree, kind),
+		},
+	})
 }
 
 func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -423,7 +423,7 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	if len(in.Amounts) != len(in.Categories) || len(in.Notes) != len(in.Categories) {
-		return domain.NewError(errors.ErrInvalid, "form: split parts do not match")
+		return domain.NewFieldError(errors.ErrInvalid, "form", "split parts do not match")
 	}
 	var rows []splitForm
 	for i, cat := range in.Categories {
@@ -437,7 +437,7 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 	for i, row := range rows {
 		d, perr := money.Parse(row.Amount)
 		if perr != nil {
-			err = domain.NewError(errors.ErrInvalid, "part %d: enter a number", i+1)
+			err = domain.NewFieldError(errors.ErrInvalid, "parts["+strconv.Itoa(i)+"].amount", "enter a number")
 			break
 		}
 		parts[i] = domain.SplitPart{CategoryID: row.CategoryID, Amount: d, Note: row.Note}

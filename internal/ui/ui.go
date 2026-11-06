@@ -26,9 +26,8 @@ import (
 
 const (
 	_sessionCookie = "gigafin_session"
-	// _flashCookie carries an error message to the page a redirect lands on.
-	_flashCookie = "gigafin_flash"
-	_maxForm     = 1 << 20
+	_flashCookie   = "gigafin_flash"
+	_maxForm       = 1 << 20
 )
 
 var _pages = [...]string{
@@ -38,17 +37,11 @@ var _pages = [...]string{
 
 // Config configures the UI.
 type Config struct {
-	Services *service.Services
-	Log      *slog.Logger
-	// SecureCookies sets the Secure flag and the __Host- prefix on the session cookie;
-	// enable behind HTTPS.
-	SecureCookies bool
-	// SessionTTL is the max age of the session cookie, the server's absolute session
-	// lifetime; the server ends idle sessions earlier.
-	SessionTTL time.Duration
-	// MaxUpload limits the body of a signed-in request, an import file included.
-	MaxUpload int64
-	// StaticCacheTTL is how long browsers cache static assets; 0 disables caching.
+	Services       *service.Services
+	Log            *slog.Logger
+	SecureCookies  bool
+	SessionTTL     time.Duration
+	MaxUploadSize  int64
 	StaticCacheTTL time.Duration
 }
 
@@ -86,30 +79,66 @@ type view struct {
 	// Title is translated, then formatted with TitleArgs, if any.
 	Title     string
 	TitleArgs []any
-	Error     error
-	Data      any
+	// Error is the error of a failed form post. render turns it, or the flash message
+	// of redirectBack, into Errors.
+	Error  error
+	Errors *formErrors
+	Data   any
+}
+
+// formErrors are the translated messages of an error shown on a page: a field message,
+// shown next to its input, and toasts, the messages of no field on the page.
+type formErrors struct {
+	field string
+	// msg is the field message without the field.
+	msg string
+	// text is the whole message, with the field.
+	text  string
+	shown bool
+}
+
+// Get returns the message about field, if any, and marks it as shown, so it is no
+// longer a toast. Call it before Toasts, which the layout calls after the content.
+func (e *formErrors) Get(field string) string {
+	if e == nil || e.field == "" || e.field != field {
+		return ""
+	}
+	e.shown = true
+	return e.msg
+}
+
+// Toasts returns the messages not shown next to an input.
+func (e *formErrors) Toasts() []string {
+	if e == nil || e.shown || e.text == "" {
+		return nil
+	}
+	return []string{e.text}
 }
 
 // New parses templates and returns the UI.
 func New(cfg Config) (*UI, error) {
-	if cfg.SessionTTL <= 0 || cfg.MaxUpload <= 0 {
+	if cfg.SessionTTL <= 0 || cfg.MaxUploadSize <= 0 {
 		return nil, fmt.Errorf("session ttl and max upload: must be positive: %w", errors.ErrInvalid)
 	}
+
 	u := &UI{
 		svc:            cfg.Services,
 		log:            cfg.Log,
 		secureCookies:  cfg.SecureCookies,
 		sessionTTL:     cfg.SessionTTL,
-		maxUpload:      cfg.MaxUpload,
+		maxUpload:      cfg.MaxUploadSize,
 		staticCacheTTL: cfg.StaticCacheTTL,
 		pages:          make(map[string]*template.Template, len(_pages)),
 		formDecoder:    form.NewDecoder(),
 	}
+
 	u.formDecoder.SetMode(form.ModeExplicit)
+
 	dicts, err := i18n.Load(web.FS)
 	if err != nil {
 		return nil, fmt.Errorf("load locales: %w", err)
 	}
+
 	u.dicts = dicts
 	for _, p := range _pages {
 		t, err := template.New(p).Funcs(_funcs).Funcs(amountFuncs(domain.Settings{})).
@@ -118,13 +147,20 @@ func New(cfg Config) (*UI, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", p, err)
 		}
+
 		u.pages[p] = t
 	}
-	frag, err := template.New("partials").Funcs(_funcs).Funcs(amountFuncs(domain.Settings{})).
-		Funcs(langFuncs(nil, "en")).ParseFS(web.FS, "templates/partials.html")
+
+	frag, err := template.
+		New("partials").
+		Funcs(_funcs).
+		Funcs(amountFuncs(domain.Settings{})).
+		Funcs(langFuncs(nil, "en")).
+		ParseFS(web.FS, "templates/partials.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse partials: %w", err)
 	}
+
 	u.fragments = frag
 	return u, nil
 }
@@ -135,13 +171,16 @@ func (u *UI) Register(mux *http.ServeMux) error {
 	if err != nil {
 		return fmt.Errorf("static fs: %w", err)
 	}
+
 	fileServer := http.StripPrefix("/static/", http.FileServerFS(static))
+
 	mux.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if u.staticCacheTTL > 0 {
 			w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(int(u.staticCacheTTL.Seconds())))
 		} else {
 			w.Header().Set("Cache-Control", "no-store")
 		}
+
 		fileServer.ServeHTTP(w, r)
 	}))
 
@@ -237,8 +276,13 @@ func (u *UI) cookie(name, value string, maxAge int) *http.Cookie {
 	}
 	// Secure is off by default so the app works over plain http on localhost
 	return &http.Cookie{ //nolint:gosec // see above
-		Name: name, Value: value, Path: "/", MaxAge: maxAge, HttpOnly: true,
-		Secure: u.secureCookies, SameSite: http.SameSiteLaxMode,
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   u.secureCookies,
+		SameSite: http.SameSiteLaxMode,
 	}
 }
 
@@ -304,24 +348,34 @@ func isUserError(err error) bool {
 
 func (u *UI) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	u.log.ErrorContext(r.Context(), "request failed",
-		slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.Any("error", err))
-	msg := "Internal error, see server logs."
-	if id := logger.RequestID(r.Context()); id != "" {
-		msg = "Internal error, see server logs for request ID " + id + "."
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+		slog.Any("error", err),
+	)
+
+	msg := "Internal server error"
+	if reqID := logger.RequestID(r.Context()); reqID != "" {
+		msg = fmt.Sprintf("%s, request ID %s", msg, reqID)
 	}
+
 	http.Error(w, msg, http.StatusInternalServerError)
 }
 
 func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page string, v view) error {
-	if v.Error == nil {
-		if msg := u.takeFlash(w, r); msg != "" {
-			v.Error = errors.Error(msg)
-		}
-	}
 	p, ok := r.Context().Value(prefsKey{}).(prefs)
 	if !ok {
 		// signed out: default settings, the browser language
 		p.lang = i18n.Match(r.Header.Get("Accept-Language"))
+	}
+	switch e, ok := errors.AsType[domain.Error](v.Error); {
+	case ok && e.Field != "":
+		field, text := e.Field, errText(u.dicts, p.lang, v.Error)
+		e.Field = ""
+		v.Errors = &formErrors{field: field, msg: errText(u.dicts, p.lang, e), text: text}
+	case v.Error != nil:
+		v.Errors = &formErrors{text: errText(u.dicts, p.lang, v.Error)}
+	default:
+		v.Errors = &formErrors{text: u.takeFlash(w, r)}
 	}
 	v.Title = u.dicts.T(p.lang, v.Title, v.TitleArgs...)
 	// a clone, since funcs of an executed template can no longer change

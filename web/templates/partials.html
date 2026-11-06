@@ -19,17 +19,27 @@
     <small class="text-light">{{if .First}}{{t "This operation"}}{{else}}{{t "New part"}}{{end}}</small>
     {{if not .First}}<button type="button" class="outline small" data-split-remove data-variant="danger" aria-label="{{t "Remove part"}}" title="{{t "Remove part"}}">✕</button>{{end}}
   </div>
-  <label data-field class="col-6">{{t "Category"}}
-    <select name="split_category" required>
+  {{/* Errors and Index are set on the rows of a re-rendered form, not on added ones */}}
+  {{$cat := ""}}{{$amount := ""}}{{$note := ""}}
+  {{with .Errors}}
+    {{$cat = .Get (printf "parts[%d].category_id" $.Index)}}
+    {{$amount = .Get (printf "parts[%d].amount" $.Index)}}
+    {{$note = .Get (printf "parts[%d].note" $.Index)}}
+  {{end}}
+  <label data-field class="col-6"{{if $cat}} aria-invalid="true"{{end}}>{{t "Category"}}
+    <select name="split_category"{{if $cat}} aria-invalid="true"{{end}}>
       <option value="">—</option>
       {{template "category-options" (dict "Categories" .Categories "Selected" .Split.CategoryID)}}
     </select>
+    {{if $cat}}<div class="error" role="status">{{$cat}}</div>{{end}}
   </label>
-  <label data-field class="col-6">{{t "Amount"}}
-    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}" required{{if .First}} readonly{{end}}>
+  <label data-field class="col-6"{{if $amount}} aria-invalid="true"{{end}}>{{t "Amount"}}
+    <input name="split_amount" inputmode="decimal" autocomplete="off" value="{{amountInput .Split.Amount}}"{{if .First}} readonly{{end}}{{if $amount}} aria-invalid="true"{{end}}>
+    {{if $amount}}<div class="error" role="status">{{$amount}}</div>{{end}}
   </label>
-  <label data-field class="col-12">
-    <input name="split_note" value="{{.Split.Note}}" placeholder="{{t "Note"}}" aria-label="{{t "Note"}}">
+  <label data-field class="col-12"{{if $note}} aria-invalid="true"{{end}}>
+    <input name="split_note" value="{{.Split.Note}}" placeholder="{{t "Note"}}" aria-label="{{t "Note"}}"{{if $note}} aria-invalid="true"{{end}}>
+    {{if $note}}<div class="error" role="status">{{$note}}</div>{{end}}
   </label>
 </div>
 {{end}}
@@ -133,21 +143,30 @@ Months that submits to Action with the optional Kind. */}}
 {{end}}
 
 {{/* rule-condition is a condition row of the rule form: Row, a condRow, with the
-Fields to pick from, and Categories and Accounts for their value selects. */}}
+Fields to pick from, and Categories and Accounts for their value selects. Errors and
+Index are set on the rows of a re-rendered form, not on added ones. */}}
 {{define "rule-condition"}}
 {{$r := .Row}}
+{{$field := ""}}{{$op := ""}}{{$value := ""}}
+{{with .Errors}}
+  {{$field = .Get (printf "conditions[%d].field" $.Index)}}
+  {{$op = .Get (printf "conditions[%d].op" $.Index)}}
+  {{$value = or (.Get (printf "conditions[%d].value" $.Index)) (.Get (printf "conditions[%d].values" $.Index))}}
+{{end}}
 <div class="cond row mb-4">
-  <label data-field class="col-4">{{t "Field"}}
+  <label data-field class="col-4"{{if $field}} aria-invalid="true"{{end}}>{{t "Field"}}
     <select name="cond_field" hx-get="/rules/condition" hx-include="closest .cond" hx-target="closest .cond" hx-swap="outerHTML">
       {{range .Fields}}<option value="{{.Field}}"{{if eq .Field $r.Field}} selected{{end}}>{{template "rule-field" .Field}}</option>{{end}}
     </select>
+    {{if $field}}<div class="error" role="status">{{$field}}</div>{{end}}
   </label>
-  <label data-field class="col-4">{{t "Condition"}}
+  <label data-field class="col-4"{{if $op}} aria-invalid="true"{{end}}>{{t "Condition"}}
     <select name="cond_op">
       {{range $r.Ops}}<option value="{{.}}"{{if eq . $r.Op}} selected{{end}}>{{template "rule-op" .}}</option>{{end}}
     </select>
+    {{if $op}}<div class="error" role="status">{{$op}}</div>{{end}}
   </label>
-  <label data-field class="col-4">{{t "Value"}}
+  <label data-field class="col-4"{{if $value}} aria-invalid="true"{{end}}>{{t "Value"}}
     {{if eq $r.Field "category"}}
     <select name="cond_value">
       <option value="">—</option>
@@ -165,22 +184,30 @@ Fields to pick from, and Categories and Accounts for their value selects. */}}
     {{else}}
     <input name="cond_value" value="{{$r.Value}}" autocomplete="off" placeholder="{{t "one of and between take values separated by |"}}">
     {{end}}
+    {{if $value}}<div class="error" role="status">{{$value}}</div>{{end}}
   </label>
   <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label="{{t "Remove condition"}}" data-variant="secondary">✕</button></div>
 </div>
 {{end}}
 
 {{/* rule-action is an action row of the rule form: Row, an actionRow, with the
-Categories for the category select. */}}
+Categories for the category select. Errors and Index are set on the rows of a
+re-rendered form, not on added ones. */}}
 {{define "rule-action"}}
 {{$r := .Row}}
+{{$type := ""}}{{$value := ""}}
+{{with .Errors}}
+  {{$type = .Get (printf "actions[%d].type" $.Index)}}
+  {{$value = .Get (printf "actions[%d].value" $.Index)}}
+{{end}}
 <div class="act row mb-4">
-  <label data-field class="col-4">{{t "Action"}}
+  <label data-field class="col-4"{{if $type}} aria-invalid="true"{{end}}>{{t "Action"}}
     <select name="act_type" hx-get="/rules/action" hx-include="closest .act" hx-target="closest .act" hx-swap="outerHTML">
       {{range ruleActionTypes}}<option value="{{.}}"{{if eq . $r.Type}} selected{{end}}>{{template "rule-action-type" .}}</option>{{end}}
     </select>
+    {{if $type}}<div class="error" role="status">{{$type}}</div>{{end}}
   </label>
-  <label data-field class="col-4">{{t "Value"}}
+  <label data-field class="col-4"{{if $value}} aria-invalid="true"{{end}}>{{t "Value"}}
     {{if eq $r.Type "set_category"}}
     <select name="act_value">
       <option value="">—</option>
@@ -189,6 +216,7 @@ Categories for the category select. */}}
     {{else}}
     <input name="act_value" value="{{$r.Value}}" autocomplete="off">
     {{end}}
+    {{if $value}}<div class="error" role="status">{{$value}}</div>{{end}}
   </label>
   <div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .act" hx-swap="delete" aria-label="{{t "Remove action"}}" data-variant="secondary">✕</button></div>
 </div>

@@ -1,24 +1,37 @@
 {{define "content"}}
 {{$d := .Data}}
-<details class="mb-6">
+<details class="mb-6"{{if .Error}} open{{end}}>
 <summary>+ {{t "New account"}}</summary>
 <form method="post" action="/accounts">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Name"}} <input name="name" value="{{$d.Name}}" required></label>
-    <label data-field class="col-4">{{t "Kind"}}
-      <select name="kind">
+    {{$e := $.Errors.Get "name"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "kind"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Kind"}}
+      <select name="kind"{{if $e}} aria-invalid="true" aria-describedby="kind-error"{{end}}>
         {{range $d.Kinds}}<option value="{{.}}"{{if eq (print .) $d.Kind}} selected{{end}}>{{t (print .)}}</option>{{end}}
       </select>
+      {{if $e}}<div id="kind-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
-    <label data-field class="col-4">{{t "Currency"}}
-      <select name="currency">
+    {{$e = $.Errors.Get "currency"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Currency"}}
+      <select name="currency"{{if $e}} aria-invalid="true" aria-describedby="currency-error"{{end}}>
         {{range $d.Currencies}}<option{{if eq . $d.Currency}} selected{{end}}>{{.}}</option>{{end}}
       </select>
+      {{if $e}}<div id="currency-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
   </div>
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Opening balance"}} <input name="balance" inputmode="decimal" placeholder="0" value="{{amountInput $d.Balance}}"></label>
-    <label data-field class="col-4">{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}" value="{{amountInput $d.CreditLimit}}"><small data-hint>{{t "credit only"}}</small></label>
+    {{$e = $.Errors.Get "balance"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Opening balance"}} <input name="balance" inputmode="decimal" placeholder="0" value="{{amountInput $d.Balance}}"{{if $e}} aria-invalid="true" aria-describedby="balance-error"{{end}}>
+      {{if $e}}<div id="balance-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
+    {{$e = $.Errors.Get "credit limit"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Credit limit"}} <input name="credit_limit" inputmode="decimal" placeholder="{{t "credit only"}}" value="{{amountInput $d.CreditLimit}}"{{if $e}} aria-invalid="true" aria-describedby="credit-limit-error"{{end}}>
+      {{if $e}}<div id="credit-limit-error" class="error" role="status">{{$e}}</div>{{else}}<small data-hint>{{t "credit only"}}</small>{{end}}
+    </label>
     <div class="col-12 hstack"><button type="submit">{{t "Create"}}</button></div>
   </div>
 </form>

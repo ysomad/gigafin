@@ -39,9 +39,21 @@ type Language struct {
 	Name string
 }
 
+// ContextSep separates a key from its context, as in "May|date".
+const ContextSep = "|"
+
 // _languages are the UI languages, English, the default and the language of the keys,
 // first.
-var _languages = []Language{{Code: "en", Name: "English"}, {Code: "ru", Name: "Русский"}}
+var _languages = []Language{
+	{
+		Code: "en",
+		Name: "English",
+	},
+	{
+		Code: "ru",
+		Name: "Русский",
+	},
+}
 
 // _matcher matches browser languages against _languages, in the same order.
 var _matcher = func() language.Matcher {
@@ -74,56 +86,71 @@ type Dicts map[string]map[string]Message
 
 // Load reads locales/<code>.json from fsys for every language, optional for English.
 func Load(fsys fs.FS) (Dicts, error) {
-	d := make(Dicts, len(_languages))
-	for i, l := range _languages {
-		b, err := fs.ReadFile(fsys, "locales/"+l.Code+".json")
+	dir := make(Dicts, len(_languages))
+
+	for i, lang := range _languages {
+		bb, err := fs.ReadFile(fsys, "locales/"+lang.Code+".json")
 		if i == 0 && errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", l.Code, err)
+			return nil, fmt.Errorf("read %s: %w", lang.Code, err)
 		}
+
 		var groups map[string]json.RawMessage
-		if err := json.Unmarshal(b, &groups); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", l.Code, err)
+		if err := json.Unmarshal(bb, &groups); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", lang.Code, err)
 		}
+
 		delete(groups, "$schema")
+
 		msgs := map[string]Message{}
 		groupOf := map[string]string{}
+
 		for g, group := range groups {
 			var raws map[string]json.RawMessage
 			if err := json.Unmarshal(group, &raws); err != nil {
-				return nil, fmt.Errorf("parse %s: %s: %w", l.Code, g, err)
+				return nil, fmt.Errorf("parse %s: %s: %w", lang.Code, g, err)
 			}
+
 			for k, raw := range raws {
 				if prev, ok := groupOf[k]; ok {
-					return nil, fmt.Errorf("%s: %q is in groups %s and %s", l.Code, k, prev, g)
+					return nil, fmt.Errorf("%s: %q is in groups %s and %s", lang.Code, k, prev, g)
 				}
+
 				groupOf[k] = g
+
 				var m Message
 				if err := json.Unmarshal(raw, &m.Text); err != nil {
 					var forms map[string]string
 					if err := json.Unmarshal(raw, &forms); err != nil {
-						return nil, fmt.Errorf("%s: %s: %q: not a string or plural forms", l.Code, g, k)
+						return nil, fmt.Errorf("%s: %s: %q: not a string or plural forms", lang.Code, g, k)
 					}
+
 					if _, ok := forms["other"]; !ok {
-						return nil, fmt.Errorf("%s: %s: %q: no other plural form", l.Code, g, k)
+						return nil, fmt.Errorf("%s: %s: %q: no other plural form", lang.Code, g, k)
 					}
+
 					m.Forms = make(map[plural.Form]string, len(forms))
+
 					for name, s := range forms {
 						f, ok := _forms[name]
 						if !ok {
-							return nil, fmt.Errorf("%s: %s: %q: unknown plural form %q", l.Code, g, k, name)
+							return nil, fmt.Errorf("%s: %s: %q: unknown plural form %q", lang.Code, g, k, name)
 						}
+
 						m.Forms[f] = s
 					}
 				}
+
 				msgs[k] = m
 			}
 		}
-		d[l.Code] = msgs
+
+		dir[lang.Code] = msgs
 	}
-	return d, nil
+
+	return dir, nil
 }
 
 // T returns key translated to lang and formatted with args, if any.
@@ -140,7 +167,7 @@ func (d Dicts) T(lang, key string, args ...any) string {
 	case ok:
 		key = m.Text
 	default:
-		if i := strings.LastIndexByte(key, '|'); i >= 0 {
+		if i := strings.LastIndex(key, ContextSep); i >= 0 {
 			key = key[:i]
 		}
 	}

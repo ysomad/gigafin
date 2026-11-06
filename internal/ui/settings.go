@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -23,6 +24,8 @@ type settingsData struct {
 	Keys      []domain.APIKey
 	NewToken  string
 	CanBackup bool
+	// Posted are the values of a form post that failed, to fill its inputs again.
+	Posted url.Values
 
 	Settings    domain.Settings
 	Languages   []i18n.Language
@@ -42,13 +45,22 @@ type ratesSync struct {
 	Err error
 }
 
+// renderSettings renders the settings page with d, of which it sets all but NewToken,
+// RatesSync and Posted. The page has several forms with the same input names, so the
+// field of viewErr, an error of the form named form, becomes form.field.
 func (u *UI) renderSettings(
 	w http.ResponseWriter,
 	r *http.Request,
 	user domain.User,
-	token string,
-	sync ratesSync,
+	status int,
+	d settingsData,
+	form string,
+	viewErr error,
 ) error {
+	if e, ok := errors.AsType[domain.Error](viewErr); ok && e.Field != "" {
+		e.Field = form + "." + e.Field
+		viewErr = e
+	}
 	var session string
 	if c, err := r.Cookie(u.cookie(_sessionCookie, "", 0).Name); err == nil {
 		session = c.Value
@@ -73,29 +85,37 @@ func (u *UI) renderSettings(
 	if err != nil {
 		return err
 	}
-	return u.render(w, r, http.StatusOK, "settings", view{
-		User: &user, Nav: "settings", Title: "Settings",
-		Data: settingsData{
-			Sessions: sessions, Keys: keys, NewToken: token, CanBackup: user.Can(domain.PermBackup),
-			Settings: settings, Languages: i18n.Languages(), RateSources: domain.RateSources(), Currencies: money.Currencies(),
-			Rates: rates, RatesSync: sync, RateCurrencies: rateCurrencies,
-		},
+	d.Sessions, d.Keys, d.CanBackup = sessions, keys, user.Can(domain.PermBackup)
+	d.Settings, d.Rates, d.RateCurrencies = settings, rates, rateCurrencies
+	d.Languages, d.RateSources, d.Currencies = i18n.Languages(), domain.RateSources(), money.Currencies()
+	return u.render(w, r, status, "settings", view{
+		User: &user, Nav: "settings", Title: "Settings", Error: viewErr, Data: d,
 	})
 }
 
 func (u *UI) settings(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	return u.renderSettings(w, r, user, "", ratesSync{})
+	return u.renderSettings(w, r, user, http.StatusOK, settingsData{}, "", nil)
+}
+
+// settingsDone ends a settings form post: back to the page on success, the page with
+// the form's errors and values for a user error.
+func (u *UI) settingsDone(w http.ResponseWriter, r *http.Request, user domain.User, form string, err error) error {
+	if isUserError(err) {
+		return u.renderSettings(w, r, user, http.StatusUnprocessableEntity, settingsData{Posted: r.PostForm}, form, err)
+	}
+	if err != nil {
+		return err
+	}
+	redirect(w, r, "/settings")
+	return nil
 }
 
 func (u *UI) setTimezone(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	if err := u.svc.Auth.SetTimezone(r.Context(), user.ID, strings.TrimSpace(r.PostFormValue("timezone"))); err != nil {
-		return err
-	}
-	redirect(w, r, "/settings")
-	return nil
+	err := u.svc.Auth.SetTimezone(r.Context(), user.ID, strings.TrimSpace(r.PostFormValue("timezone")))
+	return u.settingsDone(w, r, user, "timezone", err)
 }
 
 func (u *UI) setDisplay(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -113,11 +133,8 @@ func (u *UI) setLanguage(w http.ResponseWriter, r *http.Request, user domain.Use
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	if err := u.svc.Settings.SetLanguage(r.Context(), user.ID, r.PostFormValue("language")); err != nil {
-		return err
-	}
-	redirect(w, r, "/settings")
-	return nil
+	err := u.svc.Settings.SetLanguage(r.Context(), user.ID, r.PostFormValue("language"))
+	return u.settingsDone(w, r, user, "language", err)
 }
 
 func (u *UI) setRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -125,15 +142,10 @@ func (u *UI) setRates(w http.ResponseWriter, r *http.Request, user domain.User) 
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 	src, err := domain.ParseRateSource(r.PostFormValue("rate_source"))
-	if err != nil {
-		return err
+	if err == nil {
+		err = u.svc.Settings.SetRates(r.Context(), user.ID, src, r.PostFormValue("primary_currency"))
 	}
-	err = u.svc.Settings.SetRates(r.Context(), user.ID, src, r.PostFormValue("primary_currency"))
-	if err != nil {
-		return err
-	}
-	redirect(w, r, "/settings")
-	return nil
+	return u.settingsDone(w, r, user, "rates", err)
 }
 
 func (u *UI) syncRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -142,7 +154,8 @@ func (u *UI) syncRates(w http.ResponseWriter, r *http.Request, user domain.User)
 	if err != nil {
 		u.log.WarnContext(r.Context(), "sync exchange rates", slog.Any("error", err))
 	}
-	return u.renderSettings(w, r, user, "", ratesSync{Done: true, Updated: n, Err: err})
+	d := settingsData{RatesSync: ratesSync{Done: true, Updated: n, Err: err}}
+	return u.renderSettings(w, r, user, http.StatusOK, d, "", nil)
 }
 
 func (u *UI) setRate(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -151,11 +164,7 @@ func (u *UI) setRate(w http.ResponseWriter, r *http.Request, user domain.User) e
 	}
 	err := u.svc.Rates.Set(r.Context(), user.ID, r.PostFormValue("currency"), r.PostFormValue("date"),
 		r.PostFormValue("rate"))
-	if err != nil {
-		return err
-	}
-	redirect(w, r, "/settings")
-	return nil
+	return u.settingsDone(w, r, user, "rate", err)
 }
 
 func (u *UI) resetRate(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -181,7 +190,7 @@ func (u *UI) changePassword(w http.ResponseWriter, r *http.Request, user domain.
 	token, err := u.svc.Auth.ChangePassword(r.Context(), user.ID, r.PostFormValue("current"),
 		r.PostFormValue("password"), r.UserAgent())
 	if err != nil {
-		return err
+		return u.settingsDone(w, r, user, "password", err)
 	}
 	// all sessions end on a password change, this browser gets a new one
 	http.SetCookie(w, u.cookie(_sessionCookie, token, int(u.sessionTTL.Seconds())))
@@ -196,10 +205,10 @@ func (u *UI) createAPIKey(w http.ResponseWriter, r *http.Request, user domain.Us
 	token, _, err := u.svc.Auth.CreateAPIKey(r.Context(), user.ID, r.PostFormValue("password"),
 		r.PostFormValue("name"), domain.Scope(r.PostFormValue("scope")), r.PostFormValue("expires"))
 	if err != nil {
-		return err
+		return u.settingsDone(w, r, user, "apikey", err)
 	}
 	// render instead of redirecting so the token is shown once and never put in a URL
-	return u.renderSettings(w, r, user, token, ratesSync{})
+	return u.renderSettings(w, r, user, http.StatusOK, settingsData{NewToken: token}, "", nil)
 }
 
 func (u *UI) revokeAPIKey(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -229,7 +238,7 @@ func (u *UI) revokeSession(w http.ResponseWriter, r *http.Request, user domain.U
 func (u *UI) exportData(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	q := r.URL.Query()
 	if f := q.Get("format"); f != "csv" {
-		return domain.NewError(errors.ErrInvalid, "format: unsupported %q", f)
+		return domain.NewFieldError(errors.ErrInvalid, "format", "unsupported %q", f)
 	}
 	f, err := u.filterFromQuery(q)
 	if err != nil {
@@ -266,7 +275,7 @@ func (u *UI) backup(w http.ResponseWriter, r *http.Request, user domain.User) er
 	}()
 	f, err := u.svc.Data.Backup(ctx, user, r.PostFormValue("password"), r.PostFormValue("passphrase"), dir)
 	if err != nil {
-		return err
+		return u.settingsDone(w, r, user, "backup", err)
 	}
 	defer f.Close()
 	fi, err := f.Stat()
@@ -288,7 +297,7 @@ func (u *UI) deleteAllData(w http.ResponseWriter, r *http.Request, user domain.U
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 	defer cancel()
 	if err := u.svc.Data.DeleteAll(ctx, user.ID, r.PostFormValue("password")); err != nil {
-		return err
+		return u.settingsDone(w, r, user, "delete", err)
 	}
 	redirect(w, r, "/accounts")
 	return nil

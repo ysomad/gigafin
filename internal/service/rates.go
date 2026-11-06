@@ -149,11 +149,11 @@ func (s *Rates) Set(ctx context.Context, userID int64, currency, date, rate stri
 	}
 	day, err := timex.ParseDate(date)
 	if err != nil {
-		return fmt.Errorf("date: %w", err)
+		return domain.NewFieldError(errors.ErrInvalid, "date", "must be YYYY-MM-DD")
 	}
 	v, err := decimal.NewFromString(strings.ReplaceAll(strings.TrimSpace(rate), ",", "."))
 	if err != nil {
-		return domain.NewError(errors.ErrInvalid, "rate: %q is not a number", rate)
+		return domain.NewFieldError(errors.ErrInvalid, "rate", "%q is not a number", rate)
 	}
 	r, err := domain.NewRate(src, strings.ToUpper(strings.TrimSpace(currency)), src.Pivot(), day, v)
 	if err != nil {

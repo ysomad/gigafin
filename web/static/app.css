@@ -1,5 +1,10 @@
 /* App styles on top of Oat. Use Oat tokens (var(--space-*), etc.) only. */
 
+/* Field messages from the server start lowercase, as they follow the field in toasts. */
+[data-field] .error::first-letter {
+  text-transform: uppercase;
+}
+
 /* Scroll-to-top button floats in the corner, as lists load more at their end. */
 .to-top {
   position: fixed;

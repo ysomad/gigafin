@@ -8,57 +8,65 @@
   <a class="button{{if ne $d.Type "transfer"}} outline{{end}}"{{if eq $d.Type "transfer"}} aria-current="page"{{end}} href="/operations/new?type=transfer" data-variant="secondary">⇄ {{t "Transfer"}}</a>
 </div>
 {{end}}
-<form id="op-form-{{$d.Type}}" class="form-compact" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
-  {{if .Error}}<div data-field aria-invalid="true"><div class="error" role="status">{{errText .Error}}</div></div>{{end}}
+<form id="op-form-{{$d.Type}}" class="form-compact" {{if not $d.ID}}hx-post="/operations" hx-select="#op-form-{{$d.Type}}" hx-select-oob="#toasts" hx-target="this" hx-swap="outerHTML ignoreTitle:true"{{end}} method="post" action="{{if $d.ID}}/operations/{{$d.ID}}{{else}}/operations{{end}}">
   <input type="hidden" name="type" value="{{$d.Type}}">
   {{if $d.ImportID}}<input type="hidden" name="import_id" value="{{$d.ImportID}}">{{end}}
   {{if $d.OriginID}}<input type="hidden" name="origin_id" value="{{$d.OriginID}}">{{end}}
   <fieldset class="row mb-4" aria-label="{{t "Operation details"}}">
     <label data-field class="col-6">{{if eq $d.Type "transfer"}}{{t "From"}}{{else}}{{t "Account"}}{{end}}
-      <select name="account" required aria-describedby="account-error-{{$d.Type}}">
+      <select name="account">
         {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.AccountID}} selected{{end}}>{{.Name}} ({{if $d.ID}}{{.Currency}}{{else}}{{money .Balance .Currency}} {{.Currency}}{{end}})</option>{{end}}
       </select>
-      <div id="account-error-{{$d.Type}}" class="error" role="status">{{t "Select an account."}}</div>
     </label>
     {{if eq $d.Type "transfer"}}
-    <label data-field class="col-6">{{t "To"}}
-      <select name="to_account" required aria-describedby="to-account-error-{{$d.Type}}">
+    {{$e := $.Errors.Get "to_account_id"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "To"}}
+      <select name="to_account"{{if $e}} aria-invalid="true" aria-describedby="to-account-error-{{$d.Type}}"{{end}}>
         <option value="">—</option>
         {{range $d.Accounts}}<option value="{{.ID}}"{{if eq .ID $d.ToAccountID}} selected{{end}}>{{.Name}} ({{if $d.ID}}{{.Currency}}{{else}}{{money .Balance .Currency}} {{.Currency}}{{end}})</option>{{end}}
       </select>
-      <div id="to-account-error-{{$d.Type}}" class="error" role="status">{{t "Select a different destination account."}}</div>
+      {{if $e}}<div id="to-account-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{end}}
     {{if or (eq $d.Type "expense") (eq $d.Type "income")}}
-    <label data-field class="col-6">{{t "Category"}}
-      <select name="category" required aria-describedby="category-error-{{$d.Type}}">
+    {{$e := $.Errors.Get "category_id"}}
+    <label data-field class="col-6"{{if $e}} aria-invalid="true"{{end}}>{{t "Category"}}
+      <select name="category"{{if $e}} aria-invalid="true" aria-describedby="category-error-{{$d.Type}}"{{end}}>
         <option value="">—</option>
         {{template "category-options" (dict "Categories" $d.Categories "Selected" $d.CategoryID)}}
       </select>
-      <div id="category-error-{{$d.Type}}" class="error" role="status">{{t "Select a category."}}</div>
+      {{if $e}}<div id="category-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{end}}
-    <label data-field class="col-12">{{t "Amount"}}
-      <input name="amount" inputmode="decimal" autocomplete="off" value="{{amountInput $d.Amount}}" required {{if ne $d.Type "adjustment"}}pattern="[0-9]+([.,][0-9]+)?"{{end}} aria-describedby="amount-error-{{$d.Type}}">
-      <div id="amount-error-{{$d.Type}}" class="error" role="status">{{t "Enter a positive amount."}}</div>
+    {{$e := $.Errors.Get "amount"}}
+    <label data-field class="col-12"{{if $e}} aria-invalid="true"{{end}}>{{t "Amount"}}
+      <input name="amount" inputmode="decimal" autocomplete="off" value="{{amountInput $d.Amount}}"{{if $e}} aria-invalid="true" aria-describedby="amount-error-{{$d.Type}}"{{end}}>
+      {{if $e}}<div id="amount-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </label>
   </fieldset>
   <fieldset class="row mb-4" aria-label="{{t "Date and payee"}}">
-    <div data-field class="col-12">
+    {{$e := or ($.Errors.Get "date") ($.Errors.Get "time")}}
+    <div data-field class="col-12"{{if $e}} aria-invalid="true"{{end}}>
       <label for="date-{{$d.Type}}">{{t "Date"}}</label>
       <fieldset class="group">
-        <input type="date" id="date-{{$d.Type}}" name="date" value="{{$d.Date}}" required aria-describedby="date-error-{{$d.Type}}">
+        <input type="date" id="date-{{$d.Type}}" name="date" value="{{$d.Date}}"{{if $e}} aria-describedby="date-error-{{$d.Type}}"{{end}}>
         <input type="time" name="time" value="{{$d.Time}}" aria-label="{{t "Time"}}">
       </fieldset>
-      <span id="date-error-{{$d.Type}}" class="error" role="status">{{t "Enter a valid date."}}</span>
+      {{if $e}}<div id="date-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </div>
-    <label data-field class="col-12">{{t "Payee"}}
-      <input name="payee" value="{{$d.Payee}}" autocomplete="off"{{if not $d.ID}} hx-post="/operations/fill" hx-trigger="change" hx-select="#op-form-{{$d.Type}}" hx-target="closest form" hx-swap="outerHTML ignoreTitle:true"{{end}}>
+    {{$e := $.Errors.Get "payee"}}
+    <label data-field class="col-12"{{if $e}} aria-invalid="true"{{end}}>{{t "Payee"}}
+      <input name="payee" value="{{$d.Payee}}" autocomplete="off"{{if $e}} aria-invalid="true" aria-describedby="payee-error-{{$d.Type}}"{{end}}{{if not $d.ID}} hx-post="/operations/fill" hx-trigger="change" hx-select="#op-form-{{$d.Type}}" hx-target="closest form" hx-swap="outerHTML ignoreTitle:true"{{end}}>
+      {{if $e}}<div id="payee-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
     </label>
   </fieldset>
   {{if and $d.SourcePayee (ne $d.SourcePayee $d.Payee)}}<p class="text-light">{{t "Bank payee"}}: {{$d.SourcePayee}}</p>{{end}}
-  <label data-field>{{t "Note"}} <input name="note" value="{{$d.Note}}"></label>
-  <div data-field data-operation-tags>
+  {{$e := $.Errors.Get "note"}}
+  <label data-field{{if $e}} aria-invalid="true"{{end}}>{{t "Note"}} <input name="note" value="{{$d.Note}}"{{if $e}} aria-invalid="true" aria-describedby="note-error-{{$d.Type}}"{{end}}>
+    {{if $e}}<div id="note-error-{{$d.Type}}" class="error" role="status">{{$e}}</div>{{end}}
+  </label>
+  {{$e = $.Errors.Get "tags"}}
+  <div data-field data-operation-tags{{if $e}} aria-invalid="true"{{end}}>
     <label for="operation-tags-{{$d.Type}}">{{t "Tags"}}</label>
     <ot-taginput value="{{$d.Tags}}">
       <input id="operation-tags-{{$d.Type}}" list="all-tags-{{$d.Type}}" autocomplete="off" placeholder="{{t "Add tags with Enter or comma"}}">
@@ -66,6 +74,7 @@
     </ot-taginput>
     <input type="hidden" name="tags" value="{{$d.Tags}}">
     <template data-tag-suggestions>{{range $d.AllTags}}<option value="{{.}}"></option>{{end}}</template>
+    {{if $e}}<div class="error" role="status">{{$e}}</div>{{end}}
   </div>
 
   <div class="hstack justify-between">

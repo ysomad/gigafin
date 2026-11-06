@@ -13,7 +13,7 @@
   <input type="hidden" name="kind" value="{{$d.Kind}}">
   <div class="row mb-4">
     <label data-field class="col-4">{{t "Category"}}
-      <select name="category" required>
+      <select name="category">
         {{range $parent := $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}
           <option value="{{.ID}}">{{.Name}}</option>
           {{range .Children}}{{if not .Archived}}<option value="{{.ID}}">{{$parent.Name}} / {{.Name}}</option>{{end}}{{end}}
@@ -23,7 +23,7 @@
     <label data-field class="col-4">{{t "Currency"}}
       <select name="currency">{{range $d.Currencies}}<option>{{.}}</option>{{end}}</select>
     </label>
-    <label data-field class="col-4">{{t "Amount"}} <input name="amount" inputmode="decimal" required></label>
+    <label data-field class="col-4">{{t "Amount"}} <input name="amount" inputmode="decimal"></label>
     <label data-field class="col-4"><input type="checkbox" name="repeating" value="true" checked> {{t "Repeat every month"}}</label>
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>
   </div>

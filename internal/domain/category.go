@@ -28,7 +28,7 @@ func Kinds() []Kind {
 func ParseKind(s string) (Kind, error) {
 	k := Kind(s)
 	if !slices.Contains(Kinds(), k) {
-		return "", NewError(errors.ErrInvalid, "kind: must be expense or income")
+		return "", NewFieldError(errors.ErrInvalid, "kind", "must be expense or income")
 	}
 	return k, nil
 }
@@ -63,7 +63,7 @@ func NewCategory(parent *Category, kind Kind, name string) (Category, error) {
 	c := Category{Name: name, Kind: kind}
 	if parent != nil {
 		if parent.ParentID != 0 {
-			return Category{}, NewError(errors.ErrInvalid, "parent_id: categories can be nested only one level deep")
+			return Category{}, NewFieldError(errors.ErrInvalid, "parent_id", "categories can be nested only one level deep")
 		}
 		c.ParentID, c.Kind = parent.ID, parent.Kind
 	}
@@ -84,15 +84,15 @@ func (c Category) Edit(name string, parent *Category) (Category, error) {
 		return c, nil
 	}
 	if c.ParentID == 0 {
-		return Category{}, NewError(
+		return Category{}, NewFieldError(
 			errors.ErrInvalid,
-			"parent_id: only a category inside another category can be moved",
+			"parent_id", "only a category inside another category can be moved",
 		)
 	}
 	if parent.ParentID != 0 || parent.Kind != c.Kind {
-		return Category{}, NewError(
+		return Category{}, NewFieldError(
 			errors.ErrInvalid,
-			"parent_id: must be an %s category that is not inside another category",
+			"parent_id", "must be an %s category that is not inside another category",
 			c.Kind,
 		)
 	}
@@ -178,13 +178,13 @@ func ParentChoices(tree []Category, c Category) ([]Category, string) {
 func categoryName(s string) (string, error) {
 	name := strings.TrimSpace(s)
 	if name == "" {
-		return "", NewError(errors.ErrInvalid, "name: required")
+		return "", NewFieldError(errors.ErrInvalid, "name", "required")
 	}
 	if utf8.RuneCountInString(name) > _maxTextLen {
-		return "", NewError(errors.ErrInvalid, "name: too long")
+		return "", NewFieldError(errors.ErrInvalid, "name", "too long")
 	}
 	if strings.Contains(name, _nameSep) {
-		return "", NewError(errors.ErrInvalid, "name: must not contain %q", _nameSep)
+		return "", NewFieldError(errors.ErrInvalid, "name", "must not contain %q", _nameSep)
 	}
 	return name, nil
 }

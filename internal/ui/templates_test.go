@@ -16,7 +16,7 @@ import (
 func TestTemplatesWithoutDatabase(t *testing.T) {
 	t.Parallel()
 
-	u, err := New(Config{SessionTTL: time.Hour, MaxUpload: 1024})
+	u, err := New(Config{SessionTTL: time.Hour, MaxUploadSize: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}

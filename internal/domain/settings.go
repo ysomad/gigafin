@@ -26,7 +26,7 @@ type Settings struct {
 func (s Settings) Validate() error {
 	if s.Language != "" &&
 		!slices.ContainsFunc(i18n.Languages(), func(l i18n.Language) bool { return l.Code == s.Language }) {
-		return NewError(errors.ErrInvalid, "language: unknown %q", s.Language)
+		return NewFieldError(errors.ErrInvalid, "language", "unknown %q", s.Language)
 	}
 	if _, err := ParseRateSource(string(s.RateSource)); err != nil {
 		return err
@@ -35,10 +35,10 @@ func (s Settings) Validate() error {
 		return nil
 	}
 	if s.PrimaryCurrency == "" {
-		return NewError(errors.ErrInvalid, "primary currency: required with exchange rates on")
+		return NewFieldError(errors.ErrInvalid, "primary currency", "required with exchange rates on")
 	}
 	if !money.ValidCurrency(s.PrimaryCurrency) {
-		return NewError(errors.ErrInvalid, "primary currency: unknown %q", s.PrimaryCurrency)
+		return NewFieldError(errors.ErrInvalid, "primary currency", "unknown %q", s.PrimaryCurrency)
 	}
 	return nil
 }

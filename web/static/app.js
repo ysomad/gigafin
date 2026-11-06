@@ -5,27 +5,34 @@ addEventListener('scroll', () => {
   }
 }, { passive: true });
 
-// Browser validation shown the Oat way: a field failing its constraints gets
-// aria-invalid, which reveals the .error message of its [data-field], instead of the
-// browser's bubble, and the first invalid field of the form is focused. Fields
-// without an .error message keep the bubble.
-document.addEventListener('invalid', e => {
-  if (!e.target.closest('[data-field]')?.querySelector('.error')) return;
-  e.preventDefault();
-  e.target.setAttribute('aria-invalid', 'true');
-  if (e.target === e.target.form?.querySelector(':is(input, select, textarea):invalid')) {
-    e.target.focus();
+// Show the toasts the server rendered into #toasts, on page load and after htmx swaps.
+function showToasts() {
+  for (const toast of document.querySelectorAll('#toasts > .toast')) {
+    ot.toast.el(toast);
+    toast.remove();
   }
-}, true);
+}
+document.addEventListener('DOMContentLoaded', showToasts);
+document.addEventListener('htmx:after:settle', showToasts);
 
-// Hide the message once the field is valid, and show it again if it is not.
+// Hide a field's server message once the user edits the field.
 for (const type of ['input', 'change']) {
   document.addEventListener(type, e => {
-    if (e.target.validity && e.target.hasAttribute('aria-invalid')) {
-      e.target.setAttribute('aria-invalid', String(!e.target.validity.valid));
-    }
+    const field = e.target.closest('[data-field][aria-invalid]');
+    if (!field) return;
+    field.removeAttribute('aria-invalid');
+    e.target.removeAttribute('aria-invalid');
   });
 }
+
+// htmx swaps error responses too. A form that failed validation is re-rendered with a
+// 4xx, but a server error is plain text, so show it as a toast instead of swapping it in.
+document.addEventListener('htmx:response:error', e => {
+  const ctx = e.detail.ctx;
+  if (ctx.response.status < 500) return;
+  ctx.swap = 'none';
+  ot.toast(ctx.text, '', { variant: 'danger' });
+});
 
 // In the split form the first part, the operation itself, keeps what the other parts
 // leave of the total, so typing a part's amount takes it from the first one. It counts

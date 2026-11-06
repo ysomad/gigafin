@@ -40,7 +40,7 @@ func newBrowser(t *testing.T) (browser, *service.Services, int64) {
 	})
 	require.NoError(t, err)
 	u, err := ui.New(ui.Config{
-		Services: svc, Log: slog.New(slog.DiscardHandler), SessionTTL: 30 * 24 * time.Hour, MaxUpload: 10 << 20,
+		Services: svc, Log: slog.New(slog.DiscardHandler), SessionTTL: 30 * 24 * time.Hour, MaxUploadSize: 10 << 20,
 	})
 	require.NoError(t, err)
 	mux := http.NewServeMux()
@@ -224,7 +224,14 @@ func TestPagesAndFlows(t *testing.T) {
 		"category": {strconv.FormatInt(salary.ID, 10)}, "amount": {"10"},
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "is not an expense category")
+	assert.Contains(
+		t,
+		body,
+		`<div id="category-error-expense" class="error" role="status">`+
+			`category &#34;Salary&#34; is not an expense category</div>`,
+		"a field error is shown under its input",
+	)
+	assert.NotContains(t, body, `class="toast"`, "a field error shown under its input is not a toast")
 
 	ops, _, err := f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})
 	require.NoError(t, err)
@@ -244,7 +251,12 @@ func TestPagesAndFlows(t *testing.T) {
 		"split_note":     {"", ""},
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "add up to 101.00, not 150.25")
+	assert.Contains(
+		t,
+		body,
+		`<output class="toast" data-variant="danger"><p>parts: add up to 101.00, not 150.25</p></output>`,
+		"an error of no input on the page is a toast",
+	)
 	assert.Contains(t, body, `value="100"`, "rows are kept")
 
 	status, body = b.post(opPath+"/split", url.Values{
@@ -356,7 +368,7 @@ func TestPagesAndFlows(t *testing.T) {
 
 	status, body = b.postFrom("/settings/api-keys", "/settings",
 		url.Values{"name": {"script"}, "scope": {"read"}, "expires": {"30"}, "password": {"wrong"}})
-	require.Equal(t, http.StatusOK, status)
+	require.Equal(t, http.StatusUnprocessableEntity, status)
 	assert.Contains(t, body, "invalid login or password", "key needs the current password")
 	assert.NotContains(t, body, "not shown again")
 
@@ -589,7 +601,7 @@ func TestDeleteAllData(t *testing.T) {
 	assert.Contains(t, body, "Danger zone")
 
 	status, body = b.postFrom("/settings/delete-data", "/settings", url.Values{"password": {"wrong"}})
-	require.Equal(t, http.StatusOK, status)
+	require.Equal(t, http.StatusUnprocessableEntity, status)
 	assert.Contains(t, body, "invalid login or password")
 	accounts, err := f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
@@ -619,7 +631,7 @@ func TestBackup(t *testing.T) {
 
 		status, body = b.postFrom("/settings/backup", "/settings",
 			url.Values{"password": {"password1234"}, "passphrase": {passphrase}})
-		require.Equal(t, http.StatusOK, status)
+		require.Equal(t, http.StatusUnprocessableEntity, status)
 		assert.Contains(t, body, "forbidden")
 		assert.NotContains(t, body, "age-encryption.org/v1")
 	})
@@ -637,7 +649,7 @@ func TestBackup(t *testing.T) {
 
 		status, body = b.postFrom("/settings/backup", "/settings",
 			url.Values{"password": {"wrong"}, "passphrase": {passphrase}})
-		require.Equal(t, http.StatusOK, status)
+		require.Equal(t, http.StatusUnprocessableEntity, status)
 		assert.Contains(t, body, "invalid login or password")
 
 		form := url.Values{"password": {"password1234"}, "passphrase": {passphrase}}
@@ -678,7 +690,7 @@ func TestSecureCookies(t *testing.T) {
 	require.NoError(t, err)
 	u, err := ui.New(ui.Config{
 		Services: svc, Log: slog.New(slog.DiscardHandler), SecureCookies: true,
-		SessionTTL: 30 * 24 * time.Hour, MaxUpload: 10 << 20,
+		SessionTTL: 30 * 24 * time.Hour, MaxUploadSize: 10 << 20,
 	})
 	require.NoError(t, err)
 	mux := http.NewServeMux()
@@ -757,10 +769,12 @@ func TestLanguage(t *testing.T) {
 	assert.Contains(t, body, "Настройки")
 
 	_, body = b.post("/settings/language", url.Values{"language": {"xx"}})
-	assert.Contains(t, body, "Язык: неизвестный язык &#34;xx&#34;", "errors are translated")
+	assert.Contains(t, body,
+		`<div id="language-error" class="error" role="status">неизвестное значение &#34;xx&#34;</div>`,
+		"errors are translated")
 
 	_, body = b.post("/settings/language", url.Values{"language": {"Save"}})
-	assert.Contains(t, body, "Язык: неизвестный язык &#34;Save&#34;", "user input in errors is not translated")
+	assert.Contains(t, body, "неизвестное значение &#34;Save&#34;", "user input in errors is not translated")
 
 	_, body = b.post("/settings/language", url.Values{"language": {""}})
 	assert.Contains(t, body, `<html lang="en">`, "empty follows the browser")
@@ -819,7 +833,8 @@ func TestRulesFlow(t *testing.T) {
 	}
 	status, body = b.post("/rules", bad)
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, "takes 2 values")
+	assert.Contains(t, body, `<div class="error" role="status">between takes 2 values</div>`,
+		"a condition error is shown in its row")
 
 	status, body = b.post("/rules", form)
 	require.Equal(t, http.StatusOK, status, body)

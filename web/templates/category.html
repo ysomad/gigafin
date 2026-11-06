@@ -4,12 +4,17 @@
 <p><a href="/operations?category={{$c.ID}}">{{t "Operations"}}</a></p>
 <form method="post" action="/categories/{{$c.ID}}">
   <div class="row mb-4">
-    <label data-field class="col-4">{{t "Name"}} <input name="name" value="{{$c.Name}}" required></label>
+    {{$e := $.Errors.Get "name"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}} <input name="name" value="{{.Data.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+      {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
+    </label>
     {{if $c.ParentID}}
-    <label data-field class="col-4">{{t "Inside"}}
-      <select name="parent">
-        {{range .Data.Parents}}<option value="{{.ID}}"{{if eq .ID $c.ParentID}} selected{{end}}>{{.Name}}</option>{{end}}
+    {{$e = $.Errors.Get "parent_id"}}
+    <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Inside"}}
+      <select name="parent"{{if $e}} aria-invalid="true" aria-describedby="parent-error"{{end}}>
+        {{range .Data.Parents}}<option value="{{.ID}}"{{if eq .ID $.Data.Parent}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
+      {{if $e}}<div id="parent-error" class="error" role="status">{{$e}}</div>{{end}}
     </label>
     {{end}}
     <div class="col-12 hstack"><button type="submit">{{t "Save"}}</button></div>

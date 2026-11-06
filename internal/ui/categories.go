@@ -9,38 +9,46 @@ import (
 	"github.com/ysomad/gigafin/internal/errors"
 )
 
+// categoriesData is the categories page with the values of its new category form.
 type categoriesData struct {
 	Categories []domain.Category
-	Kind       domain.Kind
+	Kind       domain.Kind `form:"kind"`
+	Parent     int64       `form:"parent"` // 0 is a cat1
+	Name       string      `form:"name"`
+}
+
+func (u *UI) renderCategories(
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, d categoriesData, viewErr error,
+) error {
+	if _, err := domain.ParseKind(string(d.Kind)); err != nil {
+		d.Kind = domain.KindExpense
+	}
+	var err error
+	if d.Categories, err = u.svc.Categories.Tree(r.Context(), user.ID); err != nil {
+		return err
+	}
+	return u.render(w, r, status, "categories", view{
+		User: &user, Nav: "settings", Title: "Categories", Error: viewErr, Data: d,
+	})
 }
 
 func (u *UI) categories(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	kind, err := domain.ParseKind(r.URL.Query().Get("kind"))
-	if err != nil {
-		kind = domain.KindExpense
-	}
-	tree, err := u.svc.Categories.Tree(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
-	return u.render(w, r, http.StatusOK, "categories", view{
-		User: &user, Nav: "settings", Title: "Categories", Data: categoriesData{Categories: tree, Kind: kind},
-	})
+	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
+	return u.renderCategories(w, r, user, http.StatusOK, d, nil)
 }
 
 func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f struct {
-		Parent int64  `form:"parent"` // 0 is a cat1
-		Kind   string `form:"kind"`
-		Name   string `form:"name"`
-	}
-	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
+	var d categoriesData
+	if err := u.formDecoder.Decode(&d, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	c, err := u.svc.Categories.Create(r.Context(), user.ID, f.Parent, domain.Kind(f.Kind), f.Name)
+	c, err := u.svc.Categories.Create(r.Context(), user.ID, d.Parent, d.Kind, d.Name)
+	if isUserError(err) {
+		return u.renderCategories(w, r, user, http.StatusUnprocessableEntity, d, err)
+	}
 	if err != nil {
 		return err
 	}
@@ -48,10 +56,32 @@ func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.
 	return nil
 }
 
+// categoryData is the category page with the values of its edit form.
 type categoryData struct {
 	Category   domain.Category
 	ParentName string
 	Parents    []domain.Category
+	Name       string `form:"name"`
+	Parent     int64  `form:"parent"` // 0 keeps the parent
+}
+
+// renderCategory renders the page of category id. A nil f shows the category's values
+// in the form, otherwise f holds the values of a form post that failed with viewErr.
+func (u *UI) renderCategory(
+	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, f *categoryData, viewErr error,
+) error {
+	c, tree, err := u.svc.Categories.Get(r.Context(), user.ID, id)
+	if err != nil {
+		return err
+	}
+	d := categoryData{Category: c, Name: c.Name, Parent: c.ParentID}
+	if f != nil {
+		d.Name, d.Parent = f.Name, f.Parent
+	}
+	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
+	return u.render(w, r, status, "category", view{
+		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name}, Error: viewErr, Data: d,
+	})
 }
 
 func (u *UI) category(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -59,19 +89,7 @@ func (u *UI) category(w http.ResponseWriter, r *http.Request, user domain.User) 
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	c, tree, err := u.svc.Categories.Get(r.Context(), user.ID, id)
-	if err != nil {
-		return err
-	}
-	d := categoryData{Category: c}
-	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
-	return u.render(
-		w,
-		r,
-		http.StatusOK,
-		"category",
-		view{User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name}, Data: d},
-	)
+	return u.renderCategory(w, r, user, id, http.StatusOK, nil, nil)
 }
 
 func (u *UI) updateCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -82,14 +100,15 @@ func (u *UI) updateCategory(w http.ResponseWriter, r *http.Request, user domain.
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f struct {
-		Parent int64  `form:"parent"` // 0 keeps the parent
-		Name   string `form:"name"`
-	}
+	var f categoryData
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	if err := u.svc.Categories.Update(r.Context(), user.ID, id, f.Name, f.Parent); err != nil {
+	err = u.svc.Categories.Update(r.Context(), user.ID, id, f.Name, f.Parent)
+	if isUserError(err) {
+		return u.renderCategory(w, r, user, id, http.StatusUnprocessableEntity, &f, err)
+	}
+	if err != nil {
 		return err
 	}
 	redirect(w, r, "/categories")

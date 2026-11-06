@@ -33,7 +33,7 @@ func ImportSources() []ImportSource {
 func ParseImportSource(s string) (ImportSource, error) {
 	src := ImportSource(s)
 	if !slices.Contains(ImportSources(), src) {
-		return "", NewError(errors.ErrInvalid, "source: must be gigafin, tbank or zenmoney")
+		return "", NewFieldError(errors.ErrInvalid, "source", "must be gigafin, tbank or zenmoney")
 	}
 	return src, nil
 }

@@ -3,16 +3,22 @@
 <ul class="unstyled hstack mb-4">
   {{range kinds}}<li><a href="/categories?kind={{.}}"{{if eq . $d.Kind}} aria-current="page"{{end}}>{{if eq . "expense"}}{{t "Expenses"}}{{else}}{{t "Income"}}{{end}}</a></li>{{end}}
 </ul>
-<details class="mb-6">
+<details class="mb-6"{{if .Error}} open{{end}}>
 <summary>+ {{t "New category"}}</summary>
 <form method="post" action="/categories">
 <div class="row mb-4">
   <input type="hidden" name="kind" value="{{$d.Kind}}">
-  <label data-field class="col-4">{{t "Name"}}<input name="name" placeholder="{{t "Name"}}" required></label>
-  <label data-field class="col-4">{{t "Inside"}}<select name="parent">
+  {{$e := $.Errors.Get "name"}}
+  <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Name"}}<input name="name" placeholder="{{t "Name"}}" value="{{$d.Name}}"{{if $e}} aria-invalid="true" aria-describedby="name-error"{{end}}>
+    {{if $e}}<div id="name-error" class="error" role="status">{{$e}}</div>{{end}}
+  </label>
+  {{$e = $.Errors.Get "parent_id"}}
+  <label data-field class="col-4"{{if $e}} aria-invalid="true"{{end}}>{{t "Inside"}}<select name="parent"{{if $e}} aria-invalid="true" aria-describedby="parent-error"{{end}}>
     <option value="0">{{t "Top level"}}</option>
-    {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}<option value="{{.ID}}">{{t "in %s" .Name}}</option>{{end}}{{end}}
-  </select></label>
+    {{range $d.Categories}}{{if and (eq .Kind $d.Kind) (not .Archived)}}<option value="{{.ID}}"{{if eq .ID $d.Parent}} selected{{end}}>{{t "in %s" .Name}}</option>{{end}}{{end}}
+  </select>
+    {{if $e}}<div id="parent-error" class="error" role="status">{{$e}}</div>{{end}}
+  </label>
   <div class="col-12 hstack"><button type="submit">{{t "Create"}}</button></div>
 </div>
 </form>
