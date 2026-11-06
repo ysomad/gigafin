@@ -487,7 +487,7 @@ func TestImportUpload(t *testing.T) {
 	status, body = b.get("/imports/1")
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Самокат", "mapped import continues at preview")
-	assert.Contains(t, body, "Import 1 rows")
+	assert.Contains(t, body, "Import 1 row")
 	assert.NotContains(t, body, "disabled")
 
 	status, body = b.post("/imports/1/commit", nil)
@@ -811,7 +811,7 @@ func TestRulesFlow(t *testing.T) {
 	}
 	status, body = b.post("/rules/preview", form)
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "Matches 1 operations")
+	assert.Contains(t, body, "Matches 1 operation")
 
 	bad := url.Values{
 		"stage": {"default"}, "match": {"all"}, "cond_field": {"amount"}, "cond_op": {"between"},
@@ -837,7 +837,7 @@ func TestRulesFlow(t *testing.T) {
 
 	status, body = b.post("/rules/"+ruleID+"/apply", nil)
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "Changed 1 operations.")
+	assert.Contains(t, body, "Changed 1 operation.")
 	got, err := f.Operations.Get(ctx, userID, op.ID)
 	require.NoError(t, err)
 	assert.Equal(t, cafe.ID, got.CategoryID)

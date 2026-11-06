@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gigafin UI dictionary",
+  "description": "Translations keyed by the English text, grouped by area of the UI, see internal/i18n.",
+  "type": "object",
+  "properties": {
+    "$schema": {"type": "string"}
+  },
+  "patternProperties": {
+    "^[a-z]+$": {
+      "description": "A group of messages, keyed by the English text.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string", "minLength": 1},
+          {
+            "description": "CLDR plural forms, picked by the first integer arg.",
+            "type": "object",
+            "properties": {
+              "zero": {"type": "string", "minLength": 1},
+              "one": {"type": "string", "minLength": 1},
+              "two": {"type": "string", "minLength": 1},
+              "few": {"type": "string", "minLength": 1},
+              "many": {"type": "string", "minLength": 1},
+              "other": {"type": "string", "minLength": 1}
+            },
+            "required": ["other"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "./schema.json",
+  "common": {
+    "Matches %d operations, the latest:": {"one": "Matches %d operation, the latest:", "other": "Matches %d operations, the latest:"}
+  },
+  "errors": {
+    "account has %d operations, archive it instead": {"one": "account has %d operation, archive it instead", "other": "account has %d operations, archive it instead"},
+    "category contains %d other categories": {"one": "category contains %d other category", "other": "category contains %d other categories"},
+    "category is used by %d operations, archive it instead": {"one": "category is used by %d operation, archive it instead", "other": "category is used by %d operations, archive it instead"},
+    "category is used by %d rules": {"one": "category is used by %d rule", "other": "category is used by %d rules"}
+  },
+  "imports": {
+    "%d daily rates": {"one": "%d daily rate", "other": "%d daily rates"},
+    "%d rows": {"one": "%d row", "other": "%d rows"},
+    "Import %d rates": {"one": "Import %d rate", "other": "Import %d rates"},
+    "Import %d rows": {"one": "Import %d row", "other": "Import %d rows"},
+    "Imported %d daily rates.": {"one": "Imported %d daily rate.", "other": "Imported %d daily rates."}
+  },
+  "operations": {
+    "Rules changed %d operations.": {"one": "Rules changed %d operation.", "other": "Rules changed %d operations."}
+  },
+  "rules": {
+    "Changed %d operations.": {"one": "Changed %d operation.", "other": "Changed %d operations."}
+  }
+}

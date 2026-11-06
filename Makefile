@@ -6,7 +6,7 @@ ADDR ?= $(or $(HTTP_ADDR),127.0.0.1:8080)
 TOOL = go tool
 GOOSE = $(TOOL) goose -dir migrations sqlite3 $(DB)
 
-.PHONY: tools generate build run dev test lint vuln migrate-up migrate-down migrate-status migrate-create \
+.PHONY: tools generate build run dev test lint vuln locales migrate-up migrate-down migrate-status migrate-create \
 	user-add user-passwd user-role clean
 
 tools:
@@ -28,8 +28,12 @@ dev:
 test:
 	go test -race ./...
 
-lint: vuln
+lint: vuln locales
 	golangci-lint run ./...
+
+# locales validates the UI dictionaries against their JSON schema
+locales:
+	check-jsonschema --schemafile web/locales/schema.json $(filter-out web/locales/schema.json,$(wildcard web/locales/*.json))
 
 vuln:
 	$(TOOL) govulncheck ./...

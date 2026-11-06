@@ -59,7 +59,6 @@ linters:
     - lll
   settings:
     depguard:
-      # layering: transport (ui, api) -> service -> repository -> sqlc; domain is pure
       rules:
         no-stdlib-errors:
           files:
@@ -117,9 +116,6 @@ linters:
     rules:
       - path: _test\.go
         linters: [gosec, promlinter]
-      # an ogen handler answers a failed call with a typed error response and a nil
-      # error; returning the error instead would route it to the error handler and
-      # answer 400 invalid_data
       - path: internal/api/
         linters: [nilerr]
       - linters: [errcheck]
