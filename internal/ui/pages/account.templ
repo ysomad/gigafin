@@ -1,0 +1,78 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Account(v view.Page) {
+	{{
+		d, _ := v.Data.(view.Account)
+		a, f := d.Account, d.Edit
+		base := fmt.Sprintf("/accounts/%d", a.ID)
+	}}
+	@components.Layout(v, false, nil) {
+		<h1>
+			{ a.Name }
+			<span class="text-light">
+				{ view.T(ctx, string(a.Kind)) } · { a.Currency }
+				if a.Archived {
+					· { view.T(ctx, "archived") }
+				}
+			</span>
+		</h1>
+		<p class="text-light mb-4">
+			{ view.T(ctx, "Balance:") } { view.Money(ctx, a.Balance, a.Currency) } { a.Currency }
+			if a.Kind.Liability() {
+				· { view.T(ctx, "owed %s", view.Money(ctx, a.Owed(), a.Currency)) }
+			}
+			if !a.CreditLimit.IsZero() {
+				· { view.T(ctx, "available %s of %s", view.Money(ctx, a.Available(), a.Currency), view.Money(ctx, a.CreditLimit, a.Currency)) }
+			}
+			· <a href={ templ.SafeURL(fmt.Sprintf("/operations?account=%d", a.ID)) }>{ view.T(ctx, "Operations") }</a>
+		</p>
+		<form id="form-edit" class="form-compact" method="post" action={ templ.SafeURL(base) }>
+			@components.FormError(v.Errors.Form("edit"), "")
+			<fieldset class="row mb-4" aria-label={ view.T(ctx, "Account") }>
+				{{ e := v.Errors.Get("name") }}
+				@components.Field("col-4", view.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ f.Name } { view.Invalid(e, "name-error")... }/>
+				}
+				{{ e = v.Errors.Get("kind") }}
+				@components.Field("col-4", view.T(ctx, "Kind"), e, "kind-error", nil) {
+					@components.AccountKindSelect(d.Kinds, f.Kind, e)
+				}
+				@components.CreditLimitField("col-4", f.Kind, f.CreditLimit, v.Errors.Get("credit_limit"))
+			</fieldset>
+			<div class="hstack justify-between">
+				<div class="hstack">
+					<button type="submit">{ view.T(ctx, "Save") }</button>
+					@components.LinkButton("/accounts", "secondary", view.T(ctx, "Cancel"))
+				</div>
+				@components.ArchiveDelete("account", a.Archived)
+			</div>
+			<p class="text-light">{ view.T(ctx, "Accounts with operations can only be archived.") }</p>
+		</form>
+		@components.ArchiveDeleteForms("account", base, a.Archived, view.T(ctx, "Delete account %s?", a.Name))
+		<h2 class="mt-6">{ view.T(ctx, "Set balance") }</h2>
+		<form id="form-balance" class="form-compact" method="post" action={ templ.SafeURL(base + "/balance") }>
+			@components.FormError(v.Errors.Form("balance"), "")
+			<p class="text-light">{ view.T(ctx, "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank.") }</p>
+			<fieldset class="row mb-4" aria-label={ view.T(ctx, "Set balance") }>
+				{{ e = v.Errors.Get("balance") }}
+				@components.Field("col-6", view.T(ctx, "New balance"), e, "balance-error", nil) {
+					<input name="balance" inputmode="decimal" value={ view.AmountInput(ctx, d.Target) } { view.Invalid(e, "balance-error")... }/>
+				}
+				{{ e = v.Errors.Get("date") }}
+				@components.Field("col-6", view.T(ctx, "As of"), e, "date-error", nil) {
+					<input type="date" name="date" value={ d.Date } { view.Invalid(e, "date-error")... }/>
+				}
+			</fieldset>
+			<div class="hstack">
+				<button type="submit">{ view.T(ctx, "Set") }</button>
+			</div>
+		</form>
+	}
+}

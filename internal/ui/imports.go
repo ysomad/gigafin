@@ -12,11 +12,9 @@ import (
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/importer"
 	"github.com/ysomad/gigafin/internal/money"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
-
-type importsData struct {
-	Imports []domain.Import
-}
 
 func (u *UI) imports(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	imports, err := u.svc.Imports.List(r.Context(), user.ID)
@@ -24,21 +22,9 @@ func (u *UI) imports(w http.ResponseWriter, r *http.Request, user domain.User) e
 		return err
 	}
 
-	return u.render(w, r, http.StatusOK, "imports", view{
-		User: &user, Nav: "settings", Title: "Import", Data: importsData{Imports: imports},
+	return u.render(w, r, http.StatusOK, pages.Imports, view.Page{
+		User: &user, Nav: "settings", Title: "Import", Data: view.Imports{Imports: imports},
 	})
-}
-
-type importNewData struct {
-	// Step is "type" or "file".
-	Step   string
-	Source domain.ImportSource
-	// Rates is set instead of Source for a file of exchange rates.
-	Rates bool
-	// Header is the header line of a file of Source.
-	Header string
-	// Content is the pasted content of an upload that failed, to fill it again.
-	Content string
 }
 
 // _ratesSource is the source query value of a file of exchange rates; they are not
@@ -46,15 +32,15 @@ type importNewData struct {
 const _ratesSource = "rates"
 
 func (u *UI) importNew(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	d := importNewData{Step: "type"}
+	d := view.ImportNew{Step: "type"}
 
 	if src, err := domain.ParseImportSource(r.URL.Query().Get("source")); err == nil {
-		d = importNewData{Step: "file", Source: src, Header: u.svc.Imports.Header(src)}
+		d = view.ImportNew{Step: "file", Source: src, Header: u.svc.Imports.Header(src)}
 	} else if r.URL.Query().Get("source") == _ratesSource {
-		d = importNewData{Step: "file", Rates: true, Header: importer.RatesHeader}
+		d = view.ImportNew{Step: "file", Rates: true, Header: importer.RatesHeader}
 	}
 
-	return u.render(w, r, http.StatusOK, "import_new", view{
+	return u.render(w, r, http.StatusOK, pages.ImportNew, view.Page{
 		User: &user, Nav: "settings", Title: "New import", Data: d,
 	})
 }
@@ -77,8 +63,8 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 	if err != nil {
 		return domain.NewError(errors.ErrInvalid, "choose what to import")
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	d := importNewData{Step: "file", Source: src, Header: u.svc.Imports.Header(src)}
+	p := view.PrefsFrom(r.Context())
+	d := view.ImportNew{Step: "file", Source: src, Header: u.svc.Imports.Header(src)}
 	d.Content = strings.TrimSpace(r.FormValue("content"))
 
 	var (
@@ -90,9 +76,9 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 	switch {
 	case errors.Is(err, http.ErrMissingFile) || errors.Is(err, http.ErrNotMultipart):
 		if d.Content == "" {
-			msg := u.dicts.T(p.lang, "choose a CSV file or paste its content")
-			return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
-				User: &user, Nav: "settings", Title: "New import", Error: fieldsError{"file": msg}, Form: "import", Data: d,
+			msg := u.dicts.T(p.Lang, "choose a CSV file or paste its content")
+			return u.render(w, r, http.StatusUnprocessableEntity, pages.ImportNew, view.Page{
+				User: &user, Nav: "settings", Title: "New import", Error: view.FieldsError{"file": msg}, Form: "import", Data: d,
 			})
 		}
 		file, filename = strings.NewReader(d.Content), "pasted.csv"
@@ -105,7 +91,7 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 
 	im, err := u.svc.Imports.Upload(r.Context(), user.ID, src, filename, file, user.Location())
 	if isUserError(err) {
-		return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+		return u.render(w, r, http.StatusUnprocessableEntity, pages.ImportNew, view.Page{
 			User: &user, Nav: "settings", Title: "New import", Error: err, Form: "import", Data: d,
 		})
 	}
@@ -115,16 +101,6 @@ func (u *UI) upload(w http.ResponseWriter, r *http.Request, user domain.User) er
 
 	redirect(w, r, "/imports/"+strconv.FormatInt(im.ID, 10))
 	return nil
-}
-
-type importData struct {
-	// Step is "accounts", "categories" or "preview".
-	Step       string
-	Preview    domain.Preview
-	Accounts   []domain.Account
-	Categories []domain.Category
-	// AccountKinds are offered for new accounts.
-	AccountKinds []domain.AccountKind
 }
 
 func (u *UI) importPage(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -140,7 +116,7 @@ func (u *UI) importPage(w http.ResponseWriter, r *http.Request, user domain.User
 
 	base := "/imports/" + r.PathValue("id")
 	staged := p.Import.Status == domain.ImportStaged
-	d := importData{Step: r.PathValue("step"), Preview: p}
+	d := view.Import{Step: r.PathValue("step"), Preview: p}
 
 	switch d.Step {
 	case "":
@@ -180,7 +156,7 @@ func (u *UI) importPage(w http.ResponseWriter, r *http.Request, user domain.User
 		return errors.ErrNotFound
 	}
 
-	return u.render(w, r, http.StatusOK, "import", view{
+	return u.render(w, r, http.StatusOK, pages.Import, view.Page{
 		User: &user, Nav: "settings", Title: "Import #%s", TitleArgs: []any{r.PathValue("id")}, Data: d,
 	})
 }
@@ -345,17 +321,6 @@ func (u *UI) discard(w http.ResponseWriter, r *http.Request, user domain.User) e
 	return nil
 }
 
-type importRatesData struct {
-	Changes []domain.RateChange
-	// Content is the uploaded file, sent again to commit it.
-	Content string
-	New     int
-	Changed int
-	// Imported is the number of stored rates once committed.
-	Imported int
-	Done     bool
-}
-
 // previewRates shows the daily rates a file of exchange rates would store. Nothing is
 // staged: the confirm form sends the file content again.
 func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -371,17 +336,18 @@ func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.Us
 	if err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	d := importNewData{Step: "file", Rates: true, Header: importer.RatesHeader}
+	p := view.PrefsFrom(r.Context())
+	d := view.ImportNew{Step: "file", Rates: true, Header: importer.RatesHeader}
 	d.Content = strings.TrimSpace(r.FormValue("content"))
 	var content string
 	f, _, err := r.FormFile("file")
 	switch {
 	case errors.Is(err, http.ErrMissingFile) || errors.Is(err, http.ErrNotMultipart):
 		if content = d.Content; content == "" {
-			msg := u.dicts.T(p.lang, "choose a CSV file or paste its content")
-			return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
-				User: &user, Nav: "settings", Title: "New import", Error: fieldsError{"file": msg}, Form: "import-rates", Data: d,
+			msg := u.dicts.T(p.Lang, "choose a CSV file or paste its content")
+			return u.render(w, r, http.StatusUnprocessableEntity, pages.ImportNew, view.Page{
+				User: &user, Nav: "settings", Title: "New import", Error: view.FieldsError{"file": msg},
+				Form: "import-rates", Data: d,
 			})
 		}
 	case err != nil:
@@ -396,14 +362,14 @@ func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.Us
 	}
 	changes, err := u.svc.Rates.Preview(r.Context(), user.ID, strings.NewReader(content))
 	if isUserError(err) {
-		return u.render(w, r, http.StatusUnprocessableEntity, "import_new", view{
+		return u.render(w, r, http.StatusUnprocessableEntity, pages.ImportNew, view.Page{
 			User: &user, Nav: "settings", Title: "New import", Error: err, Form: "import-rates", Data: d,
 		})
 	}
 	if err != nil {
 		return err
 	}
-	rd := importRatesData{Changes: changes, Content: content}
+	rd := view.ImportRates{Changes: changes, Content: content}
 	for _, c := range changes {
 		switch c.Status() {
 		case "new":
@@ -412,7 +378,7 @@ func (u *UI) previewRates(w http.ResponseWriter, r *http.Request, user domain.Us
 			rd.Changed++
 		}
 	}
-	return u.render(w, r, http.StatusOK, "import_rates", view{
+	return u.render(w, r, http.StatusOK, pages.ImportRates, view.Page{
 		User: &user, Nav: "settings", Title: "Import exchange rates", Data: rd,
 	})
 }
@@ -425,8 +391,8 @@ func (u *UI) commitRates(w http.ResponseWriter, r *http.Request, user domain.Use
 	if err != nil {
 		return err
 	}
-	return u.render(w, r, http.StatusOK, "import_rates", view{
+	return u.render(w, r, http.StatusOK, pages.ImportRates, view.Page{
 		User: &user, Nav: "settings", Title: "Import exchange rates",
-		Data: importRatesData{Imported: n, Done: true},
+		Data: view.ImportRates{Imported: n, Done: true},
 	})
 }

@@ -1,0 +1,93 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// RatesCard shows the latest exchange rates and sets one by hand, hidden without a
+// rate source.
+templ RatesCard(v view.Page, d view.Settings) {
+	{{ pivot := d.Settings.RateSource.Pivot() }}
+	<article id="settings-rates" class="card mb-4 form-compact" hidden?={ d.Settings.RateSource == "" }>
+		<div class="hstack justify-between">
+			<h3>{ view.T(ctx, "Exchange rates") }</h3>
+			if d.Settings.RateSource != "" {
+				<div class="hstack">
+					<a class="button outline small" href="/imports/new?source=rates" data-variant="secondary">{ view.T(ctx, "Import from CSV") }</a>
+					if len(d.RateCurrencies) > 0 {
+						<form method="post" action="/settings/rates/sync" { view.HXCard("/settings/rates/sync", "settings-rates", "#toasts")... } hx-disable="find button"><button type="submit" class="small" data-spinner>{ view.T(ctx, "Update rates") }</button></form>
+					}
+				</div>
+			}
+		</div>
+		if d.Settings.RateSource != "" {
+			if len(d.RateCurrencies) == 0 {
+				<p class="text-light">{ view.T(ctx, "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate.", pivot) }</p>
+			} else if len(d.Rates) > 0 {
+				<div class="table">
+					<table>
+						<thead><tr><th>{ view.T(ctx, "Currency") }</th><th>{ view.T(ctx, "Last date") }</th><th>{ view.T(ctx, "Rate, %s", pivot) }</th><th></th></tr></thead>
+						<tbody>
+							for _, r := range d.Rates {
+								<tr>
+									<td>{ r.Currency }</td>
+									<td>{ timex.FormatDate(r.Date) }</td>
+									<td>{ r.Rate.String() }</td>
+									<td>
+										if r.Manual {
+											<form method="post" action="/settings/rates/reset" { view.HXCard("/settings/rates/reset", "settings-rates", "#toasts")... } hx-confirm={ view.T(ctx, "Replace the manual %s rate of %s with the source one?", r.Currency, timex.FormatDate(r.Date)) }>
+												<input type="hidden" name="currency" value={ r.Currency }/>
+												<input type="hidden" name="date" value={ timex.FormatDate(r.Date) }/>
+												<button type="submit" class="outline small" data-variant="secondary">{ view.T(ctx, "Reset") }</button>
+											</form>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			} else {
+				<p class="text-light">{ view.T(ctx, "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates.", pivot) }</p>
+			}
+			<form id="form-rate" method="post" action="/settings/rates/set" class="row" { view.HXCard("/settings/rates/set", "settings-rates", "#toasts")... }>
+				@FormError(v.Errors.Form("rate"), "col-12")
+				{{ e := v.Errors.Get("rate.currency") }}
+				@Field("col-3", view.T(ctx, "Currency"), e, "rate-currency-error", nil) {
+					<select name="currency" { view.Invalid(e, "rate-currency-error")... }>
+						for _, c := range d.Currencies {
+							if c != pivot {
+								<option value={ c } selected?={ c == d.Posted.Get("currency") }>{ c }</option>
+							}
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("rate.date") }}
+				@Field("col-3", view.T(ctx, "Date"), e, "rate-date-error", nil) {
+					<input
+						type="date"
+						name="date"
+						if len(d.Posted) > 0 {
+							value={ d.Posted.Get("date") }
+						}
+						{ view.Invalid(e, "rate-date-error")... }
+					/>
+				}
+				{{ e = v.Errors.Get("rate.rate") }}
+				@Field("col-3", view.T(ctx, "Rate, %s", pivot), e, "rate-rate-error", nil) {
+					<input
+						name="rate"
+						inputmode="decimal"
+						placeholder="90.4040"
+						if len(d.Posted) > 0 {
+							value={ d.Posted.Get("rate") }
+						}
+						{ view.Invalid(e, "rate-rate-error")... }
+					/>
+				}
+				@SubmitColumn("col-3", "", view.T(ctx, "Set rate"))
+			</form>
+		}
+	</article>
+}

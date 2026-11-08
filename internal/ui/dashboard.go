@@ -8,33 +8,9 @@ import (
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
-
-type dashboardData struct {
-	Dash domain.Dashboard
-	// Prev, Next, ComparePrev and CompareNext are adjacent months within Months,
-	// empty when there is none.
-	Prev        string
-	Next        string
-	ComparePrev string
-	CompareNext string
-	From        string
-	To          string
-	// Charts are income vs expense with net worth per currency, ordered by currency.
-	Charts []trendChart
-	// Months are the months with operations, latest first, to pick Month and CompareMonth from.
-	Months []timex.Month
-}
-
-// trendChart is a trend and net worth of a currency as chart series, read by dashboard.js.
-type trendChart struct {
-	Currency string    `json:"-"`
-	Months   []int64   `json:"months"` // unix seconds of the first day
-	Income   []float64 `json:"income"`
-	Expense  []float64 `json:"expense"`
-	// Balance is the month-end net worth, empty for a currency without one.
-	Balance []float64 `json:"balance,omitempty"`
-}
 
 func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	month := timex.MonthOf(u.svc.Today(user))
@@ -59,7 +35,7 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	if err != nil {
 		return err
 	}
-	d := dashboardData{
+	d := view.Dashboard{
 		Dash:   dash,
 		From:   timex.FormatDate(month.First()),
 		To:     timex.FormatDate(month.Last()),
@@ -93,9 +69,9 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	for i, m := range dash.TrendMonths {
 		chartMonths[i] = m.First().Unix()
 	}
-	charts := make(map[string]*trendChart, len(dash.Trends))
+	charts := make(map[string]*view.TrendChart, len(dash.Trends))
 	for _, t := range dash.Trends {
-		c := &trendChart{
+		c := &view.TrendChart{
 			Currency: t.Currency,
 			Months:   chartMonths,
 			Income:   make([]float64, n),
@@ -110,7 +86,7 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 	for _, t := range dash.NetWorth {
 		c, ok := charts[t.Currency]
 		if !ok {
-			c = &trendChart{
+			c = &view.TrendChart{
 				Currency: t.Currency,
 				Months:   chartMonths,
 				Income:   make([]float64, n),
@@ -124,11 +100,11 @@ func (u *UI) dashboard(w http.ResponseWriter, r *http.Request, user domain.User)
 		}
 	}
 	curs := slices.Sorted(maps.Keys(charts))
-	d.Charts = make([]trendChart, len(curs))
+	d.Charts = make([]view.TrendChart, len(curs))
 	for i, cur := range curs {
 		d.Charts[i] = *charts[cur]
 	}
-	return u.render(w, r, http.StatusOK, "dashboard", view{
+	return u.render(w, r, http.StatusOK, pages.Dashboard, view.Page{
 		User: &user, Nav: "dashboard", Title: "Dashboard %s", TitleArgs: []any{month}, Data: d,
 	})
 }

@@ -7,15 +7,13 @@ import (
 
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/i18n"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
-
-type loginData struct {
-	Login string
-}
 
 func (u *UI) loginPage(w http.ResponseWriter, r *http.Request) {
 	//nolint:errcheck // render logs its own errors
-	_ = u.render(w, r, http.StatusOK, "login", view{Title: "Sign in", Data: loginData{}})
+	_ = u.render(w, r, http.StatusOK, pages.Login, view.Page{Title: "Sign in", Data: view.Login{}})
 }
 
 func (u *UI) login(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +24,7 @@ func (u *UI) login(w http.ResponseWriter, r *http.Request) {
 	}
 	login, pass := r.PostFormValue("login"), r.PostFormValue("password")
 	lang := i18n.Match(r.Header.Get("Accept-Language"))
-	errs := fieldsError{}
+	errs := view.FieldsError{}
 	if strings.TrimSpace(login) == "" {
 		errs["login"] = u.dicts.T(lang, "required")
 	}
@@ -35,8 +33,8 @@ func (u *UI) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(errs) > 0 {
 		//nolint:errcheck // render logs its own errors
-		_ = u.render(w, r, http.StatusUnprocessableEntity, "login", view{
-			Title: "Sign in", Error: errs, Form: "login", Data: loginData{Login: login},
+		_ = u.render(w, r, http.StatusUnprocessableEntity, pages.Login, view.Page{
+			Title: "Sign in", Error: errs, Form: "login", Data: view.Login{Login: login},
 		})
 		return
 	}
@@ -52,8 +50,8 @@ func (u *UI) login(w http.ResponseWriter, r *http.Request) {
 				slog.String("login", login), slog.String("remote_addr", r.RemoteAddr))
 		}
 		//nolint:errcheck // render logs its own errors
-		_ = u.render(w, r, http.StatusUnprocessableEntity, "login", view{
-			Title: "Sign in", Error: err, Form: "login", Data: loginData{Login: login},
+		_ = u.render(w, r, http.StatusUnprocessableEntity, pages.Login, view.Page{
+			Title: "Sign in", Error: err, Form: "login", Data: view.Login{Login: login},
 		})
 		return
 	}

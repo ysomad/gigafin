@@ -1,0 +1,6 @@
+package components
+
+// EmptyRow is a table row of msg over colspan columns.
+templ EmptyRow(colspan int, msg string) {
+	<tr><td colspan={ colspan } class="text-light">{ msg }</td></tr>
+}

@@ -1,0 +1,130 @@
+package components
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// ImportRows lists the rows of the import of p, then its skipped rows.
+templ ImportRows(p domain.Preview, base string, user *domain.User) {
+	<div class="table">
+		<table>
+			<thead><tr><th>{ view.T(ctx, "Time") }</th><th>{ view.T(ctx, "Operation") }</th><th class="align-right">{ view.T(ctx, "Amount") }</th><th>{ view.T(ctx, "Status") }</th></tr></thead>
+			<tbody>
+				for _, row := range p.Rows {
+					{{
+						r := row.Row
+						transfer := row.PairID != 0 || r.ToAccount != ""
+					}}
+					<tr>
+						<td class="text-light nowrap">
+							@RowTime(r, user)
+						</td>
+						<td>
+							<div>
+								if transfer {
+									<em>{ view.T(ctx, "transfer") }</em>
+								} else if r.Category != "" {
+									{ r.Category }
+								} else {
+									—
+								}
+								if r.Payee != "" {
+									· { r.Payee }
+								}
+							</div>
+							<div class="text-light">
+								{ r.Account }
+								if r.ToAccount != "" {
+									→ { r.ToAccount }
+								}
+								if r.Group != "" && !transfer {
+									· { view.T(ctx, "split %s", r.Group) }
+								}
+								if r.Note != "" {
+									· { r.Note }
+								}
+								if r.MCC != "" {
+									· MCC { r.MCC }
+								}
+							</div>
+						</td>
+						<td class="align-right nowrap">{ view.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span></td>
+						<td>
+							switch  {
+								case row.Status == domain.ImportRowDuplicate:
+									<span class="badge" data-variant="secondary">{ view.T(ctx, "duplicate") }</span>
+								case row.OperationID != 0:
+									<a href={ templ.SafeURL(fmt.Sprintf("/operations/%d/edit", row.OperationID)) }>{ view.T(ctx, "imported") }</a>
+								case row.PairID != 0 && p.Import.Status == domain.ImportStaged:
+									<form method="post" action={ templ.SafeURL(fmt.Sprintf("%s/unpair/%d", base, row.ID)) }>
+										<button type="submit" class="outline small" data-variant="secondary">{ view.T(ctx, "Not a transfer") }</button>
+									</form>
+								default:
+									{ view.T(ctx, "new") }
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	if len(p.Skipped) > 0 {
+		<h2 id="skipped" class="mt-6">{ view.T(ctx, "Skipped") } <span class="text-light">{ view.T(ctx, "Not imported: see the reason of each row.") }</span></h2>
+		<div class="table">
+			<table>
+				<thead><tr><th>{ view.T(ctx, "Line") }</th><th>{ view.T(ctx, "Time") }</th><th>{ view.T(ctx, "Operation") }</th><th class="align-right">{ view.T(ctx, "Amount") }</th><th>{ view.T(ctx, "Reason") }</th></tr></thead>
+				<tbody>
+					for _, row := range p.Skipped {
+						{{ r := row.Row }}
+						<tr>
+							<td class="text-light">{ r.Line }</td>
+							<td class="text-light nowrap">
+								if r.Time.IsZero() {
+									—
+								} else {
+									@RowTime(r, user)
+								}
+							</td>
+							<td>
+								<div>
+									if r.Category != "" {
+										{ r.Category }
+									} else {
+										—
+									}
+									if r.Payee != "" {
+										· { r.Payee }
+									}
+								</div>
+								<div class="text-light">
+									if r.Account != "" {
+										{ r.Account }
+									} else {
+										—
+									}
+									if r.ToAccount != "" {
+										→ { r.ToAccount }
+									}
+									if r.Note != "" {
+										· { r.Note }
+									}
+								</div>
+							</td>
+							<td class="align-right nowrap">
+								if r.Currency != "" {
+									{ view.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span>
+								} else {
+									—
+								}
+							</td>
+							<td>{ view.T(ctx, r.SkipReason) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}

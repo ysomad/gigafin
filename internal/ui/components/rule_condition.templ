@@ -1,0 +1,60 @@
+package components
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// RuleCondition is a condition row of the rule form: r, with the fields to pick from,
+// and categories and accounts for their value selects. errs and index are set on the
+// rows of a re-rendered form, not on added ones.
+templ RuleCondition(r view.CondRow, fields []domain.RuleFieldOps, categories []domain.Category, accounts []domain.Account, index int, errs *view.FormErrors) {
+	{{
+		fieldErr := errs.Get(fmt.Sprintf("cond_field[%d]", index))
+		opErr := errs.Get(fmt.Sprintf("cond_op[%d]", index))
+		valueErr := errs.Get(fmt.Sprintf("cond_value[%d]", index))
+	}}
+	<div class="cond row mb-4">
+		@Field("col-4", view.T(ctx, "Field"), fieldErr, "", nil) {
+			<select name="cond_field" hx-get="/rules/condition" hx-include="closest .cond" hx-target="closest .cond" hx-swap="outerHTML">
+				for _, f := range fields {
+					<option value={ string(f.Field) } selected?={ f.Field == r.Field }>{ view.RuleFieldLabel(ctx, f.Field) }</option>
+				}
+			</select>
+		}
+		@Field("col-4", view.T(ctx, "Condition"), opErr, "", nil) {
+			<select name="cond_op">
+				for _, op := range r.Ops {
+					<option value={ string(op) } selected?={ op == r.Op }>{ view.RuleOpLabel(ctx, op) }</option>
+				}
+			</select>
+		}
+		@Field("col-4", view.T(ctx, "Value"), valueErr, "", nil) {
+			switch r.Field {
+				case domain.RuleFieldCategory:
+					<select name="cond_value">
+						<option value="">—</option>
+						@CategoryOptions(categories, r.ID)
+					</select>
+				case domain.RuleFieldAccount:
+					<select name="cond_value">
+						<option value="">—</option>
+						for _, a := range accounts {
+							<option value={ a.ID } selected?={ a.ID == r.ID }>{ a.Name } ({ a.Currency })</option>
+						}
+					</select>
+				case domain.RuleFieldType:
+					<select name="cond_value">
+						for _, typ := range domain.OpTypes() {
+							<option value={ string(typ) } selected?={ string(typ) == r.Value }>{ view.T(ctx, string(typ)) }</option>
+						}
+					</select>
+				default:
+					<input name="cond_value" value={ r.Value } autocomplete="off" placeholder={ view.T(ctx, "one of and between take values separated by |") }/>
+			}
+		}
+		<div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label={ view.T(ctx, "Remove condition") } data-variant="secondary">✕</button></div>
+	</div>
+}

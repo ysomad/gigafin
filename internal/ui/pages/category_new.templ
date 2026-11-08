@@ -1,0 +1,43 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ CategoryNew(v view.Page) {
+	{{ d, _ := v.Data.(view.Categories) }}
+	@components.Layout(v, false, nil) {
+		<h1>
+			{ view.T(ctx, "New category") }
+			<span class="text-light">{ view.KindLabel(ctx, d.Kind) }</span>
+		</h1>
+		<form id="form-category" class="form-compact" method="post" action="/categories">
+			@components.FormError(v.Errors.Form("category"), "")
+			<input type="hidden" name="kind" value={ string(d.Kind) }/>
+			<fieldset class="row mb-4" aria-label={ view.T(ctx, "Category") }>
+				{{ e := v.Errors.Get("name") }}
+				@components.Field("col-6", view.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ d.Name } { view.Invalid(e, "name-error")... }/>
+				}
+				@components.Field("col-6", view.T(ctx, "Inside"), "", "", nil) {
+					<select name="parent">
+						<option value="0">{ view.T(ctx, "Top level") }</option>
+						for _, c := range domain.ByKind(d.Categories, d.Kind) {
+							if !c.Archived {
+								<option value={ c.ID } selected?={ c.ID == d.Parent }>{ c.Name }</option>
+							}
+						}
+					</select>
+				}
+			</fieldset>
+			<div class="hstack">
+				<button type="submit">{ view.T(ctx, "Create") }</button>
+				@components.LinkButton(fmt.Sprintf("/categories?kind=%s", d.Kind), "secondary", view.T(ctx, "Cancel"))
+			</div>
+		</form>
+	}
+}

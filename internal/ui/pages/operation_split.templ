@@ -1,0 +1,40 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ OperationSplit(v view.Page) {
+	{{ d, _ := v.Data.(view.OpForm) }}
+	@components.Layout(v, false, nil) {
+		<h1>{ view.T(ctx, "Split") }</h1>
+		<p class="text-light">
+			if d.Payee != "" {
+				{ d.Payee } ·
+			}
+			{ view.AmountInput(ctx, d.Amount) }
+		</p>
+		<form id="form-split" class="form-compact" method="post" action={ templ.SafeURL(fmt.Sprintf("/operations/%d/split", d.ID)) } data-split-total={ d.Amount }>
+			@components.FormError(v.Errors.Form("split"), "")
+			<p class="text-light">
+				{ view.T(ctx, "Divide the saved amount between categories. Each part becomes an operation of its own.") }
+				if d.OriginID != 0 {
+					{ view.T(ctx, "Part of a split. Splitting it again adds parts to the same split.") }
+				}
+			</p>
+			<div id="splits" class="vstack">
+				for i, p := range d.Parts {
+					@components.SplitRow(d.Categories, p, i == 0, i, v.Errors)
+				}
+			</div>
+			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { view.T(ctx, "Add part") }</button>
+			<div class="hstack justify-end">
+				@components.LinkButton(fmt.Sprintf("/operations/%d/edit", d.ID), "secondary", view.T(ctx, "Cancel"))
+				<button type="submit">{ view.T(ctx, "Split") }</button>
+			</div>
+		</form>
+	}
+}

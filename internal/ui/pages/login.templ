@@ -1,0 +1,29 @@
+package pages
+
+import (
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Login(v view.Page) {
+	{{ d, _ := v.Data.(view.Login) }}
+	@components.Layout(v, false, nil) {
+		<div class="row">
+			<article class="card col-6 offset-3">
+				<h1>{ view.T(ctx, "Sign in") }</h1>
+				<form id="form-login" method="post" action="/login">
+					@components.FormError(v.Errors.Form("login"), "")
+					{{ e := v.Errors.Get("login") }}
+					@components.Field("", view.T(ctx, "Login"), e, "login-error", nil) {
+						<input name="login" autocomplete="username" value={ d.Login } autofocus { view.Invalid(e, "login-error")... }/>
+					}
+					{{ e = v.Errors.Get("password") }}
+					@components.Field("", view.T(ctx, "Password"), e, "password-error", nil) {
+						<input type="password" name="password" autocomplete="current-password" { view.Invalid(e, "password-error")... }/>
+					}
+					<button type="submit">{ view.T(ctx, "Sign in") }</button>
+				</form>
+			</article>
+		</div>
+	}
+}

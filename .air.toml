@@ -2,11 +2,11 @@ root = "."
 tmp_dir = "bin/tmp"
 
 [build]
-cmd = "make build migrate-up && ./bin/fw-allow.sh"
+cmd = "go tool templ generate -path internal/ui && make build migrate-up && ./bin/fw-allow.sh"
 entrypoint = ["./bin/gigafin", "serve"]
-include_ext = ["go", "html", "css", "js", "sql", "yaml"]
+include_ext = ["go", "templ", "css", "js", "sql", "yaml"]
 exclude_dir = ["bin", ".playwright-mcp", "internal/gen"]
-exclude_regex = ["_test\\.go$"]
+exclude_regex = ["_test\\.go$", "_templ\\.go$"]
 delay = 300
 kill_delay = "2s"
 send_interrupt = true

@@ -1,0 +1,15 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// CreditLimitField is the credit limit of an account of kind, hidden and disabled
+// unless a credit card.
+templ CreditLimitField(class, kind, value, err string) {
+	{{ credit := kind == string(domain.AccountCredit) }}
+	@Field(class, view.T(ctx, "Credit limit"), err, "credit-limit-error", templ.Attributes{"data-credit-limit": true, "hidden": !credit}) {
+		<input name="credit_limit" inputmode="decimal" value={ view.AmountInput(ctx, value) } disabled?={ !credit } { view.Invalid(err, "credit-limit-error")... }/>
+	}
+}

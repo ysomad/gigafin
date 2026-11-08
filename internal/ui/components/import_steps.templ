@@ -1,0 +1,83 @@
+package components
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// ImportSteps renders the import wizard steps at step as Oat tabs: the current one is
+// selected, reachable ones are links, done ones are checked and unreachable ones are
+// disabled. The steps are of a file of exchange rates if rates, otherwise of the
+// staged import p, if any.
+templ ImportSteps(step string, rates bool, p *domain.Preview) {
+	{{ file := step != "type" }}
+	<div class="table mb-6">
+		<nav role="tablist" aria-label={ view.T(ctx, "Import steps") }>
+			if step == "file" {
+				<a role="tab" aria-selected="false" href="/imports/new">✓ { view.T(ctx, "Source") }</a>
+			} else {
+				<span role="tab" aria-selected={ strconv.FormatBool(step == "type") }>
+					if file {
+						✓
+					} else {
+						1.
+					}
+					{ view.T(ctx, "Source") }
+				</span>
+			}
+			<span
+				role="tab"
+				aria-selected={ strconv.FormatBool(step == "file") }
+				if !file {
+					aria-disabled="true"
+				}
+			>
+				if file && step != "file" {
+					✓
+				} else {
+					2.
+				}
+				{ view.T(ctx, "Upload|step") }
+			</span>
+			if rates {
+				{{ review := step == "preview" || step == "done" }}
+				<span
+					role="tab"
+					aria-selected={ strconv.FormatBool(review) }
+					if !review {
+						aria-disabled="true"
+					}
+				>
+					if step == "done" {
+						✓
+					} else {
+						3.
+					}
+					{ view.T(ctx, "Review") }
+				</span>
+			} else if p != nil {
+				{{
+					base := fmt.Sprintf("/imports/%d", p.Import.ID)
+					staged := p.Import.Status == domain.ImportStaged
+				}}
+				@ImportStep(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", view.T(ctx, "Accounts"))
+				@ImportStep(staged, step == "categories", base+"/categories", p.CategoriesMapped(), "4.", view.T(ctx, "Categories"))
+				<a role="tab" aria-selected={ strconv.FormatBool(step == "preview") } href={ templ.SafeURL(base + "/preview") }>
+					if staged {
+						5.
+					} else {
+						✓
+					}
+					{ view.T(ctx, "Review") }
+				</a>
+			} else {
+				<span role="tab" aria-disabled="true">3. { view.T(ctx, "Accounts") }</span>
+				<span role="tab" aria-disabled="true">4. { view.T(ctx, "Categories") }</span>
+				<span role="tab" aria-disabled="true">5. { view.T(ctx, "Review") }</span>
+			}
+		</nav>
+	</div>
+}

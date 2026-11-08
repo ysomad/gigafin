@@ -1,0 +1,11 @@
+package components
+
+templ NavLink(href string, current bool, label string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "button small", templ.KV("outline", current), templ.KV("ghost", !current) }
+		if current {
+			aria-current="page"
+		}
+	>{ label }</a>
+}

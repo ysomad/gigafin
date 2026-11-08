@@ -3,19 +3,16 @@ package ui
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"log/slog"
-	"maps"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/go-playground/form/v4"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -23,6 +20,9 @@ import (
 	"github.com/ysomad/gigafin/internal/i18n"
 	"github.com/ysomad/gigafin/internal/logger"
 	"github.com/ysomad/gigafin/internal/service"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 	"github.com/ysomad/gigafin/web"
 )
 
@@ -32,12 +32,6 @@ const (
 	_noticeCookie  = "gigafin_notice"
 	_maxForm       = 1 << 20
 )
-
-var _pages = [...]string{
-	"login", "dashboard", "operations", "operation_form", "operation_split", "accounts", "account", "account_new",
-	"categories", "category", "category_new", "plans", "plan_new", "imports", "import", "import_new", "import_rates",
-	"settings", "rules", "rule", "notfound",
-}
 
 // Config configures the UI.
 type Config struct {
@@ -49,7 +43,7 @@ type Config struct {
 	StaticCacheTTL time.Duration
 }
 
-// UI holds handlers and parsed templates.
+// UI holds handlers.
 type UI struct {
 	svc            *service.Services
 	log            *slog.Logger
@@ -58,97 +52,13 @@ type UI struct {
 	maxUpload      int64
 	staticCacheTTL time.Duration
 	dicts          i18n.Dicts
-	pages          map[string]*template.Template
-	fragments      *template.Template
 	// formDecoder decodes forms and queries into structs; only fields with a form tag are set.
 	formDecoder *form.Decoder
 }
 
 type handler func(w http.ResponseWriter, r *http.Request, user domain.User) error
 
-// prefs are the settings and UI language of the signed-in user, read once per request
-// by authed and kept in the request context under prefsKey. A handler that changes the
-// settings redirects, so they are never stale when rendered, except the settings page
-// rendered for htmx, which reads the settings itself and shows no amounts.
-type prefs struct {
-	settings domain.Settings
-	lang     string
-}
-
-type prefsKey struct{}
-
-// view is the data of every page.
-type view struct {
-	User *domain.User
-	Nav  string
-	// Title is translated, then formatted with TitleArgs, if any.
-	Title     string
-	TitleArgs []any
-	// Error is the error of a failed form post: fieldsError of its inputs, or an error
-	// of the business logic. render turns it, or the flash message of redirectBack, into
-	// Errors.
-	Error error
-	// Form names the posted form, which shows an Error other than fieldsError on itself
-	// rather than as a toast; see formErrors.Form.
-	Form   string
-	Errors *formErrors
-	// Notice is a success message set before a redirect, shown as a toast.
-	Notice string
-	Data   any
-}
-
-// fieldsError holds the translated messages of the inputs of a form that failed
-// validation, keyed by input name. A handler validates every input of its form, before
-// calling a service, and passes them as the view error.
-type fieldsError map[string]string
-
-// type check
-var _ error = fieldsError{}
-
-// Error implements the error interface for fieldsError.
-func (e fieldsError) Error() string {
-	msgs := make([]string, 0, len(e))
-	for _, k := range slices.Sorted(maps.Keys(e)) {
-		msgs = append(msgs, k+": "+e[k])
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// formErrors are the translated messages of an error shown on a page: field messages,
-// shown next to their inputs, a form message, shown on the posted form, and a toast.
-type formErrors struct {
-	fields fieldsError
-	// form is the form of msg.
-	form  string
-	msg   string
-	toast string
-}
-
-// Get returns the message about the input named field, if any.
-func (e *formErrors) Get(field string) string {
-	if e == nil {
-		return ""
-	}
-	return e.fields[field]
-}
-
-// Form returns the message about the form named name, if any.
-func (e *formErrors) Form(name string) string {
-	if e == nil || e.form != name {
-		return ""
-	}
-	return e.msg
-}
-
-// Toasts returns the messages shown as toasts.
-func (e *formErrors) Toasts() []string {
-	if e == nil || e.toast == "" {
-		return nil
-	}
-	return []string{e.toast}
-}
-
-// New parses templates and returns the UI.
+// New returns the UI.
 func New(cfg Config) (*UI, error) {
 	if cfg.SessionTTL <= 0 || cfg.MaxUploadSize <= 0 {
 		return nil, fmt.Errorf("session ttl and max upload: must be positive: %w", errors.ErrInvalid)
@@ -161,7 +71,6 @@ func New(cfg Config) (*UI, error) {
 		sessionTTL:     cfg.SessionTTL,
 		maxUpload:      cfg.MaxUploadSize,
 		staticCacheTTL: cfg.StaticCacheTTL,
-		pages:          make(map[string]*template.Template, len(_pages)),
 		formDecoder:    form.NewDecoder(),
 	}
 
@@ -173,28 +82,6 @@ func New(cfg Config) (*UI, error) {
 	}
 
 	u.dicts = dicts
-	for _, p := range _pages {
-		t, err := template.New(p).Funcs(_funcs).Funcs(amountFuncs(domain.Settings{})).
-			Funcs(langFuncs(nil, "en")).ParseFS(web.FS,
-			"templates/layout.html", "templates/partials.html", "templates/"+p+".html")
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", p, err)
-		}
-
-		u.pages[p] = t
-	}
-
-	frag, err := template.
-		New("partials").
-		Funcs(_funcs).
-		Funcs(amountFuncs(domain.Settings{})).
-		Funcs(langFuncs(nil, "en")).
-		ParseFS(web.FS, "templates/partials.html")
-	if err != nil {
-		return nil, fmt.Errorf("parse partials: %w", err)
-	}
-
-	u.fragments = frag
 	return u, nil
 }
 
@@ -294,7 +181,7 @@ func (u *UI) Register(mux *http.ServeMux) error {
 		mux.Handle(pattern, u.authed(h))
 	}
 	mux.Handle("/", u.authed(func(w http.ResponseWriter, r *http.Request, user domain.User) error {
-		return u.render(w, r, http.StatusNotFound, "notfound", view{User: &user, Title: "Not found"})
+		return u.render(w, r, http.StatusNotFound, pages.NotFound, view.Page{User: &user, Title: "Not found"})
 	}))
 	return nil
 }
@@ -339,11 +226,11 @@ func (u *UI) authed(h handler) http.Handler {
 			u.serverError(w, r, err)
 			return
 		}
-		p := prefs{settings: settings, lang: settings.Language}
-		if p.lang == "" {
-			p.lang = i18n.Match(r.Header.Get("Accept-Language"))
+		p := view.Prefs{Settings: settings, Lang: settings.Language, Dicts: u.dicts}
+		if p.Lang == "" {
+			p.Lang = i18n.Match(r.Header.Get("Accept-Language"))
 		}
-		r = r.WithContext(context.WithValue(r.Context(), prefsKey{}, p))
+		r = r.WithContext(view.WithPrefs(r.Context(), p))
 		r.Body = http.MaxBytesReader(w, r.Body, u.maxUpload)
 		if err := h(w, r, user); err != nil {
 			u.handleError(w, r, user, err)
@@ -355,7 +242,7 @@ func (u *UI) handleError(w http.ResponseWriter, r *http.Request, user domain.Use
 	switch {
 	case errors.Is(err, errors.ErrNotFound):
 		//nolint:errcheck // render logs its own errors
-		_ = u.render(w, r, http.StatusNotFound, "notfound", view{User: &user, Title: "Not found"})
+		_ = u.render(w, r, http.StatusNotFound, pages.NotFound, view.Page{User: &user, Title: "Not found"})
 	case isUserError(err):
 		// a forbidden request is one the UI never makes, so it may be tampering
 		level := slog.LevelDebug
@@ -363,14 +250,14 @@ func (u *UI) handleError(w http.ResponseWriter, r *http.Request, user domain.Use
 			level = slog.LevelWarn
 		}
 		u.log.Log(r.Context(), level, "request rejected", slog.Any("error", err))
-		p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-		msg := errText(u.dicts, p.lang, err)
+		p := view.PrefsFrom(r.Context())
+		msg := view.ErrText(u.dicts, p.Lang, err)
 		// an htmx action, one of no form to show the error on, leaves the page as it is
 		// and gets the error as a toast
 		if r.Header.Get("HX-Request") == "true" {
 			w.Header().Set("HX-Reswap", "none")
 			//nolint:errcheck // fragment logs its own errors
-			_ = u.fragment(w, r, http.StatusUnprocessableEntity, "toast", msg)
+			_ = u.fragment(w, r, http.StatusUnprocessableEntity, components.ToastOOB(msg))
 			return
 		}
 		u.redirectBack(w, r, msg)
@@ -402,35 +289,32 @@ func (u *UI) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	http.Error(w, msg, http.StatusInternalServerError)
 }
 
-func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page string, v view) error {
-	p, ok := r.Context().Value(prefsKey{}).(prefs)
+// render writes page of v.
+func (u *UI) render(
+	w http.ResponseWriter, r *http.Request, status int, page func(view.Page) templ.Component, v view.Page,
+) error {
+	ctx := r.Context()
+	p, ok := view.LookupPrefs(ctx)
 	if !ok {
 		// signed out: default settings, the browser language
-		p.lang = i18n.Match(r.Header.Get("Accept-Language"))
+		p = view.Prefs{Lang: i18n.Match(r.Header.Get("Accept-Language")), Dicts: u.dicts}
+		ctx = view.WithPrefs(ctx, p)
 	}
-	switch fields, ok := errors.AsType[fieldsError](v.Error); {
+	switch fields, ok := errors.AsType[view.FieldsError](v.Error); {
 	case ok:
-		v.Errors = &formErrors{fields: fields}
+		v.Errors = &view.FormErrors{Fields: fields}
 	case v.Error != nil && v.Form != "":
-		v.Errors = &formErrors{form: v.Form, msg: errText(u.dicts, p.lang, v.Error)}
+		v.Errors = &view.FormErrors{FormName: v.Form, Msg: view.ErrText(u.dicts, p.Lang, v.Error)}
 	case v.Error != nil:
-		v.Errors = &formErrors{toast: errText(u.dicts, p.lang, v.Error)}
+		v.Errors = &view.FormErrors{Toast: view.ErrText(u.dicts, p.Lang, v.Error)}
 	default:
-		v.Errors = &formErrors{toast: u.takeFlash(w, r, _flashCookie)}
+		v.Errors = &view.FormErrors{Toast: u.takeFlash(w, r, _flashCookie)}
 	}
 	v.Notice = u.takeFlash(w, r, _noticeCookie)
-	v.Title = u.dicts.T(p.lang, v.Title, v.TitleArgs...)
-	// a clone, since funcs of an executed template can no longer change
-	t, err := u.pages[page].Clone()
-	if err != nil {
-		u.serverError(w, r, fmt.Errorf("clone %s: %w", page, err))
-		return nil
-	}
+	v.Title = u.dicts.T(p.Lang, v.Title, v.TitleArgs...)
 	var buf bytes.Buffer
-	if err := t.Funcs(amountFuncs(p.settings)).
-		Funcs(langFuncs(u.dicts, p.lang)).
-		ExecuteTemplate(&buf, "layout", v); err != nil {
-		u.serverError(w, r, fmt.Errorf("render %s: %w", page, err))
+	if err := page(v).Render(ctx, &buf); err != nil {
+		u.serverError(w, r, fmt.Errorf("render %s: %w", r.URL.Path, err))
 		return nil
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -461,18 +345,11 @@ func (u *UI) render(w http.ResponseWriter, r *http.Request, status int, page str
 	return nil
 }
 
-func (u *UI) fragment(w http.ResponseWriter, r *http.Request, status int, name string, data any) error {
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	t, err := u.fragments.Clone()
-	if err != nil {
-		u.serverError(w, r, fmt.Errorf("clone fragments: %w", err))
-		return nil
-	}
+// fragment writes c alone, for htmx to swap in.
+func (u *UI) fragment(w http.ResponseWriter, r *http.Request, status int, c templ.Component) error {
 	var buf bytes.Buffer
-	if err := t.Funcs(amountFuncs(p.settings)).
-		Funcs(langFuncs(u.dicts, p.lang)).
-		ExecuteTemplate(&buf, name, data); err != nil {
-		u.serverError(w, r, fmt.Errorf("render %s: %w", name, err))
+	if err := c.Render(r.Context(), &buf); err != nil {
+		u.serverError(w, r, fmt.Errorf("render fragment %s: %w", r.URL.Path, err))
 		return nil
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

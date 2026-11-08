@@ -1,0 +1,90 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Rule(v view.Page) {
+	{{ d, _ := v.Data.(view.RuleForm) }}
+	@components.Layout(v, false, nil) {
+		<h1>
+			if d.ID != 0 {
+				{ view.T(ctx, "Rule") }
+				if d.Origin == domain.RuleOriginLearned {
+					@components.LearnedBadge()
+				}
+			} else {
+				{ view.T(ctx, "New rule") }
+			}
+		</h1>
+		if d.Applied >= 0 {
+			<p role="status" class="badge" data-variant="success">{ view.T(ctx, "Changed %d operations.", d.Applied) }</p>
+		}
+		<form
+			id="form-rule"
+			method="post"
+			if d.ID != 0 {
+				action={ templ.SafeURL(fmt.Sprintf("/rules/%d", d.ID)) }
+			} else {
+				action="/rules"
+			}
+		>
+			@components.FormError(v.Errors.Form("rule"), "")
+			<div class="row mb-4">
+				{{ e := v.Errors.Get("stage") }}
+				@components.Field("col-4", view.T(ctx, "Runs"), e, "", nil) {
+					<select name="stage" { view.Invalid(e, "")... }>
+						for _, s := range domain.RuleStages() {
+							<option value={ string(s) } selected?={ s == d.Stage }>{ view.RuleStageLabel(ctx, s) }</option>
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("match") }}
+				@components.Field("col-4", view.T(ctx, "Match"), e, "", nil) {
+					<select name="match" { view.Invalid(e, "")... }>
+						<option value="all" selected?={ d.Match == domain.RuleMatchAll }>{ view.T(ctx, "all conditions") }</option>
+						<option value="any" selected?={ d.Match == domain.RuleMatchAny }>{ view.T(ctx, "any condition") }</option>
+					</select>
+				}
+			</div>
+			<h2>{ view.T(ctx, "If") }</h2>
+			<div id="conditions">
+				for i, c := range d.Conditions {
+					@components.RuleCondition(c, d.Fields, d.Categories, d.Accounts, i, v.Errors)
+				}
+			</div>
+			<div class="hstack mb-4">
+				<button type="button" class="outline small" hx-get="/rules/condition" hx-target="#conditions" hx-swap="beforeend" data-variant="secondary">+ { view.T(ctx, "Add condition") }</button>
+			</div>
+			<h2>{ view.T(ctx, "Then") }</h2>
+			<div id="rule-actions">
+				for i, a := range d.Actions {
+					@components.RuleAction(a, d.Categories, i, v.Errors)
+				}
+			</div>
+			<div class="hstack mb-4">
+				<button type="button" class="outline small" hx-get="/rules/action" hx-target="#rule-actions" hx-swap="beforeend" data-variant="secondary">+ { view.T(ctx, "Add action") }</button>
+			</div>
+			<div class="hstack mb-4">
+				<button type="submit">{ view.T(ctx, "Save") }</button>
+				<button type="button" class="outline" hx-post="/rules/preview" hx-target="#preview" data-variant="secondary">{ view.T(ctx, "Show matches") }</button>
+				@components.LinkButton("/rules", "secondary", view.T(ctx, "Cancel"))
+			</div>
+		</form>
+		<div id="preview"></div>
+		if d.ID != 0 {
+			<div class="hstack mb-4">
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/rules/%d/apply", d.ID)) } hx-confirm={ view.T(ctx, "Apply the saved rule to all operations it matches?") }>
+					<button type="submit" data-variant="secondary">{ view.T(ctx, "Apply to matching operations") }</button>
+				</form>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/rules/%d/delete", d.ID)) } hx-confirm={ view.T(ctx, "Delete this rule?") }>
+					<button type="submit" class="outline" data-variant="secondary">{ view.T(ctx, "Delete rule") }</button>
+				</form>
+			</div>
+		}
+	}
+}

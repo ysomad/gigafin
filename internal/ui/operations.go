@@ -14,38 +14,16 @@ import (
 	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
 
-type dayGroup struct {
-	Date time.Time
-	Ops  []domain.Operation
-	// Continued is set on a day the previous page ended in, so its title is not repeated.
-	Continued bool
-}
-
-type opsData struct {
-	Days     []dayGroup
-	MoreURL  string
-	Filter   domain.Filter
-	Filtered bool
-	// FilterCount is the number of Filter fields set in the filter dialog, all but Query.
-	FilterCount int
-	Accounts    []domain.Account
-	AccByID     map[int64]domain.Account
-	Categories  []domain.Category
-	CatNames    map[int64]string
-	Tags        []string
-	// RunURL runs rules on the operations matching Filter.
-	RunURL string
-	// Changed is the number of operations rules just changed, -1 when they did not run.
-	Changed int
-}
-
-func groupByDay(ops []domain.Operation) []dayGroup {
-	var days []dayGroup
+func groupByDay(ops []domain.Operation) []view.DayGroup {
+	var days []view.DayGroup
 	for _, op := range ops {
 		if len(days) == 0 || !days[len(days)-1].Date.Equal(op.Date) {
-			days = append(days, dayGroup{Date: op.Date})
+			days = append(days, view.DayGroup{Date: op.Date})
 		}
 		days[len(days)-1].Ops = append(days[len(days)-1].Ops, op)
 	}
@@ -134,7 +112,7 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 	if len(days) > 0 && !p.After.IsZero() && days[0].Date.Equal(p.After.Date) {
 		days[0].Continued = true
 	}
-	d := opsData{
+	d := view.Ops{
 		Days:       days,
 		Filter:     f,
 		Filtered:   f.Filtered(),
@@ -168,7 +146,7 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 		d.MoreURL = "/operations?" + q.Encode()
 	}
 	if !p.After.IsZero() && r.Header.Get("HX-Request") == "true" {
-		return u.fragment(w, r, http.StatusOK, "op-rows", d)
+		return u.fragment(w, r, http.StatusOK, components.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL))
 	}
 	if d.Tags, err = u.svc.Operations.Tags(r.Context(), user.ID); err != nil {
 		return err
@@ -177,46 +155,12 @@ func (u *UI) operations(w http.ResponseWriter, r *http.Request, user domain.User
 		w,
 		r,
 		http.StatusOK,
-		"operations",
-		view{User: &user, Nav: "operations", Title: "Operations", Data: d},
+		pages.Operations,
+		view.Page{User: &user, Nav: "operations", Title: "Operations", Data: d},
 	)
 }
 
-type splitForm struct {
-	CategoryID int64
-	Amount     string
-	Note       string
-}
-
-// opForm is decoded from the operation form; untagged fields are view only.
-type opForm struct {
-	ID int64
-	// ImportID and OriginID are posted back only to re-render the form; the service
-	// ignores them.
-	ImportID    int64         `form:"import_id"`
-	OriginID    int64         `form:"origin_id"`
-	Type        domain.OpType `form:"type"`
-	AccountID   int64         `form:"account"`    // 0 is not found
-	ToAccountID int64         `form:"to_account"` // 0 is not found
-	CategoryID  int64         `form:"category"`   // 0 is reported by validation
-	Amount      string        `form:"amount"`
-	Date        string        `form:"date"`
-	Time        string        `form:"time"`
-	Payee       string        `form:"payee"`
-	Note        string        `form:"note"`
-	// SourcePayee is the payee as the bank sent it.
-	SourcePayee string
-	// Tags are comma separated names.
-	Tags string `form:"tags"`
-	// Parts are the rows of the split page of a saved expense or income.
-	Parts      []splitForm
-	Accounts   []domain.Account
-	Categories []domain.Category
-	// AllTags are the user's tags to pick from.
-	AllTags []string
-}
-
-func (u *UI) fillForm(r *http.Request, user domain.User, f *opForm) error {
+func (u *UI) fillForm(r *http.Request, user domain.User, f *view.OpForm) error {
 	accounts, err := u.svc.Accounts.List(r.Context(), user.ID)
 	if err != nil {
 		return err
@@ -244,7 +188,7 @@ func (u *UI) fillForm(r *http.Request, user domain.User, f *opForm) error {
 }
 
 func (u *UI) renderForm(
-	w http.ResponseWriter, r *http.Request, user domain.User, status int, f opForm, viewErr error,
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, f view.OpForm, viewErr error,
 ) error {
 	if err := u.fillForm(r, user, &f); err != nil {
 		return err
@@ -253,7 +197,7 @@ func (u *UI) renderForm(
 	if f.ID != 0 {
 		title = "Edit " + string(f.Type)
 	}
-	return u.render(w, r, status, "operation_form", view{
+	return u.render(w, r, status, pages.OperationForm, view.Page{
 		User: &user, Nav: "operations", Title: title, Error: viewErr, Form: "operation", Data: f,
 	})
 }
@@ -264,7 +208,7 @@ func (u *UI) newOperation(w http.ResponseWriter, r *http.Request, user domain.Us
 		typ = domain.OpExpense
 	}
 	now := time.Now().In(user.Location())
-	f := opForm{Type: typ, Date: timex.FormatDate(now), Time: now.Format("15:04")}
+	f := view.OpForm{Type: typ, Date: timex.FormatDate(now), Time: now.Format("15:04")}
 	return u.renderForm(w, r, user, http.StatusOK, f, nil)
 }
 
@@ -277,25 +221,23 @@ func (u *UI) operationSplit(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		return err
 	}
-	return u.fragment(w, r, http.StatusOK, "split", map[string]any{
-		"Categories": domain.ByKind(tree, kind), "Split": splitForm{},
-	})
+	return u.fragment(w, r, http.StatusOK, components.SplitRow(domain.ByKind(tree, kind), view.SplitForm{}, false, 0, nil))
 }
 
 // parseOpForm reads the form into both the raw form, for re-rendering, and the
 // domain input, and returns the messages of its invalid inputs translated to lang.
 //
 //nolint:cyclop // every input of the form is checked here, so the checks stay together
-func (u *UI) parseOpForm(r *http.Request, lang string) (opForm, domain.OperationInput, fieldsError, error) {
+func (u *UI) parseOpForm(r *http.Request, lang string) (view.OpForm, domain.OperationInput, view.FieldsError, error) {
 	if err := r.ParseForm(); err != nil {
-		return opForm{}, domain.OperationInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
+		return view.OpForm{}, domain.OperationInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f opForm
+	var f view.OpForm
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return f, domain.OperationInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
 
-	errs := fieldsError{}
+	errs := view.FieldsError{}
 	in := domain.OperationInput{
 		Type:        f.Type,
 		AccountID:   f.AccountID,
@@ -362,8 +304,8 @@ func (u *UI) parseOpForm(r *http.Request, lang string) (opForm, domain.Operation
 }
 
 func (u *UI) createOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	f, in, errs, err := u.parseOpForm(r, p.lang)
+	p := view.PrefsFrom(r.Context())
+	f, in, errs, err := u.parseOpForm(r, p.Lang)
 	if err != nil {
 		return err
 	}
@@ -390,7 +332,7 @@ func (u *UI) editOperation(w http.ResponseWriter, r *http.Request, user domain.U
 	if err != nil {
 		return err
 	}
-	f := opForm{
+	f := view.OpForm{
 		ID:          op.ID,
 		ImportID:    op.ImportID,
 		OriginID:    op.OriginID,
@@ -420,7 +362,7 @@ func (u *UI) splitOperationPage(w http.ResponseWriter, r *http.Request, user dom
 // renderSplit renders the split page of expense or income id with parts and splitErr,
 // or the operation as the first part when parts is empty.
 func (u *UI) renderSplit(
-	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, parts []splitForm, splitErr error,
+	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, parts []view.SplitForm, splitErr error,
 ) error {
 	op, err := u.svc.Operations.Get(r.Context(), user.ID, id)
 	if err != nil {
@@ -440,10 +382,10 @@ func (u *UI) renderSplit(
 	}
 	amount := op.Amount.Fixed(op.Currency)
 	if len(parts) == 0 {
-		parts = []splitForm{{CategoryID: op.CategoryID, Amount: amount}, {}}
+		parts = []view.SplitForm{{CategoryID: op.CategoryID, Amount: amount}, {}}
 	}
-	return u.render(w, r, status, "operation_split", view{
-		User: &user, Nav: "operations", Title: "Split", Error: splitErr, Form: "split", Data: opForm{
+	return u.render(w, r, status, pages.OperationSplit, view.Page{
+		User: &user, Nav: "operations", Title: "Split", Error: splitErr, Form: "split", Data: view.OpForm{
 			ID:         op.ID,
 			OriginID:   op.OriginID,
 			Type:       op.Type,
@@ -475,33 +417,33 @@ func (u *UI) splitOperation(w http.ResponseWriter, r *http.Request, user domain.
 	if len(in.Amounts) != len(in.Categories) || len(in.Notes) != len(in.Categories) {
 		return domain.NewError(errors.ErrInvalid, "split parts do not match")
 	}
-	var rows []splitForm
+	var rows []view.SplitForm
 	for i, cat := range in.Categories {
-		row := splitForm{CategoryID: cat, Amount: in.Amounts[i], Note: in.Notes[i]}
+		row := view.SplitForm{CategoryID: cat, Amount: in.Amounts[i], Note: in.Notes[i]}
 		if row.CategoryID == 0 && row.Amount == "" && row.Note == "" {
 			continue
 		}
 		rows = append(rows, row)
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	errs := fieldsError{}
+	p := view.PrefsFrom(r.Context())
+	errs := view.FieldsError{}
 	parts := make([]domain.SplitPart, len(rows))
 	for i, row := range rows {
 		// keys index the rows as re-rendered, which drops the empty ones
 		n := "[" + strconv.Itoa(i) + "]"
 		if row.CategoryID == 0 {
-			errs["split_category"+n] = u.dicts.T(p.lang, "required")
+			errs["split_category"+n] = u.dicts.T(p.Lang, "required")
 		}
 		switch d, err := money.Parse(row.Amount); {
 		case err != nil:
-			errs["split_amount"+n] = u.dicts.T(p.lang, "enter a number")
+			errs["split_amount"+n] = u.dicts.T(p.Lang, "enter a number")
 		case !d.IsPositive():
-			errs["split_amount"+n] = u.dicts.T(p.lang, "must be positive")
+			errs["split_amount"+n] = u.dicts.T(p.Lang, "must be positive")
 		default:
 			parts[i].Amount = d
 		}
 		if utf8.RuneCountInString(strings.TrimSpace(row.Note)) > domain.MaxTextLen {
-			errs["split_note"+n] = u.dicts.T(p.lang, "too long")
+			errs["split_note"+n] = u.dicts.T(p.Lang, "too long")
 		}
 		parts[i].CategoryID, parts[i].Note = row.CategoryID, row.Note
 	}
@@ -524,8 +466,8 @@ func (u *UI) updateOperation(w http.ResponseWriter, r *http.Request, user domain
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	f, in, errs, err := u.parseOpForm(r, p.lang)
+	p := view.PrefsFrom(r.Context())
+	f, in, errs, err := u.parseOpForm(r, p.Lang)
 	if err != nil {
 		return err
 	}

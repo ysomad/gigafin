@@ -1,0 +1,68 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Accounts(v view.Page) {
+	{{ d, _ := v.Data.(view.Accounts) }}
+	@components.Layout(v, false, nil) {
+		<div class="hstack mb-4">
+			<a class="button" href="/accounts/new">+ { view.T(ctx, "New account") }</a>
+		</div>
+		<div class="table">
+			<table>
+				<thead><tr><th>{ view.T(ctx, "Name") }</th><th>{ view.T(ctx, "Kind") }</th><th>{ view.T(ctx, "Currency") }</th><th class="align-right">{ view.T(ctx, "Balance") }</th></tr></thead>
+				<tbody>
+					for _, a := range d.Assets {
+						<tr>
+							<td>
+								<a href={ templ.SafeURL(fmt.Sprintf("/accounts/%d", a.ID)) }>{ a.Name }</a>
+								if a.Archived {
+									@components.ArchivedBadge()
+								}
+							</td>
+							<td>{ view.T(ctx, string(a.Kind)) }</td>
+							<td>{ a.Currency }</td>
+							<td class="align-right">{ view.Money(ctx, a.Balance, a.Currency) }</td>
+						</tr>
+					}
+					if len(d.Assets) == 0 {
+						@components.EmptyRow(4, view.T(ctx, "No accounts yet."))
+					}
+				</tbody>
+			</table>
+		</div>
+		if len(d.Liabilities) > 0 {
+			<h2>{ view.T(ctx, "Credit and loans") }</h2>
+			<div class="table">
+				<table>
+					<thead><tr><th>{ view.T(ctx, "Name") }</th><th>{ view.T(ctx, "Kind") }</th><th>{ view.T(ctx, "Currency") }</th><th class="align-right">{ view.T(ctx, "Owed") }</th><th class="align-right">{ view.T(ctx, "Available") }</th></tr></thead>
+					<tbody>
+						for _, a := range d.Liabilities {
+							<tr>
+								<td>
+									<a href={ templ.SafeURL(fmt.Sprintf("/accounts/%d", a.ID)) }>{ a.Name }</a>
+									if a.Archived {
+										@components.ArchivedBadge()
+									}
+								</td>
+								<td>{ view.T(ctx, string(a.Kind)) }</td>
+								<td>{ a.Currency }</td>
+								<td class="align-right">{ view.Money(ctx, a.Owed(), a.Currency) }</td>
+								<td class="align-right">
+									if !a.CreditLimit.IsZero() {
+										{ view.Money(ctx, a.Available(), a.Currency) }
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}

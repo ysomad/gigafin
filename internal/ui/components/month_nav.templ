@@ -1,0 +1,30 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// MonthNav picks month of months on the page at action: a select that loads on
+// change, between buttons to the adjacent prev and next, which are disabled when empty.
+templ MonthNav(action string, month timex.Month, months []timex.Month, prev, next string) {
+	<form
+		method="get"
+		action={ templ.SafeURL(action) }
+		class="hstack"
+		hx-boost="false"
+		hx-get={ action }
+		hx-trigger="change, submit"
+		hx-target="body"
+		hx-swap="outerSync"
+		hx-push-url="true"
+	>
+		<fieldset class="group">
+			@MonthButton(action+"?month="+prev, prev == "", view.T(ctx, "Previous month"), "‹")
+			<select name="month" aria-label={ view.T(ctx, "Month") }>
+				@MonthOptions(months, month)
+			</select>
+			@MonthButton(action+"?month="+next, next == "", view.T(ctx, "Next month"), "›")
+		</fieldset>
+	</form>
+}

@@ -1,0 +1,71 @@
+package pages
+
+import (
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Operations(v view.Page) {
+	{{ d, _ := v.Data.(view.Ops) }}
+	@components.Layout(v, len(d.Days) > 0, nil) {
+		<div class="hstack justify-between mb-4">
+			<ot-dropdown>
+				<menu class="buttons">
+					<li><a class="button" href="/operations/new">+ { view.T(ctx, "New operation") }</a></li>
+					<li>
+						<button type="button" popovertarget="op-actions" aria-label={ view.T(ctx, "More actions") }>▾</button>
+					</li>
+				</menu>
+				<menu popover id="op-actions">
+					<form
+						method="post"
+						action={ templ.SafeURL(d.RunURL) }
+						if d.Filtered {
+							hx-confirm={ view.T(ctx, "Run rules on the filtered operations?") }
+						} else {
+							hx-confirm={ view.T(ctx, "Run rules on all operations?") }
+						}
+					>
+						<button type="submit" role="menuitem" class="ghost">{ view.T(ctx, "Run rules") }</button>
+					</form>
+					<a href="/rules" role="menuitem" class="button ghost">{ view.T(ctx, "Rules") }</a>
+				</menu>
+			</ot-dropdown>
+			<form method="get" action="/operations">
+				<div class="hstack">
+					<fieldset class="group">
+						<input type="search" name="q" value={ d.Filter.Query } placeholder={ view.T(ctx, "payee or note") } aria-label={ view.T(ctx, "Search") }/>
+						<button type="submit">{ view.T(ctx, "Search") }</button>
+					</fieldset>
+					<ot-dropdown>
+						<button type="button" class="outline" popovertarget="filter-popover">
+							{ view.T(ctx, "Filter") }
+							if d.FilterCount > 0 {
+								<span class="badge">{ d.FilterCount }</span>
+							}
+						</button>
+						@components.FilterPopover(d)
+					</ot-dropdown>
+					if d.Filtered {
+						<a class="button ghost" href="/operations">{ view.T(ctx, "Reset") }</a>
+					}
+				</div>
+			</form>
+		</div>
+		if d.Changed >= 0 {
+			<p role="status" class="badge mb-4" data-variant="success">{ view.T(ctx, "Rules changed %d operations.", d.Changed) }</p>
+		}
+		if len(d.Days) > 0 {
+			<ul class="unstyled vstack gap-1">
+				@components.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL)
+			</ul>
+		} else {
+			<p class="text-light">
+				{ view.T(ctx, "No operations yet.") }
+				if !d.Filtered {
+					{ view.T(ctx, "Add one above or") } <a href="/imports">{ view.T(ctx, "import") }</a>.
+				}
+			</p>
+		}
+	}
+}

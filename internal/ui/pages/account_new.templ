@@ -1,0 +1,40 @@
+package pages
+
+import (
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ AccountNew(v view.Page) {
+	{{ d, _ := v.Data.(view.Accounts) }}
+	@components.Layout(v, false, nil) {
+		<h1>{ view.T(ctx, "New account") }</h1>
+		<form id="form-account" class="form-compact" method="post" action="/accounts">
+			@components.FormError(v.Errors.Form("account"), "")
+			<fieldset class="row mb-4" aria-label={ view.T(ctx, "Account") }>
+				{{ e := v.Errors.Get("name") }}
+				@components.Field("col-12", view.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ d.Name } { view.Invalid(e, "name-error")... }/>
+				}
+				{{ e = v.Errors.Get("kind") }}
+				@components.Field("col-6", view.T(ctx, "Kind"), e, "kind-error", nil) {
+					@components.AccountKindSelect(d.Kinds, d.Kind, e)
+				}
+				{{ e = v.Errors.Get("currency") }}
+				@components.Field("col-6", view.T(ctx, "Currency"), e, "currency-error", nil) {
+					@components.CurrencySelect(d.Currencies, d.Currency, e)
+				}
+				{{ e = v.Errors.Get("balance") }}
+				@components.Field("col-6", view.T(ctx, "Opening balance"), e, "balance-error", nil) {
+					<input name="balance" inputmode="decimal" placeholder="0" value={ view.AmountInput(ctx, d.Balance) } { view.Invalid(e, "balance-error")... }/>
+				}
+				@components.CreditLimitField("col-6", d.Kind, d.CreditLimit, v.Errors.Get("credit_limit"))
+			</fieldset>
+			<p class="text-light">{ view.T(ctx, "Credit card and loan balances are negative when you owe. Pay a card with a transfer to it.") }</p>
+			<div class="hstack">
+				<button type="submit">{ view.T(ctx, "Create") }</button>
+				@components.LinkButton("/accounts", "secondary", view.T(ctx, "Cancel"))
+			</div>
+		</form>
+	}
+}

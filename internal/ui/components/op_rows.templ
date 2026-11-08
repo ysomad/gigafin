@@ -1,0 +1,30 @@
+package components
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// OpRows are the list items of operations by day, followed by the loader of moreURL,
+// the next page, if any.
+templ OpRows(days []view.DayGroup, catNames map[int64]string, accByID map[int64]domain.Account, moreURL string) {
+	for _, day := range days {
+		if !day.Continued {
+			<li class="text-light mt-4">{ view.DayTitle(ctx, day.Date) }</li>
+		}
+		for _, op := range day.Ops {
+			<li class="card compact hstack justify-between">
+				<a href={ templ.SafeURL(fmt.Sprintf("/operations/%d/edit", op.ID)) }>
+					<div>{ view.OpTitle(ctx, op, catNames) }</div>
+					<div class="text-light">{ view.OpSubtitle(ctx, op, catNames, accByID) }</div>
+				</a>
+				<div class="align-right">{ view.OpAmount(ctx, op) } <span class="text-light">{ op.Currency }</span></div>
+			</li>
+		}
+	}
+	if moreURL != "" {
+		<li id="more" hx-get={ moreURL } hx-trigger="revealed" hx-swap="outerHTML" aria-busy="true"></li>
+	}
+}

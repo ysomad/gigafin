@@ -1,0 +1,24 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// CompareForm picks the month to compare the expenses of the month of d with.
+templ CompareForm(d view.Dashboard) {
+	<form method="get" action="/" class="hstack mt-6 mb-4" hx-boost="false" hx-get="/" hx-trigger="change, submit" hx-target="body" hx-swap="outerSync" hx-push-url="true">
+		<input type="hidden" name="month" value={ d.Dash.Month.String() }/>
+		<div data-field>
+			<label for="compare">{ view.T(ctx, "Compare with") }</label>
+			<fieldset class="group">
+				@MonthButton("/?month="+d.Dash.Month.String()+"&compare="+d.ComparePrev, d.ComparePrev == "", view.T(ctx, "Previous month"), "‹")
+				<select id="compare" name="compare">
+					for _, m := range d.Months {
+						if m.String() != d.Dash.Month.String() {
+							<option value={ m.String() } selected?={ m.String() == d.Dash.CompareMonth.String() }>{ view.MonthName(ctx, m.First()) }</option>
+						}
+					}
+				</select>
+				@MonthButton("/?month="+d.Dash.Month.String()+"&compare="+d.CompareNext, d.CompareNext == "", view.T(ctx, "Next month"), "›")
+			</fieldset>
+		</div>
+	</form>
+}

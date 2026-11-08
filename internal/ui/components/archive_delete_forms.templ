@@ -1,0 +1,18 @@
+package components
+
+// ArchiveDeleteForms are the forms of ArchiveDelete, put outside the edit form:
+// archiving at base + "/archive", deleting after confirm at base + "/delete".
+templ ArchiveDeleteForms(prefix, base string, archived bool, confirm string) {
+	<form id={ prefix + "-archive" } method="post" action={ templ.SafeURL(base + "/archive") }>
+		<input
+			type="hidden"
+			name="archived"
+			if archived {
+				value="0"
+			} else {
+				value="1"
+			}
+		/>
+	</form>
+	<form id={ prefix + "-delete" } method="post" action={ templ.SafeURL(base + "/delete") } hx-confirm={ confirm }></form>
+}

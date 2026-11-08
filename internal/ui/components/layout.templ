@@ -1,0 +1,60 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// Layout is the page of v around children: toTop adds the scroll-to-top button, toasts
+// more toasts after those of v.
+templ Layout(v view.Page, toTop bool, toasts templ.Component) {
+	<!DOCTYPE html>
+	<html lang={ view.Lang(ctx) }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
+			<title>{ v.Title } · gigafin</title>
+			<link rel="stylesheet" href="/static/lib/oat.min.css"/>
+			<link rel="stylesheet" href="/static/lib/uplot.min.css"/>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="/static/lib/htmx.min.js" defer></script>
+			<script src="/static/lib/uplot.min.js" defer></script>
+			<script src="/static/lib/oat.min.js" defer></script>
+			<script src="/static/operation-tags.js" defer></script>
+			<script src="/static/dashboard.js" defer></script>
+			<script src="/static/app.js" defer></script>
+		</head>
+		<body id="top" hx-boost:inherited="true">
+			<header data-topnav>
+				<nav class="container hstack justify-between">
+					<a href="/" class="unstyled brand"><strong>GIGAFIN</strong></a>
+					if v.User != nil {
+						<div class="hstack gap-1">
+							@NavLink("/", v.Nav == "dashboard", view.T(ctx, "Dashboard"))
+							@NavLink("/operations", v.Nav == "operations", view.T(ctx, "Operations"))
+							@NavLink("/plans", v.Nav == "plans", view.T(ctx, "Plans"))
+							@NavLink("/settings", v.Nav == "settings", view.T(ctx, "Settings"))
+						</div>
+					}
+				</nav>
+			</header>
+			<main class="container mb-8">
+				{ children... }
+				if toTop {
+					<a class="button to-top" href="#top" hx-boost="false" hidden aria-label={ view.T(ctx, "Scroll to top") }>↑ { view.T(ctx, "Top") }</a>
+				}
+				// after the content, whose inputs take their field messages first
+				<div id="toasts" hidden>
+					for _, msg := range v.Errors.Toasts() {
+						@Toast("danger", msg)
+					}
+					if v.Notice != "" {
+						@Toast("success", v.Notice)
+					}
+					if toasts != nil {
+						@toasts
+					}
+				</div>
+			</main>
+		</body>
+	</html>
+}

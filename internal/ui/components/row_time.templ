@@ -1,0 +1,15 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// RowTime is the time of an import row, the day of a row without a time of day.
+templ RowTime(r domain.Record, user *domain.User) {
+	if r.DateOnly {
+		{ view.DayTitle(ctx, r.Time) }
+	} else {
+		{ view.Datetime(ctx, r.Time, user) }
+	}
+}

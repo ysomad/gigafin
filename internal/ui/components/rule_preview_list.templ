@@ -1,0 +1,17 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// RulePreviewList lists the latest operations a rule form matches.
+templ RulePreviewList(d view.RulePreview) {
+	if d.Error != nil {
+		<p role="alert" data-variant="danger">{ view.ErrMsg(ctx, d.Error) }</p>
+	} else if d.Total > 0 {
+		<p>{ view.T(ctx, "Matches %d operations, the latest:", d.Total) }</p>
+		<ul class="unstyled vstack gap-1">
+			@OpRows(d.Days, d.CatNames, d.AccByID, "")
+		</ul>
+	} else {
+		<p class="text-light">{ view.T(ctx, "Matches no operations.") }</p>
+	}
+}

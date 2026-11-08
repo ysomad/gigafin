@@ -1,0 +1,41 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Imports(v view.Page) {
+	{{ d, _ := v.Data.(view.Imports) }}
+	@components.Layout(v, false, nil) {
+		<div class="hstack mb-4">
+			<a class="button" href="/imports/new">+ { view.T(ctx, "New import") }</a>
+		</div>
+		<h2>{ view.T(ctx, "Recent imports") }</h2>
+		<div class="table">
+			<table>
+				<thead><tr><th>#</th><th>{ view.T(ctx, "File") }</th><th>{ view.T(ctx, "Uploaded") }</th><th>{ view.T(ctx, "Status") }</th><th class="align-right">{ view.T(ctx, "New") }</th><th class="align-right">{ view.T(ctx, "Duplicates") }</th><th class="align-right">{ view.T(ctx, "Skipped") }</th></tr></thead>
+				<tbody>
+					for _, im := range d.Imports {
+						<tr>
+							<td><a href={ templ.SafeURL(fmt.Sprintf("/imports/%d", im.ID)) }>#{ im.ID }</a></td>
+							<td>{ im.Filename }</td>
+							<td>{ view.Datetime(ctx, im.CreatedAt, v.User) }</td>
+							<td>
+								@components.ImportStatusBadge(im.Status)
+							</td>
+							<td class="align-right">{ im.RowsNew }</td>
+							<td class="align-right">{ im.RowsDup }</td>
+							<td class="align-right">{ im.RowsSkip }</td>
+						</tr>
+					}
+					if len(d.Imports) == 0 {
+						@components.EmptyRow(7, view.T(ctx, "Nothing imported yet."))
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}

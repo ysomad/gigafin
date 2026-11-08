@@ -1,0 +1,8 @@
+package components
+
+// ToastOOB replaces the toasts with the error msg, for htmx to swap in out of band.
+templ ToastOOB(msg string) {
+	<div id="toasts" hidden hx-swap-oob="true">
+		@Toast("danger", msg)
+	</div>
+}

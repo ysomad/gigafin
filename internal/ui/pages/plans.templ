@@ -1,0 +1,89 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Plans(v view.Page) {
+	{{ d, _ := v.Data.(view.Plans) }}
+	@components.Layout(v, false, nil) {
+		<div class="hstack justify-between mb-6">
+			@components.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
+			<ot-dropdown>
+				<menu class="buttons">
+					<li><a class="button" href={ templ.SafeURL("/plans/new?month=" + d.Month.String()) }>+ { view.T(ctx, "New plan") }</a></li>
+					<li>
+						<button type="button" popovertarget="plan-actions" aria-label={ view.T(ctx, "More actions") }>▾</button>
+					</li>
+				</menu>
+				<menu popover id="plan-actions">
+					<form method="post" action="/plans/fill">
+						<input type="hidden" name="month" value={ d.Month.String() }/>
+						<button type="submit" role="menuitem" class="ghost">{ view.T(ctx, "Fill repeating plans into %s", d.Month) }</button>
+					</form>
+				</menu>
+			</ot-dropdown>
+		</div>
+		for _, sec := range d.Sections {
+			{{ inc := sec.Kind == domain.KindIncome }}
+			<section class="mb-6">
+				<div class="hstack justify-between mb-2">
+					<h3>{ view.KindLabel(ctx, sec.Kind) }</h3>
+					<div class="vstack gap-1 align-right">
+						for _, tot := range sec.Totals {
+							<span>
+								{ view.Money(ctx, tot.Spent, tot.Currency) } <span class="text-light">{ view.T(ctx, "of") } { view.Money(ctx, tot.Plan, tot.Currency) } { tot.Currency } ·</span>
+								{ view.Money(ctx, tot.Left().Abs(), tot.Currency) }
+								<span class="text-light">
+									switch  {
+										case tot.Left().IsNegative() && inc:
+											{ view.T(ctx, "above plan") }
+										case tot.Left().IsNegative():
+											{ view.T(ctx, "over") }
+										case inc:
+											{ view.T(ctx, "to go") }
+										default:
+											{ view.T(ctx, "left") }
+									}
+								</span>
+							</span>
+						}
+					</div>
+				</div>
+				if !inc && d.Day > 0 && d.Day < d.Days {
+					<p class="text-light mb-2"><small>{ view.T(ctx, "Day %d of %d · even pace: %d%% of plan", d.Day, d.Days, d.Pace) }</small></p>
+				}
+				for _, it := range sec.Planned {
+					<details open?={ d.Open == fmt.Sprintf("%d:%s", it.Row.Category.ID, it.Row.Currency) }>
+						<summary>
+							<span class="vstack gap-1 w-100">
+								<span class="hstack justify-between">
+									<span>
+										if it.Parent != "" {
+											<span class="text-light">{ it.Parent } › </span>
+										}
+										{ it.Row.Category.Name }
+										if it.Row.Repeating {
+											<span class="text-light" title={ view.T(ctx, "Repeat every month") }>↻</span>
+										}
+									</span>
+									<span class="align-right">{ view.Money(ctx, it.Row.Spent, it.Row.Currency) } <span class="text-light">/ { view.Money(ctx, it.Row.Plan, it.Row.Currency) }</span></span>
+								</span>
+								// clamp only the graphic; the label keeps the actual percentage
+								<progress value={ min(max(it.Row.Percent(), 0), 100) } max="100" aria-label={ view.T(ctx, "%d%% of plan", it.Row.Percent()) }>{ it.Row.Percent() }%</progress>
+							</span>
+						</summary>
+						@components.PlanRowForm(it.Row, d, v.Errors)
+					</details>
+				}
+				if len(sec.Planned) == 0 {
+					<p class="text-light">{ view.T(ctx, "No plans this month.") }</p>
+				}
+			</section>
+		}
+	}
+}

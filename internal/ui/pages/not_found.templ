@@ -1,0 +1,13 @@
+package pages
+
+import (
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ NotFound(v view.Page) {
+	@components.Layout(v, false, nil) {
+		<h1>{ view.T(ctx, "Not found") }</h1>
+		<p><a href="/">{ view.T(ctx, "Back to dashboard") }</a></p>
+	}
+}

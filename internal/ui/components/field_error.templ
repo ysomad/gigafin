@@ -1,0 +1,14 @@
+package components
+
+// FieldError is the message err about an input, with id errID when set.
+templ FieldError(err, errID string) {
+	if err != "" {
+		<div
+			if errID != "" {
+				id={ errID }
+			}
+			class="error"
+			role="status"
+		>{ err }</div>
+	}
+}

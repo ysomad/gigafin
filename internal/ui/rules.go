@@ -12,39 +12,14 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/money"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
 
 // _ruleValueSep separates the values of one_of, not_one_of and between in a condition
 // value input.
 const _ruleValueSep = "|"
-
-type rulesData struct {
-	// Stages are the rules of each stage that has any, oldest first, in the order
-	// stages run.
-	Stages []ruleStage
-}
-
-type ruleStage struct {
-	Stage domain.RuleStage
-	Rules []ruleView
-}
-
-// ruleView is a rule with the ids in its values replaced by names.
-type ruleView struct {
-	ID      int64
-	Origin  domain.RuleOrigin
-	Conds   []condView
-	Actions []actionRow
-}
-
-type condView struct {
-	Field domain.RuleField
-	Op    domain.CondOp
-	// Values are the values joined by _ruleValueSep.
-	Values string
-	// Any joins the condition to the one before with "or".
-	Any bool
-}
 
 func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	rules, err := u.svc.Rules.List(r.Context(), user.ID)
@@ -72,17 +47,17 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 		}
 		return v
 	}
-	var d rulesData
+	var d view.Rules
 	for _, stage := range domain.RuleStages() {
-		s := ruleStage{Stage: stage}
+		s := view.RuleStage{Stage: stage}
 		for _, rule := range rules {
 			if rule.Stage != stage {
 				continue
 			}
-			v := ruleView{
+			v := view.Rule{
 				ID: rule.ID, Origin: rule.Origin,
-				Conds:   make([]condView, len(rule.Conditions)),
-				Actions: make([]actionRow, len(rule.Actions)),
+				Conds:   make([]view.Cond, len(rule.Conditions)),
+				Actions: make([]view.ActionRow, len(rule.Actions)),
 			}
 			for i, c := range rule.Conditions {
 				values := make([]string, len(c.Values))
@@ -96,13 +71,13 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 						values[j] = val
 					}
 				}
-				v.Conds[i] = condView{
+				v.Conds[i] = view.Cond{
 					Field: c.Field, Op: c.Op, Values: strings.Join(values, " "+_ruleValueSep+" "),
 					Any: rule.Match == domain.RuleMatchAny,
 				}
 			}
 			for i, a := range rule.Actions {
-				v.Actions[i] = actionRow{Type: a.Type, Value: a.Value}
+				v.Actions[i] = view.ActionRow{Type: a.Type, Value: a.Value}
 				if a.Type == domain.ActionSetCategory {
 					v.Actions[i].Value = name(catNames, a.Value)
 				}
@@ -113,48 +88,15 @@ func (u *UI) rules(w http.ResponseWriter, r *http.Request, user domain.User) err
 			d.Stages = append(d.Stages, s)
 		}
 	}
-	return u.render(w, r, http.StatusOK, "rules", view{User: &user, Nav: "settings", Title: "Rules", Data: d})
-}
-
-// condRow is a condition row of the rule form, with the operators of its field.
-type condRow struct {
-	Field domain.RuleField
-	Op    domain.CondOp
-	// Value is the values joined by _ruleValueSep.
-	Value string
-	// ID is Value as a category or account id, 0 when it is not one.
-	ID  int64
-	Ops []domain.CondOp
-}
-
-type actionRow struct {
-	Type  domain.ActionType
-	Value string
-	// ID is Value as a category id, 0 when it is not one.
-	ID int64
-}
-
-// ruleForm is the rule form; untagged fields are view only.
-type ruleForm struct {
-	ID         int64
-	Origin     domain.RuleOrigin
-	Stage      domain.RuleStage
-	Match      domain.RuleMatch
-	Conditions []condRow
-	Actions    []actionRow
-	// Applied is the number of operations the rule just changed, -1 when not applied.
-	Applied    int
-	Fields     []domain.RuleFieldOps
-	Categories []domain.Category
-	Accounts   []domain.Account
+	return u.render(w, r, http.StatusOK, pages.Rules, view.Page{User: &user, Nav: "settings", Title: "Rules", Data: d})
 }
 
 // newCondRow returns a condition row of field, the first field when it is unknown, and
 // op, the first operator of the field when the field does not take it.
-func newCondRow(field domain.RuleField, op domain.CondOp, value string) condRow {
+func newCondRow(field domain.RuleField, op domain.CondOp, value string) view.CondRow {
 	fields := domain.RuleFields()
 	i := max(slices.IndexFunc(fields, func(f domain.RuleFieldOps) bool { return f.Field == field }), 0)
-	row := condRow{Field: fields[i].Field, Op: op, Value: value, Ops: fields[i].Ops}
+	row := view.CondRow{Field: fields[i].Field, Op: op, Value: value, Ops: fields[i].Ops}
 	if !slices.Contains(row.Ops, op) {
 		row.Op = row.Ops[0]
 	}
@@ -163,7 +105,7 @@ func newCondRow(field domain.RuleField, op domain.CondOp, value string) condRow 
 }
 
 func (u *UI) renderRule(
-	w http.ResponseWriter, r *http.Request, user domain.User, status int, f ruleForm, viewErr error,
+	w http.ResponseWriter, r *http.Request, user domain.User, status int, f view.RuleForm, viewErr error,
 ) error {
 	tree, err := u.svc.Categories.Tree(r.Context(), user.ID)
 	if err != nil {
@@ -174,16 +116,16 @@ func (u *UI) renderRule(
 	}
 	f.Categories, f.Fields = tree, domain.RuleFields()
 	if len(f.Conditions) == 0 {
-		f.Conditions = []condRow{newCondRow(domain.RuleFieldPayee, domain.CondIs, "")}
+		f.Conditions = []view.CondRow{newCondRow(domain.RuleFieldPayee, domain.CondIs, "")}
 	}
 	if len(f.Actions) == 0 {
-		f.Actions = []actionRow{{Type: domain.ActionSetCategory}}
+		f.Actions = []view.ActionRow{{Type: domain.ActionSetCategory}}
 	}
 	title := "New rule"
 	if f.ID != 0 {
 		title = "Rule"
 	}
-	return u.render(w, r, status, "rule", view{
+	return u.render(w, r, status, pages.Rule, view.Page{
 		User: &user, Nav: "settings", Title: title, Error: viewErr, Form: "rule", Data: f,
 	})
 }
@@ -192,12 +134,12 @@ func (u *UI) renderRule(
 // query, so an operation can start a rule.
 func (u *UI) newRule(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	q := r.URL.Query()
-	f := ruleForm{Stage: domain.RuleStageDefault, Match: domain.RuleMatchAll, Applied: -1}
+	f := view.RuleForm{Stage: domain.RuleStageDefault, Match: domain.RuleMatchAll, Applied: -1}
 	if payee := strings.TrimSpace(q.Get("payee")); payee != "" {
-		f.Conditions = []condRow{newCondRow(domain.RuleFieldPayee, domain.CondIs, payee)}
+		f.Conditions = []view.CondRow{newCondRow(domain.RuleFieldPayee, domain.CondIs, payee)}
 	}
 	if id, err := strconv.ParseInt(q.Get("category"), 10, 64); err == nil {
-		f.Actions = []actionRow{{Type: domain.ActionSetCategory, Value: strconv.FormatInt(id, 10), ID: id}}
+		f.Actions = []view.ActionRow{{Type: domain.ActionSetCategory, Value: strconv.FormatInt(id, 10), ID: id}}
 	}
 	return u.renderRule(w, r, user, http.StatusOK, f, nil)
 }
@@ -211,17 +153,17 @@ func (u *UI) rule(w http.ResponseWriter, r *http.Request, user domain.User) erro
 	if err != nil {
 		return err
 	}
-	f := ruleForm{ID: rule.ID, Origin: rule.Origin, Stage: rule.Stage, Match: rule.Match, Applied: -1}
+	f := view.RuleForm{ID: rule.ID, Origin: rule.Origin, Stage: rule.Stage, Match: rule.Match, Applied: -1}
 	if n, err := strconv.Atoi(r.URL.Query().Get("applied")); err == nil && n >= 0 {
 		f.Applied = n
 	}
-	f.Conditions = make([]condRow, len(rule.Conditions))
+	f.Conditions = make([]view.CondRow, len(rule.Conditions))
 	for i, c := range rule.Conditions {
 		f.Conditions[i] = newCondRow(c.Field, c.Op, strings.Join(c.Values, " "+_ruleValueSep+" "))
 	}
-	f.Actions = make([]actionRow, len(rule.Actions))
+	f.Actions = make([]view.ActionRow, len(rule.Actions))
 	for i, a := range rule.Actions {
-		f.Actions[i] = actionRow{Type: a.Type, Value: a.Value}
+		f.Actions[i] = view.ActionRow{Type: a.Type, Value: a.Value}
 		f.Actions[i].ID, _ = strconv.ParseInt(a.Value, 10, 64) //nolint:errcheck // 0 is not an id
 	}
 	return u.renderRule(w, r, user, http.StatusOK, f, nil)
@@ -233,8 +175,8 @@ func (u *UI) rule(w http.ResponseWriter, r *http.Request, user domain.User) erro
 // among the ones kept.
 //
 //nolint:cyclop // every input of the form is checked here, so the checks stay together
-func (u *UI) parseRuleForm(r *http.Request, lang string) (ruleForm, domain.RuleInput, fieldsError, error) {
-	f := ruleForm{Applied: -1}
+func (u *UI) parseRuleForm(r *http.Request, lang string) (view.RuleForm, domain.RuleInput, view.FieldsError, error) {
+	f := view.RuleForm{Applied: -1}
 	if err := r.ParseForm(); err != nil {
 		return f, domain.RuleInput{}, nil, fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
@@ -255,7 +197,7 @@ func (u *UI) parseRuleForm(r *http.Request, lang string) (ruleForm, domain.RuleI
 		len(in.ActValues) != len(in.ActTypes) {
 		return f, domain.RuleInput{}, nil, domain.NewError(errors.ErrInvalid, "rule rows do not match")
 	}
-	errs := fieldsError{}
+	errs := view.FieldsError{}
 	f.Stage, f.Match = domain.RuleStage(in.Stage), domain.RuleMatch(in.Match)
 	if !slices.Contains(domain.RuleStages(), f.Stage) {
 		errs["stage"] = u.dicts.T(lang, "choose from the list")
@@ -313,11 +255,11 @@ func (u *UI) parseRuleForm(r *http.Request, lang string) (ruleForm, domain.RuleI
 			}
 		}
 	}
-	f.Actions = make([]actionRow, len(in.ActTypes))
+	f.Actions = make([]view.ActionRow, len(in.ActTypes))
 	rule.Actions = make([]domain.Action, len(in.ActTypes))
 	for i, typ := range in.ActTypes {
 		a := domain.Action{Type: domain.ActionType(typ), Value: strings.TrimSpace(in.ActValues[i])}
-		f.Actions[i] = actionRow{Type: a.Type, Value: in.ActValues[i]}
+		f.Actions[i] = view.ActionRow{Type: a.Type, Value: in.ActValues[i]}
 		f.Actions[i].ID, _ = strconv.ParseInt(a.Value, 10, 64) //nolint:errcheck // 0 is not an id
 		rule.Actions[i] = a
 		n := "[" + strconv.Itoa(i) + "]"
@@ -334,8 +276,8 @@ func (u *UI) parseRuleForm(r *http.Request, lang string) (ruleForm, domain.RuleI
 }
 
 func (u *UI) createRule(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	f, in, errs, err := u.parseRuleForm(r, p.lang)
+	p := view.PrefsFrom(r.Context())
+	f, in, errs, err := u.parseRuleForm(r, p.Lang)
 	if err != nil {
 		return err
 	}
@@ -358,8 +300,8 @@ func (u *UI) updateRule(w http.ResponseWriter, r *http.Request, user domain.User
 	if err != nil || id <= 0 {
 		return errors.ErrNotFound
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	f, in, errs, err := u.parseRuleForm(r, p.lang)
+	p := view.PrefsFrom(r.Context())
+	f, in, errs, err := u.parseRuleForm(r, p.Lang)
 	if err != nil {
 		return err
 	}
@@ -403,32 +345,21 @@ func (u *UI) applyRule(w http.ResponseWriter, r *http.Request, user domain.User)
 	return nil
 }
 
-type rulePreview struct {
-	// Total is how many operations the rule matches; Days hold the latest of them.
-	Total    int
-	Error    error
-	Days     []dayGroup
-	CatNames map[int64]string
-	AccByID  map[int64]domain.Account
-	// MoreURL is always empty: op-rows reads it, but the preview has no more pages.
-	MoreURL string
-}
-
 // previewRule renders the operations the rule in the form matches.
 func (u *UI) previewRule(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	const limit = 20
-	var d rulePreview
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	var d view.RulePreview
+	p := view.PrefsFrom(r.Context())
 	// invalid inputs are shown on saving; the preview shows what the service rejects
-	_, in, _, err := u.parseRuleForm(r, p.lang) //nolint:errcheck // input messages are not shown here
+	_, in, _, err := u.parseRuleForm(r, p.Lang) //nolint:errcheck // input messages are not shown here
 	if err != nil {
 		d.Error = err
-		return u.fragment(w, r, http.StatusOK, "rule-preview", d)
+		return u.fragment(w, r, http.StatusOK, components.RulePreviewList(d))
 	}
 	ops, total, err := u.svc.Rules.Preview(r.Context(), user.ID, in, limit)
 	if isUserError(err) {
 		d.Error = err
-		return u.fragment(w, r, http.StatusOK, "rule-preview", d)
+		return u.fragment(w, r, http.StatusOK, components.RulePreviewList(d))
 	}
 	if err != nil {
 		return err
@@ -446,7 +377,7 @@ func (u *UI) previewRule(w http.ResponseWriter, r *http.Request, user domain.Use
 	for _, a := range accounts {
 		d.AccByID[a.ID] = a
 	}
-	return u.fragment(w, r, http.StatusOK, "rule-preview", d)
+	return u.fragment(w, r, http.StatusOK, components.RulePreviewList(d))
 }
 
 // ruleCondition renders a new condition row, or the row of the field in the query
@@ -462,9 +393,7 @@ func (u *UI) ruleCondition(w http.ResponseWriter, r *http.Request, user domain.U
 		return err
 	}
 	row := newCondRow(domain.RuleField(q.Get("cond_field")), domain.CondOp(q.Get("cond_op")), "")
-	return u.fragment(w, r, http.StatusOK, "rule-condition", map[string]any{
-		"Row": row, "Fields": domain.RuleFields(), "Categories": tree, "Accounts": accounts,
-	})
+	return u.fragment(w, r, http.StatusOK, components.RuleCondition(row, domain.RuleFields(), tree, accounts, 0, nil))
 }
 
 // ruleAction renders a new action row, or the row of the type in the query when its
@@ -478,7 +407,7 @@ func (u *UI) ruleAction(w http.ResponseWriter, r *http.Request, user domain.User
 	if !slices.Contains(domain.ActionTypes(), typ) {
 		typ = domain.ActionSetCategory
 	}
-	return u.fragment(w, r, http.StatusOK, "rule-action", map[string]any{"Row": actionRow{Type: typ}, "Categories": tree})
+	return u.fragment(w, r, http.StatusOK, components.RuleAction(view.ActionRow{Type: typ}, tree, 0, nil))
 }
 
 // categorizeOperations runs rules on the operations matching the filter in the query
@@ -501,9 +430,9 @@ func (u *UI) categorizeOperations(w http.ResponseWriter, r *http.Request, user d
 
 // fillOperation re-renders the new operation form with the empty fields rules fill.
 func (u *UI) fillOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
+	p := view.PrefsFrom(r.Context())
 	// the form is being filled in, so its invalid inputs are no error yet
-	f, in, _, err := u.parseOpForm(r, p.lang) //nolint:errcheck // input messages are not shown here
+	f, in, _, err := u.parseOpForm(r, p.Lang) //nolint:errcheck // input messages are not shown here
 	if err != nil {
 		return err
 	}

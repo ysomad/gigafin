@@ -1,0 +1,20 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// SettingsToasts are the toasts of an htmx post of a settings form.
+templ SettingsToasts(d view.Settings) {
+	if d.Notice != "" {
+		@Toast("success", d.Notice)
+	}
+	if d.RatesSync.Done {
+		if d.RatesSync.Updated > 0 {
+			@Toast("success", view.T(ctx, "Daily rates updated: %d.", d.RatesSync.Updated))
+		} else {
+			@Toast("success", view.T(ctx, "Rates are up to date."))
+		}
+		if d.RatesSync.Err != nil {
+			@Toast("danger", view.T(ctx, "Some failed:")+" "+view.ErrMsg(ctx, d.RatesSync.Err))
+		}
+	}
+}

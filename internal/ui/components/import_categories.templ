@@ -1,0 +1,61 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// ImportCategories maps the categories of the file of d to categories of the user.
+templ ImportCategories(d view.Import, base string) {
+	<form method="post" action={ templ.SafeURL(base + "/categories") }>
+		<p class="text-light">{ view.T(ctx, `Categories of the file map separately for money out (expense) and money in (income, e.g. refunds). To create a new category inside another one, write "Parent / Child".`) }</p>
+		<div class="hstack mb-4">
+			<button type="submit" formaction={ templ.SafeURL(base + "/discard") } class="outline" data-variant="secondary">{ view.T(ctx, "Cancel") }</button>
+			@LinkButton(base+"/accounts", "secondary", view.T(ctx, "Back"))
+			<button type="submit">{ view.T(ctx, "Save and continue") }</button>
+		</div>
+		<div class="table mb-4">
+			<table>
+				<thead><tr><th>{ view.T(ctx, "In file") }</th><th>{ view.T(ctx, "Category") }</th><th>{ view.T(ctx, "New category") }</th></tr></thead>
+				<tbody>
+					for _, c := range d.Preview.Categories {
+						<tr>
+							<td>
+								<input type="hidden" name="cat_name" value={ c.Name }/>
+								<input type="hidden" name="cat_kind" value={ string(c.Kind) }/>
+								<strong>{ c.Name }</strong>
+								<div>
+									<span
+										class="badge"
+										if c.Kind == domain.KindIncome {
+											data-variant="success"
+										} else {
+											data-variant="danger"
+										}
+									>{ view.T(ctx, string(c.Kind)) }</span> <span class="text-light">{ view.T(ctx, "%d rows", c.Rows) }</span>
+								</div>
+							</td>
+							<td>
+								<select name="cat_id" aria-label={ view.T(ctx, "Category") }>
+									<option value="0">{ view.T(ctx, "Create new category") } →</option>
+									@CategoryOptions(domain.ByKind(d.Categories, c.Kind), c.CategoryID)
+								</select>
+							</td>
+							<td>
+								<input
+									name="cat_new"
+									if c.CategoryID == 0 {
+										value={ c.Name }
+									} else {
+										value=""
+									}
+									aria-label={ view.T(ctx, "New category") }
+								/>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</form>
+}

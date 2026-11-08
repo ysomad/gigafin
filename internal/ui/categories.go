@@ -7,22 +7,24 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/a-h/templ"
+
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/ui/pages"
+	"github.com/ysomad/gigafin/internal/ui/view"
 )
 
-// categoriesData is the categories page of Kind, or the new category page with the
-// values of its form.
-type categoriesData struct {
-	Categories []domain.Category
-	Kind       domain.Kind `form:"kind"`
-	Parent     int64       `form:"parent"` // 0 is a cat1
-	Name       string      `form:"name"`
-}
-
-// renderCategories renders page "categories" or "category_new" of d.
+// renderCategories renders page, the categories or the new category page, titled title, of d.
 func (u *UI) renderCategories(
-	w http.ResponseWriter, r *http.Request, user domain.User, page string, status int, d categoriesData, viewErr error,
+	w http.ResponseWriter,
+	r *http.Request,
+	user domain.User,
+	page func(view.Page) templ.Component,
+	title string,
+	status int,
+	d view.Categories,
+	viewErr error,
 ) error {
 	if _, err := domain.ParseKind(string(d.Kind)); err != nil {
 		d.Kind = domain.KindExpense
@@ -31,11 +33,7 @@ func (u *UI) renderCategories(
 	if d.Categories, err = u.svc.Categories.Tree(r.Context(), user.ID); err != nil {
 		return err
 	}
-	title := "Categories"
-	if page == "category_new" {
-		title = "New category"
-	}
-	return u.render(w, r, status, page, view{
+	return u.render(w, r, status, page, view.Page{
 		User: &user, Nav: "settings", Title: title, Error: viewErr, Form: "category", Data: d,
 	})
 }
@@ -56,30 +54,32 @@ func (u *UI) categoryNameError(name, lang string) string {
 }
 
 func (u *UI) categories(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
-	return u.renderCategories(w, r, user, "categories", http.StatusOK, d, nil)
+	d := view.Categories{Kind: domain.Kind(r.URL.Query().Get("kind"))}
+	return u.renderCategories(w, r, user, pages.Categories, "Categories", http.StatusOK, d, nil)
 }
 
 func (u *UI) newCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
-	return u.renderCategories(w, r, user, "category_new", http.StatusOK, d, nil)
+	d := view.Categories{Kind: domain.Kind(r.URL.Query().Get("kind"))}
+	return u.renderCategories(w, r, user, pages.CategoryNew, "New category", http.StatusOK, d, nil)
 }
 
 func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var d categoriesData
+	var d view.Categories
 	if err := u.formDecoder.Decode(&d, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	if msg := u.categoryNameError(d.Name, p.lang); msg != "" {
-		return u.renderCategories(w, r, user, "category_new", http.StatusUnprocessableEntity, d, fieldsError{"name": msg})
+	p := view.PrefsFrom(r.Context())
+	if msg := u.categoryNameError(d.Name, p.Lang); msg != "" {
+		return u.renderCategories(
+			w, r, user, pages.CategoryNew, "New category", http.StatusUnprocessableEntity, d, view.FieldsError{"name": msg},
+		)
 	}
 	c, err := u.svc.Categories.Create(r.Context(), user.ID, d.Parent, d.Kind, d.Name)
 	if isUserError(err) {
-		return u.renderCategories(w, r, user, "category_new", http.StatusUnprocessableEntity, d, err)
+		return u.renderCategories(w, r, user, pages.CategoryNew, "New category", http.StatusUnprocessableEntity, d, err)
 	}
 	if err != nil {
 		return err
@@ -88,30 +88,21 @@ func (u *UI) createCategory(w http.ResponseWriter, r *http.Request, user domain.
 	return nil
 }
 
-// categoryData is the category page with the values of its edit form.
-type categoryData struct {
-	Category   domain.Category
-	ParentName string
-	Parents    []domain.Category
-	Name       string `form:"name"`
-	Parent     int64  `form:"parent"` // 0 keeps the parent
-}
-
 // renderCategory renders the page of category id. A nil f shows the category's values
 // in the form, otherwise f holds the values of a form post that failed with viewErr.
 func (u *UI) renderCategory(
-	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, f *categoryData, viewErr error,
+	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, f *view.Category, viewErr error,
 ) error {
 	c, tree, err := u.svc.Categories.Get(r.Context(), user.ID, id)
 	if err != nil {
 		return err
 	}
-	d := categoryData{Category: c, Name: c.Name, Parent: c.ParentID}
+	d := view.Category{Category: c, Name: c.Name, Parent: c.ParentID}
 	if f != nil {
 		d.Name, d.Parent = f.Name, f.Parent
 	}
 	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
-	return u.render(w, r, status, "category", view{
+	return u.render(w, r, status, pages.Category, view.Page{
 		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name}, Error: viewErr, Form: "category",
 		Data: d,
 	})
@@ -133,13 +124,13 @@ func (u *UI) updateCategory(w http.ResponseWriter, r *http.Request, user domain.
 	if err := r.ParseForm(); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	var f categoryData
+	var f view.Category
 	if err := u.formDecoder.Decode(&f, r.PostForm); err != nil {
 		return fmt.Errorf("form: %w: %w", err, errors.ErrInvalid)
 	}
-	p, _ := r.Context().Value(prefsKey{}).(prefs) //nolint:errcheck // set by authed
-	if msg := u.categoryNameError(f.Name, p.lang); msg != "" {
-		return u.renderCategory(w, r, user, id, http.StatusUnprocessableEntity, &f, fieldsError{"name": msg})
+	p := view.PrefsFrom(r.Context())
+	if msg := u.categoryNameError(f.Name, p.Lang); msg != "" {
+		return u.renderCategory(w, r, user, id, http.StatusUnprocessableEntity, &f, view.FieldsError{"name": msg})
 	}
 	err = u.svc.Categories.Update(r.Context(), user.ID, id, f.Name, f.Parent)
 	if isUserError(err) {

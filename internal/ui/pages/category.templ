@@ -1,0 +1,58 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+templ Category(v view.Page) {
+	{{
+		d, _ := v.Data.(view.Category)
+		c := d.Category
+		base := fmt.Sprintf("/categories/%d", c.ID)
+	}}
+	@components.Layout(v, false, nil) {
+		<h1>
+			if d.ParentName != "" {
+				{ d.ParentName } /
+			}
+			{ c.Name }
+			<span class="text-light">
+				{ view.T(ctx, string(c.Kind)) }
+				if c.Archived {
+					· { view.T(ctx, "archived") }
+				}
+			</span>
+		</h1>
+		<p class="text-light mb-4"><a href={ templ.SafeURL(fmt.Sprintf("/operations?category=%d", c.ID)) }>{ view.T(ctx, "Operations") }</a></p>
+		<form id="form-category" class="form-compact" method="post" action={ templ.SafeURL(base) }>
+			@components.FormError(v.Errors.Form("category"), "")
+			<fieldset class="row mb-4" aria-label={ view.T(ctx, "Category") }>
+				{{ e := v.Errors.Get("name") }}
+				@components.Field("col-6", view.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ d.Name } { view.Invalid(e, "name-error")... }/>
+				}
+				if c.ParentID != 0 {
+					@components.Field("col-6", view.T(ctx, "Inside"), "", "", nil) {
+						<select name="parent">
+							for _, p := range d.Parents {
+								<option value={ p.ID } selected?={ p.ID == d.Parent }>{ p.Name }</option>
+							}
+						</select>
+					}
+				}
+			</fieldset>
+			<div class="hstack justify-between">
+				<div class="hstack">
+					<button type="submit">{ view.T(ctx, "Save") }</button>
+					@components.LinkButton(fmt.Sprintf("/categories?kind=%s", c.Kind), "secondary", view.T(ctx, "Cancel"))
+				</div>
+				@components.ArchiveDelete("category", c.Archived)
+			</div>
+			<p class="text-light">{ view.T(ctx, "Categories that contain other categories or have operations can only be archived.") }</p>
+		</form>
+		@components.ArchiveDeleteForms("category", base, c.Archived, view.T(ctx, "Delete category %s?", c.Name))
+	}
+}

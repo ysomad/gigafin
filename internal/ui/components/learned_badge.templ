@@ -1,0 +1,8 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// LearnedBadge marks a rule learned from the user's categories.
+templ LearnedBadge() {
+	<span class="badge" data-variant="secondary">{ view.T(ctx, "learned") }</span>
+}

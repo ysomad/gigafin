@@ -15,6 +15,7 @@ tools:
 generate:
 	$(TOOL) sqlc generate
 	$(TOOL) ogen --config ogen.yml --target internal/gen/ogen --package ogen --clean api/public.yaml
+	$(TOOL) templ generate -path internal/ui
 
 build:
 	go build -tags apidocs -o bin/gigafin .

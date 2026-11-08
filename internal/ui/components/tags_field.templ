@@ -1,0 +1,31 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// TagsField is the tags input of id, completed from all by the datalist of listID,
+// with the comma separated tags of value, posted as tags, and the message err.
+templ TagsField(id, listID, value, placeholder string, all []string, err, class string) {
+	<div
+		data-field
+		data-operation-tags
+		if class != "" {
+			class={ class }
+		}
+		if err != "" {
+			aria-invalid="true"
+		}
+	>
+		<label for={ id }>{ view.T(ctx, "Tags") }</label>
+		<ot-taginput value={ value }>
+			<input id={ id } list={ listID } autocomplete="off" placeholder={ placeholder }/>
+			<datalist id={ listID }></datalist>
+		</ot-taginput>
+		<input type="hidden" name="tags" value={ value }/>
+		<template data-tag-suggestions>
+			for _, tag := range all {
+				<option value={ tag }></option>
+			}
+		</template>
+		@FieldError(err, "")
+	</div>
+}

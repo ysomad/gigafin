@@ -1,0 +1,12 @@
+package components
+
+import "github.com/ysomad/gigafin/internal/ui/view"
+
+// CurrencySelect picks one of currencies.
+templ CurrencySelect(currencies []string, selected, err string) {
+	<select name="currency" { view.Invalid(err, "currency-error")... }>
+		for _, c := range currencies {
+			<option selected?={ c == selected }>{ c }</option>
+		}
+	</select>
+}

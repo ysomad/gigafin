@@ -1,0 +1,63 @@
+package components
+
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/view"
+)
+
+// ImportAccounts maps the accounts of the file of d to accounts of the user.
+templ ImportAccounts(d view.Import, base string) {
+	<form method="post" action={ templ.SafeURL(base + "/accounts") }>
+		<p class="text-light">{ view.T(ctx, "Accounts of the file the new rows belong to. Pick an existing account or create one; accounts with the same name are picked already.") }</p>
+		<div class="hstack mb-4">
+			<button type="submit" formaction={ templ.SafeURL(base + "/discard") } class="outline" data-variant="secondary">{ view.T(ctx, "Cancel") }</button>
+			<button type="submit">{ view.T(ctx, "Save and continue") }</button>
+		</div>
+		<div class="table mb-4">
+			<table>
+				<thead><tr><th>{ view.T(ctx, "In file") }</th><th>{ view.T(ctx, "Account") }</th><th>{ view.T(ctx, "New account name") }</th><th>{ view.T(ctx, "Kind") }</th><th>{ view.T(ctx, "Credit limit") }</th></tr></thead>
+				<tbody>
+					for _, a := range d.Preview.Accounts {
+						<tr data-account>
+							<td>
+								<input type="hidden" name="acc_name" value={ a.Name }/>
+								<input type="hidden" name="acc_currency" value={ a.Currency }/>
+								<strong>{ a.Name }</strong>
+								<div class="text-light">{ a.Currency } · { view.T(ctx, "%d rows", a.Rows) }</div>
+							</td>
+							<td>
+								<select name="acc_id" aria-label={ view.T(ctx, "Account") }>
+									<option value="0">{ view.T(ctx, "Create new account") } →</option>
+									for _, acc := range d.Accounts {
+										if acc.Currency == a.Currency {
+											<option value={ acc.ID } selected?={ acc.ID == a.AccountID }>{ acc.Name }</option>
+										}
+									}
+								</select>
+							</td>
+							<td>
+								<input
+									name="acc_new"
+									if a.AccountID == 0 {
+										value={ a.Name }
+									} else {
+										value=""
+									}
+									aria-label={ view.T(ctx, "New account name") }
+								/>
+							</td>
+							<td>
+								<select name="acc_kind" data-account-kind aria-label={ view.T(ctx, "Kind") }>
+									for _, k := range d.AccountKinds {
+										<option value={ string(k) } selected?={ k == a.Kind }>{ view.T(ctx, string(k)) }</option>
+									}
+								</select>
+							</td>
+							<td><div data-credit-limit hidden?={ a.Kind != domain.AccountCredit }><input name="acc_limit" inputmode="decimal" placeholder={ view.T(ctx, "optional") } aria-label={ view.T(ctx, "Credit limit") }/></div></td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</form>
+}

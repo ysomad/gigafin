@@ -1,0 +1,141 @@
+package pages
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/components"
+	"github.com/ysomad/gigafin/internal/ui/view"
+	"net/url"
+)
+
+templ Dashboard(v view.Page) {
+	{{ d, _ := v.Data.(view.Dashboard) }}
+	@components.Layout(v, false, nil) {
+		<div class="mb-6">
+			@components.MonthNav("/", d.Dash.Month, d.Months, d.Prev, d.Next)
+		</div>
+		for _, c := range d.Charts {
+			<h2>{ view.T(ctx, "Income vs expense") } <span class="text-light">{ c.Currency }</span></h2>
+			<div class="table">
+				<figure class="trend" data-locale={ view.Lang(ctx) } data-minor-units?={ view.ShowMinorUnits(ctx) } data-currency={ c.Currency }>
+					@view.ChartScript(c, view.T(ctx, "Income"), view.T(ctx, "Expense"), view.T(ctx, "Net worth"))
+				</figure>
+			</div>
+		}
+		if len(d.Dash.Trends) == 0 {
+			<p class="text-light">{ view.T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ view.T(ctx, "Add one") }</a> { view.T(ctx, "or") } <a href="/imports/new">{ view.T(ctx, "import") }</a>.</p>
+		}
+		if len(d.Dash.Expenses) > 0 {
+			@components.CompareForm(d)
+		}
+		// expenses are ordered by currency: a table per currency
+		for _, group := range view.CurrencyGroups(d.Dash.Expenses, func(s domain.CategoryShare) string { return s.Currency }) {
+			<h2>{ view.T(ctx, "Expenses by category") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<thead>
+						<tr>
+							<th></th>
+							<th></th>
+							<th class="align-right">{ view.T(ctx, d.Dash.Month.First().Format("Jan")) } { d.Dash.Month.First().Format("2006") }</th>
+							<th></th>
+							<th class="align-right">{ view.T(ctx, d.Dash.CompareMonth.First().Format("Jan")) } { d.Dash.CompareMonth.First().Format("2006") }</th>
+							<th class="align-right">Δ</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, s := range group {
+							<tr>
+								<td><a href={ templ.SafeURL(fmt.Sprintf("/operations?category=%d&from=%s&to=%s", s.Category.ID, d.From, d.To)) }>{ s.Category.Name }</a></td>
+								<td><progress value={ s.Percent } max="100" aria-label={ fmt.Sprintf("%s: %d%%", s.Category.Name, s.Percent) }></progress></td>
+								<td class="align-right">{ view.Money(ctx, s.Spent, s.Currency) }</td>
+								<td class="align-right text-light">{ s.Percent }%</td>
+								<td class="align-right text-light">
+									if s.Prev.IsPositive() {
+										{ view.Money(ctx, s.Prev, s.Currency) }
+									} else {
+										—
+									}
+								</td>
+								<td class="align-right">
+									<span
+										class="badge"
+										if s.Change() > 0 {
+											data-variant="danger"
+										}
+										else
+										if s.Change() < 0 {
+											data-variant="success"
+										} else {
+											data-variant=""
+										}
+									>
+										if !s.Prev.IsPositive() {
+											{ view.T(ctx, "new") }
+										} else if s.Change() > 0 {
+											+{ s.Change() }%
+										} else {
+											{ s.Change() }%
+										}
+									</span>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		// category trends are ordered by currency: a table per currency
+		for _, group := range view.CurrencyGroups(d.Dash.CategoryTrends, func(c domain.CategoryTrend) string { return c.Currency }) {
+			<h2>{ view.T(ctx, "Expenses by month") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<thead>
+						<tr>
+							<th></th>
+							for _, m := range d.Dash.TrendMonths {
+								<th class="align-right">{ view.T(ctx, m.First().Format("Jan")) }</th>
+							}
+							<th class="align-right">{ view.T(ctx, "Avg") }</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, ct := range group {
+							<tr>
+								<td>{ ct.Category.Name }</td>
+								for i, amount := range ct.Months {
+									<td class="align-right">
+										if amount.IsZero() {
+											<span class="text-light">—</span>
+										} else {
+											<a href={ templ.SafeURL(fmt.Sprintf("/operations?category=%d&from=%s&to=%s", ct.Category.ID, timex.FormatDate(d.Dash.TrendMonths[i].First()), timex.FormatDate(d.Dash.TrendMonths[i].Last()))) }>{ view.Money(ctx, amount, ct.Currency) }</a>
+										}
+									</td>
+								}
+								<td class="align-right text-light">{ view.Money(ctx, ct.Average(), ct.Currency) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		for _, group := range view.CurrencyGroups(d.Dash.Payees, func(p domain.PayeeSum) string { return p.Currency }) {
+			<h2>{ view.T(ctx, "Top payees") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<tbody>
+						for _, p := range group {
+							<tr>
+								<td><a href={ templ.SafeURL(fmt.Sprintf("/operations?q=%s&from=%s&to=%s", url.QueryEscape(p.Payee), d.From, d.To)) }>{ p.Payee }</a></td>
+								<td class="align-right text-light">{ p.Count }×</td>
+								<td class="align-right">{ view.Money(ctx, p.Total, p.Currency) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
