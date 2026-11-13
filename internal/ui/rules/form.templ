@@ -1,0 +1,185 @@
+package rules
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ formPage(v kit.Page, d ruleForm) {
+	@kit.Layout(v, false, nil) {
+		<h1>
+			if d.ID != 0 {
+				{ kit.T(ctx, "Rule") }
+				if d.Origin == domain.RuleOriginLearned {
+					@learnedBadge()
+				}
+			} else {
+				{ kit.T(ctx, "New rule") }
+			}
+		</h1>
+		if d.Applied >= 0 {
+			<p role="status" class="badge" data-variant="success">{ kit.T(ctx, "Changed %d operations.", d.Applied) }</p>
+		}
+		<form
+			id="form-rule"
+			method="post"
+			if d.ID != 0 {
+				action={ fmt.Sprintf("/rules/%d", d.ID) }
+			} else {
+				action="/rules"
+			}
+		>
+			@kit.FormError(v.Errors.Form("rule"), "")
+			<div class="row mb-4">
+				{{ e := v.Errors.Get("stage") }}
+				@kit.Field("col-4", kit.T(ctx, "Runs"), e, "", nil) {
+					<select name="stage" { kit.Invalid(e, "")... }>
+						for _, s := range domain.RuleStages() {
+							<option value={ string(s) } selected?={ s == d.Stage }>{ ruleStageLabel(ctx, s) }</option>
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("match") }}
+				@kit.Field("col-4", kit.T(ctx, "Match"), e, "", nil) {
+					<select name="match" { kit.Invalid(e, "")... }>
+						<option value="all" selected?={ d.Match == domain.RuleMatchAll }>{ kit.T(ctx, "all conditions") }</option>
+						<option value="any" selected?={ d.Match == domain.RuleMatchAny }>{ kit.T(ctx, "any condition") }</option>
+					</select>
+				}
+			</div>
+			<h2>{ kit.T(ctx, "If") }</h2>
+			<div id="conditions">
+				for i, c := range d.Conditions {
+					@condFields(c, d.Fields, d.Categories, d.Accounts, i, v.Errors)
+				}
+			</div>
+			<div class="hstack mb-4">
+				<button type="button" class="outline small" hx-get="/rules/condition" hx-target="#conditions" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add condition") }</button>
+			</div>
+			<h2>{ kit.T(ctx, "Then") }</h2>
+			<div id="rule-actions">
+				for i, a := range d.Actions {
+					@actionFields(a, d.Categories, i, v.Errors)
+				}
+			</div>
+			<div class="hstack mb-4">
+				<button type="button" class="outline small" hx-get="/rules/action" hx-target="#rule-actions" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add action") }</button>
+			</div>
+			<div class="hstack mb-4">
+				<button type="submit">{ kit.T(ctx, "Save") }</button>
+				<button type="button" class="outline" hx-post="/rules/preview" hx-target="#preview" data-variant="secondary">{ kit.T(ctx, "Show matches") }</button>
+				@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Cancel"))
+			</div>
+		</form>
+		<div id="preview"></div>
+		if d.ID != 0 {
+			<div class="hstack mb-4">
+				<form method="post" action={ fmt.Sprintf("/rules/%d/apply", d.ID) } hx-confirm={ kit.T(ctx, "Apply the saved rule to all operations it matches?") }>
+					<button type="submit" data-variant="secondary">{ kit.T(ctx, "Apply to matching operations") }</button>
+				</form>
+				<form method="post" action={ fmt.Sprintf("/rules/%d/delete", d.ID) } hx-confirm={ kit.T(ctx, "Delete this rule?") }>
+					<button type="submit" class="outline" data-variant="secondary">{ kit.T(ctx, "Delete rule") }</button>
+				</form>
+			</div>
+		}
+	}
+}
+
+// condFields is a condition row of the rule form: r, with the fields to pick from,
+// and categories and accounts for their value selects. errs and index are set on the
+// rows of a re-rendered form, not on added ones.
+templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Category, accounts []domain.Account, index int, errs *kit.FormErrors) {
+	{{
+		fieldErr := errs.Get(fmt.Sprintf("cond_field[%d]", index))
+		opErr := errs.Get(fmt.Sprintf("cond_op[%d]", index))
+		valueErr := errs.Get(fmt.Sprintf("cond_value[%d]", index))
+	}}
+	<div class="cond row mb-4">
+		@kit.Field("col-4", kit.T(ctx, "Field"), fieldErr, "", nil) {
+			<select name="cond_field" hx-get="/rules/condition" hx-include="closest .cond" hx-target="closest .cond" hx-swap="outerHTML">
+				for _, f := range fields {
+					<option value={ string(f.Field) } selected?={ f.Field == r.Field }>{ ruleFieldLabel(ctx, f.Field) }</option>
+				}
+			</select>
+		}
+		@kit.Field("col-4", kit.T(ctx, "Condition"), opErr, "", nil) {
+			<select name="cond_op">
+				for _, op := range r.Ops {
+					<option value={ string(op) } selected?={ op == r.Op }>{ ruleOpLabel(ctx, op) }</option>
+				}
+			</select>
+		}
+		@kit.Field("col-4", kit.T(ctx, "Value"), valueErr, "", nil) {
+			switch r.Field {
+				case domain.RuleFieldCategory:
+					<select name="cond_value">
+						<option value="">—</option>
+						@kit.CategoryOptions(categories, r.ID)
+					</select>
+				case domain.RuleFieldAccount:
+					<select name="cond_value">
+						<option value="">—</option>
+						for _, a := range accounts {
+							<option value={ a.ID } selected?={ a.ID == r.ID }>{ a.Name } ({ a.Currency })</option>
+						}
+					</select>
+				case domain.RuleFieldType:
+					<select name="cond_value">
+						for _, typ := range domain.OpTypes() {
+							<option value={ string(typ) } selected?={ string(typ) == r.Value }>{ kit.T(ctx, string(typ)) }</option>
+						}
+					</select>
+				default:
+					<input name="cond_value" value={ r.Value } autocomplete="off" placeholder={ kit.T(ctx, "one of and between take values separated by |") }/>
+			}
+		}
+		<div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label={ kit.T(ctx, "Remove condition") } data-variant="secondary">✕</button></div>
+	</div>
+}
+
+// actionFields is an action row of the rule form: r, with the categories for the
+// category select. errs and index are set on the rows of a re-rendered form, not on
+// added ones.
+templ actionFields(r actionRow, categories []domain.Category, index int, errs *kit.FormErrors) {
+	{{
+		typeErr := errs.Get(fmt.Sprintf("act_type[%d]", index))
+		valueErr := errs.Get(fmt.Sprintf("act_value[%d]", index))
+	}}
+	<div class="act row mb-4">
+		@kit.Field("col-4", kit.T(ctx, "Action"), typeErr, "", nil) {
+			<select name="act_type" hx-get="/rules/action" hx-include="closest .act" hx-target="closest .act" hx-swap="outerHTML">
+				for _, typ := range domain.ActionTypes() {
+					<option value={ string(typ) } selected?={ typ == r.Type }>{ ruleActionLabel(ctx, typ) }</option>
+				}
+			</select>
+		}
+		@kit.Field("col-4", kit.T(ctx, "Value"), valueErr, "", nil) {
+			if r.Type == domain.ActionSetCategory {
+				<select name="act_value">
+					<option value="">—</option>
+					@kit.CategoryOptions(categories, r.ID)
+				</select>
+			} else {
+				<input name="act_value" value={ r.Value } autocomplete="off"/>
+			}
+		}
+		<div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .act" hx-swap="delete" aria-label={ kit.T(ctx, "Remove action") } data-variant="secondary">✕</button></div>
+	</div>
+}
+
+// previewList lists the latest operations a rule form matches.
+templ previewList(d rulePreview) {
+	if d.Error != nil {
+		<p role="alert" data-variant="danger">{ kit.ErrMsg(ctx, d.Error) }</p>
+	} else if d.Total > 0 {
+		<p>{ kit.T(ctx, "Matches %d operations, the latest:", d.Total) }</p>
+		<ul class="unstyled vstack gap-1">
+			@kit.OpRows(d.Days, d.CatNames, d.AccByID, "")
+		</ul>
+	} else {
+		<p class="text-light">{ kit.T(ctx, "Matches no operations.") }</p>
+	}
+}
+

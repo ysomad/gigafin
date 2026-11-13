@@ -1,0 +1,65 @@
+package imports
+
+import (
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ ratesPage(v kit.Page, d ratesData) {
+	@kit.Layout(v, !d.Done, nil) {
+		<h1>{ kit.T(ctx, "Import exchange rates") }</h1>
+		if d.Done {
+			@steps("done", true, nil)
+			<p role="status" class="badge" data-variant="success">{ kit.T(ctx, "Imported %d daily rates.", d.Imported) }</p>
+			<div class="hstack mb-4">
+				@kit.LinkButton("/imports/new?source=rates", "secondary", kit.T(ctx, "Import more"))
+				<a class="button" href="/settings">{ kit.T(ctx, "Settings") }</a>
+			</div>
+		} else {
+			@steps("preview", true, nil)
+			<p>{ kit.T(ctx, "%d daily rates", len(d.Changes)) } · { kit.T(ctx, "%d new", d.New) } · { kit.T(ctx, "%d change a stored rate", d.Changed) }</p>
+			<div class="hstack mb-4">
+				@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
+				@kit.LinkButton("/imports/new?source=rates", "secondary", kit.T(ctx, "Back"))
+				<form method="post" action="/imports/rates/commit" hx-disable="find button">
+					<textarea name="content" hidden>{ d.Content }</textarea>
+					<button type="submit" data-spinner>{ kit.T(ctx, "Import %d rates", len(d.Changes)) }</button>
+				</form>
+			</div>
+			<div class="table">
+				<table>
+					<thead><tr><th>{ kit.T(ctx, "Date") }</th><th>{ kit.T(ctx, "Currency") }</th><th class="align-right">{ kit.T(ctx, "Rate") }</th><th class="align-right">{ kit.T(ctx, "Stored") }</th><th>{ kit.T(ctx, "Status") }</th></tr></thead>
+					<tbody>
+						for _, c := range d.Changes {
+							<tr>
+								<td>{ timex.FormatDate(c.Rate.Date) }</td>
+								<td>{ c.Rate.Currency }</td>
+								<td class="align-right">{ c.Rate.Rate.String() }</td>
+								<td class="align-right">
+									if c.Old != nil {
+										{ c.Old.Rate.String() }
+										if c.Old.Manual {
+											<span class="badge" data-variant="secondary">{ kit.T(ctx, "manual") }</span>
+										}
+									} else {
+										—
+									}
+								</td>
+								<td>
+									switch c.Status() {
+										case "new":
+											{ kit.T(ctx, "new") }
+										case "changed":
+											<strong>{ kit.T(ctx, "changed") }</strong>
+										default:
+											<span class="badge" data-variant="secondary">{ kit.T(ctx, "unchanged") }</span>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}

@@ -1,0 +1,98 @@
+package kit
+
+import "github.com/ysomad/gigafin/internal/domain"
+
+// Field is a form field: a label of class with the input as children, followed by
+// the message err about it, with id errID when set. attrs are added to the label.
+templ Field(class, label, err, errID string, attrs templ.Attributes) {
+	<label
+		data-field
+		class={ templ.KV(class, class != "") }
+		if err != "" {
+			aria-invalid="true"
+		}
+		{ attrs... }
+	>
+		{ label }
+		{ children... }
+		@FieldError(err, errID)
+	</label>
+}
+
+// FieldError is the message err about an input, with id errID when set.
+templ FieldError(err, errID string) {
+	if err != "" {
+		<div
+			if errID != "" {
+				id={ errID }
+			}
+			class="error"
+			role="status"
+		>{ err }</div>
+	}
+}
+
+// FormError is the message msg about a whole form, in grid column col, if any.
+templ FormError(msg, col string) {
+	if msg != "" {
+		<p class={ templ.KV(col, col != ""), "error" } role="alert">{ msg }</p>
+	}
+}
+
+// SubmitColumn is the submit button of a one-row form in a column of class, under an
+// empty caption, so it lines up with the inputs under their labels.
+templ SubmitColumn(class, variant, label string) {
+	<div class={ class, "vstack gap-1" }>
+		<label aria-hidden="true">&nbsp;</label>
+		<div>
+			<button
+				type="submit"
+				if variant != "" {
+					data-variant={ variant }
+				}
+			>{ label }</button>
+		</div>
+	</div>
+}
+
+// LinkButton is a link that looks like an outline button of variant.
+templ LinkButton(href, variant, label string) {
+	<a class="button outline" href={ href } data-variant={ variant }>{ label }</a>
+}
+
+// SegmentLink is a link of a group of links to the variants of a page, filled when
+// current.
+templ SegmentLink(href string, current bool, label string) {
+	<a
+		class={ "button", templ.KV("outline", !current) }
+		if current {
+			aria-current="page"
+		}
+		href={ href }
+		data-variant="secondary"
+	>{ label }</a>
+}
+
+// CurrencySelect picks one of currencies.
+templ CurrencySelect(currencies []string, selected, err string) {
+	<select name="currency" { Invalid(err, "currency-error")... }>
+		for _, c := range currencies {
+			<option selected?={ c == selected }>{ c }</option>
+		}
+	</select>
+}
+
+// CategoryOptions are the options of the categories of tree, cat2 named after their
+// cat1. Archived ones are left out, unless selected.
+templ CategoryOptions(tree []domain.Category, selected int64) {
+	for _, parent := range tree {
+		if !parent.Archived || parent.ID == selected {
+			<option value={ parent.ID } selected?={ parent.ID == selected }>{ parent.Name }</option>
+		}
+		for _, c := range parent.Children {
+			if !c.Archived || c.ID == selected {
+				<option value={ c.ID } selected?={ c.ID == selected }>{ parent.Name } / { c.Name }</option>
+			}
+		}
+	}
+}

@@ -1,0 +1,165 @@
+package dashboard
+
+import (
+	"fmt"
+	"net/url"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ dashboardPage(v kit.Page, d dashboardData) {
+	@kit.Layout(v, false, nil) {
+		<div class="mb-6">
+			@kit.MonthNav("/", d.Dash.Month, d.Months, d.Prev, d.Next)
+		</div>
+		for _, c := range d.Charts {
+			<h2>{ kit.T(ctx, "Income vs expense") } <span class="text-light">{ c.Currency }</span></h2>
+			<div class="table">
+				<figure
+					class="trend"
+					data-locale={ kit.Lang(ctx) }
+					data-minor-units?={ kit.ShowMinorUnits(ctx) }
+					data-currency={ c.Currency }
+					data-label-income={ kit.T(ctx, "Income") }
+					data-label-expense={ kit.T(ctx, "Expense") }
+					data-label-balance={ kit.T(ctx, "Net worth") }
+				>
+					@templ.JSONScript("chart-"+c.Currency, c)
+				</figure>
+			</div>
+		}
+		if len(d.Dash.Trends) == 0 {
+			@kit.NoOperations()
+		}
+		if len(d.Dash.Expenses) > 0 {
+			@compareForm(d)
+		}
+		// expenses are ordered by currency: a table per currency
+		for _, group := range currencyGroups(d.Dash.Expenses, func(s domain.CategoryShare) string { return s.Currency }) {
+			<h2>{ kit.T(ctx, "Expenses by category") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<thead>
+						<tr>
+							<th></th>
+							<th></th>
+							<th class="align-right">{ kit.T(ctx, d.Dash.Month.First().Format("Jan")) } { d.Dash.Month.First().Format("2006") }</th>
+							<th></th>
+							<th class="align-right">{ kit.T(ctx, d.Dash.CompareMonth.First().Format("Jan")) } { d.Dash.CompareMonth.First().Format("2006") }</th>
+							<th class="align-right">Δ</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, s := range group {
+							<tr>
+								<td><a href={ fmt.Sprintf("/operations?category=%d&from=%s&to=%s", s.Category.ID, d.From, d.To) }>{ s.Category.Name }</a></td>
+								<td><progress value={ s.Percent } max="100" aria-label={ fmt.Sprintf("%s: %d%%", s.Category.Name, s.Percent) }></progress></td>
+								<td class="align-right">{ kit.Money(ctx, s.Spent, s.Currency) }</td>
+								<td class="align-right text-light">{ s.Percent }%</td>
+								<td class="align-right text-light">
+									if s.Prev.IsPositive() {
+										{ kit.Money(ctx, s.Prev, s.Currency) }
+									} else {
+										—
+									}
+								</td>
+								<td class="align-right">
+									<span
+										class="badge"
+										if s.Change() > 0 {
+											data-variant="danger"
+										}
+										if s.Change() < 0 {
+											data-variant="success"
+										}
+									>
+										if !s.Prev.IsPositive() {
+											{ kit.T(ctx, "new") }
+										} else if s.Change() > 0 {
+											+{ s.Change() }%
+										} else {
+											{ s.Change() }%
+										}
+									</span>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		// category trends are ordered by currency: a table per currency
+		for _, group := range currencyGroups(d.Dash.CategoryTrends, func(c domain.CategoryTrend) string { return c.Currency }) {
+			<h2>{ kit.T(ctx, "Expenses by month") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<thead>
+						<tr>
+							<th></th>
+							for _, m := range d.Dash.TrendMonths {
+								<th class="align-right">{ kit.T(ctx, m.First().Format("Jan")) }</th>
+							}
+							<th class="align-right">{ kit.T(ctx, "Avg") }</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, ct := range group {
+							<tr>
+								<td>{ ct.Category.Name }</td>
+								for i, amount := range ct.Months {
+									<td class="align-right">
+										if amount.IsZero() {
+											<span class="text-light">—</span>
+										} else {
+											<a href={ fmt.Sprintf("/operations?category=%d&from=%s&to=%s", ct.Category.ID, timex.FormatDate(d.Dash.TrendMonths[i].First()), timex.FormatDate(d.Dash.TrendMonths[i].Last())) }>{ kit.Money(ctx, amount, ct.Currency) }</a>
+										}
+									</td>
+								}
+								<td class="align-right text-light">{ kit.Money(ctx, ct.Average(), ct.Currency) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		for _, group := range currencyGroups(d.Dash.Payees, func(p domain.PayeeSum) string { return p.Currency }) {
+			<h2>{ kit.T(ctx, "Top payees") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<div class="table">
+				<table>
+					<tbody>
+						for _, p := range group {
+							<tr>
+								<td><a href={ fmt.Sprintf("/operations?q=%s&from=%s&to=%s", url.QueryEscape(p.Payee), d.From, d.To) }>{ p.Payee }</a></td>
+								<td class="align-right text-light">{ p.Count }×</td>
+								<td class="align-right">{ kit.Money(ctx, p.Total, p.Currency) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+// compareForm picks the month to compare the expenses of the month of d with.
+templ compareForm(d dashboardData) {
+	<form method="get" action="/" class="hstack mt-6 mb-4" hx-boost="false" hx-get="/" hx-trigger="change, submit" hx-target="body" hx-swap="outerSync" hx-push-url="true">
+		<input type="hidden" name="month" value={ d.Dash.Month.String() }/>
+		<div data-field>
+			<label for="compare">{ kit.T(ctx, "Compare with") }</label>
+			<fieldset class="group">
+				@kit.MonthButton("/?month="+d.Dash.Month.String()+"&compare="+d.ComparePrev, d.ComparePrev == "", kit.T(ctx, "Previous month"), "‹")
+				<select id="compare" name="compare">
+					for _, m := range d.Months {
+						if m.String() != d.Dash.Month.String() {
+							<option value={ m.String() } selected?={ m.String() == d.Dash.CompareMonth.String() }>{ kit.MonthName(ctx, m.First()) }</option>
+						}
+					}
+				</select>
+				@kit.MonthButton("/?month="+d.Dash.Month.String()+"&compare="+d.CompareNext, d.CompareNext == "", kit.T(ctx, "Next month"), "›")
+			</fieldset>
+		</div>
+	</form>
+}

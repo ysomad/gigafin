@@ -1,0 +1,205 @@
+package operations
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ formPage(v kit.Page, d opForm) {
+	{{
+		typ := string(d.Type)
+		editing := d.ID != 0
+		// errID is the id of the message about input name; the new operation page has
+		// a form per type
+		errID := func(name string) string { return name + "-error-" + typ }
+	}}
+	@kit.Layout(v, false, nil) {
+		<h1>
+			if editing {
+				{ kit.T(ctx, "Edit %s", kit.T(ctx, typ)) }
+			} else {
+				{ kit.T(ctx, "New %s", kit.T(ctx, typ)) }
+			}
+		</h1>
+		if editing && d.ImportID != 0 {
+			<p class="text-light mb-4">{ kit.T(ctx, "Imported in") } <a href={ fmt.Sprintf("/imports/%d", d.ImportID) }>{ kit.T(ctx, "import #%d", d.ImportID) }</a></p>
+		}
+		if !editing {
+			<div class="hstack mb-4">
+				@kit.SegmentLink("/operations/new?type=expense", d.Type == domain.OpExpense, "− "+kit.T(ctx, "Expense"))
+				@kit.SegmentLink("/operations/new?type=income", d.Type == domain.OpIncome, "+ "+kit.T(ctx, "Income"))
+				@kit.SegmentLink("/operations/new?type=transfer", d.Type == domain.OpTransfer, "⇄ "+kit.T(ctx, "Transfer"))
+			</div>
+		}
+		<form
+			if editing {
+				id="form-operation"
+			} else {
+				id={ "op-form-" + typ }
+				hx-post="/operations"
+				hx-select={ "#op-form-" + typ }
+				hx-select-oob="#toasts"
+				hx-target="this"
+				hx-swap="outerHTML ignoreTitle:true"
+			}
+			class="form-compact"
+			method="post"
+			if editing {
+				action={ fmt.Sprintf("/operations/%d", d.ID) }
+			} else {
+				action="/operations"
+			}
+		>
+			@kit.FormError(v.Errors.Form("operation"), "")
+			<input type="hidden" name="type" value={ typ }/>
+			if d.ImportID != 0 {
+				<input type="hidden" name="import_id" value={ d.ImportID }/>
+			}
+			if d.OriginID != 0 {
+				<input type="hidden" name="origin_id" value={ d.OriginID }/>
+			}
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Operation details") }>
+				{{ e := v.Errors.Get("account") }}
+				{{ accountLabel := kit.T(ctx, "Account") }}
+				if d.Type == domain.OpTransfer {
+					{{ accountLabel = kit.T(ctx, "From") }}
+				}
+				@kit.Field("col-6", accountLabel, e, errID("account"), nil) {
+					<select name="account" { kit.Invalid(e, errID("account"))... }>
+						@accountOptions(d.Accounts, d.AccountID, editing)
+					</select>
+				}
+				if d.Type == domain.OpTransfer {
+					{{ e := v.Errors.Get("to_account") }}
+					@kit.Field("col-6", kit.T(ctx, "To"), e, errID("to-account"), nil) {
+						<select name="to_account" { kit.Invalid(e, errID("to-account"))... }>
+							<option value="">—</option>
+							@accountOptions(d.Accounts, d.ToAccountID, editing)
+						</select>
+					}
+				}
+				if d.Type == domain.OpExpense || d.Type == domain.OpIncome {
+					{{ e := v.Errors.Get("category") }}
+					@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
+						<select name="category" { kit.Invalid(e, errID("category"))... }>
+							<option value="">—</option>
+							@kit.CategoryOptions(d.Categories, d.CategoryID)
+						</select>
+					}
+				}
+				{{ e = v.Errors.Get("amount") }}
+				@kit.Field("col-12", kit.T(ctx, "Amount"), e, errID("amount"), nil) {
+					<input name="amount" inputmode="decimal" autocomplete="off" value={ kit.AmountInput(ctx, d.Amount) } { kit.Invalid(e, errID("amount"))... }/>
+				}
+			</fieldset>
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Date and payee") }>
+				{{ e = v.Errors.Get("date") }}
+				<div
+					data-field
+					class="col-12"
+					if e != "" {
+						aria-invalid="true"
+					}
+				>
+					<label for={ "date-" + typ }>{ kit.T(ctx, "Date") }</label>
+					<fieldset class="group">
+						<input
+							type="date"
+							id={ "date-" + typ }
+							name="date"
+							value={ d.Date }
+							if e != "" {
+								aria-describedby={ errID("date") }
+							}
+						/>
+						<input type="time" name="time" value={ d.Time } aria-label={ kit.T(ctx, "Time") }/>
+					</fieldset>
+					@kit.FieldError(e, errID("date"))
+				</div>
+				{{ e = v.Errors.Get("payee") }}
+				@kit.Field("col-12", kit.T(ctx, "Payee"), e, errID("payee"), nil) {
+					<input
+						name="payee"
+						value={ d.Payee }
+						autocomplete="off"
+						{ kit.Invalid(e, errID("payee"))... }
+						if !editing {
+							hx-post="/operations/fill"
+							hx-trigger="change"
+							hx-select={ "#op-form-" + typ }
+							hx-target="closest form"
+							hx-swap="outerHTML ignoreTitle:true"
+						}
+					/>
+				}
+			</fieldset>
+			if d.SourcePayee != "" && d.SourcePayee != d.Payee {
+				<p class="text-light">{ kit.T(ctx, "Bank payee") }: { d.SourcePayee }</p>
+			}
+			{{ e = v.Errors.Get("note") }}
+			@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
+				<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
+			}
+			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Add tags with Enter or comma"), d.AllTags, v.Errors.Get("tags"), "")
+			<div class="hstack justify-between">
+				<div class="hstack">
+					<button type="submit">{ kit.T(ctx, "Save") }</button>
+					if editing && (d.Type == domain.OpExpense || d.Type == domain.OpIncome) {
+						@kit.LinkButton(fmt.Sprintf("/operations/%d/split", d.ID), "secondary", kit.T(ctx, "Split"))
+					}
+					if editing {
+						@kit.LinkButton("/operations", "secondary", kit.T(ctx, "Cancel"))
+					}
+				</div>
+				if editing {
+					<button type="submit" form="op-delete" class="outline" data-variant="danger">{ kit.T(ctx, "Delete") }</button>
+				}
+			</div>
+		</form>
+		if editing {
+			<form id="op-delete" method="post" action={ fmt.Sprintf("/operations/%d/delete", d.ID) } hx-confirm={ kit.T(ctx, "Delete this operation?") }></form>
+		}
+	}
+}
+
+// accountOptions are the options of accounts, selected the one of id: with the
+// balance, unless editing.
+templ accountOptions(accounts []domain.Account, selected int64, editing bool) {
+	for _, a := range accounts {
+		if editing {
+			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ a.Currency })</option>
+		} else {
+			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ kit.Money(ctx, a.Balance, a.Currency) } { a.Currency })</option>
+		}
+	}
+}
+
+// tagsField is the tags input of id, completed from all by the datalist of listID,
+// with the comma separated tags of value, posted as tags, and the message err.
+templ tagsField(id, listID, value, placeholder string, all []string, err, class string) {
+	<div
+		data-field
+		data-operation-tags
+		if class != "" {
+			class={ class }
+		}
+		if err != "" {
+			aria-invalid="true"
+		}
+	>
+		<label for={ id }>{ kit.T(ctx, "Tags") }</label>
+		<ot-taginput value={ value }>
+			<input id={ id } list={ listID } autocomplete="off" placeholder={ placeholder }/>
+			<datalist id={ listID }></datalist>
+		</ot-taginput>
+		<input type="hidden" name="tags" value={ value }/>
+		<template data-tag-suggestions>
+			for _, tag := range all {
+				<option value={ tag }></option>
+			}
+		</template>
+		@kit.FieldError(err, "")
+	</div>
+}

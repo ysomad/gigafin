@@ -1,8 +1,0 @@
-package components
-
-import "github.com/ysomad/gigafin/internal/ui/view"
-
-// FileInput picks a CSV file, with the message err about it.
-templ FileInput(err string) {
-	<input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2" { view.Invalid(err, "file-error")... }/>
-}

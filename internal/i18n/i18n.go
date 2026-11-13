@@ -66,8 +66,12 @@ var _matcher = func() language.Matcher {
 
 // _forms are the plural forms by their names in a dictionary.
 var _forms = map[string]plural.Form{
-	"zero": plural.Zero, "one": plural.One, "two": plural.Two,
-	"few": plural.Few, "many": plural.Many, "other": plural.Other,
+	"zero":  plural.Zero,
+	"one":   plural.One,
+	"two":   plural.Two,
+	"few":   plural.Few,
+	"many":  plural.Many,
+	"other": plural.Other,
 }
 
 // Languages returns the UI languages, the default first.

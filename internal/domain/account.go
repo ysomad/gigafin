@@ -190,6 +190,15 @@ func Totals(accounts []Account) []Total {
 	return totals
 }
 
+// AccountsByID returns accounts keyed by id.
+func AccountsByID(accounts []Account) map[int64]Account {
+	m := make(map[int64]Account, len(accounts))
+	for _, a := range accounts {
+		m[a.ID] = a
+	}
+	return m
+}
+
 // AccountCurrencies returns the sorted currencies of active accounts, or every
 // supported currency when there are none.
 func AccountCurrencies(accounts []Account) []string {

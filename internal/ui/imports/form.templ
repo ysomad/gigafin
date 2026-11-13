@@ -1,0 +1,219 @@
+package imports
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ formPage(v kit.Page, d formData) {
+	@kit.Layout(v, false, nil) {
+		<h1>{ kit.T(ctx, "New import") }</h1>
+		@steps(d.Step, d.Rates, nil)
+		if d.Step == "type" {
+			<form method="get" action="/imports/new">
+				<fieldset class="w-100">
+					<legend>{ kit.T(ctx, "What are you importing?") }</legend>
+					<div class="vstack gap-2">
+						<label><input type="radio" name="source" value="gigafin" checked/> { kit.T(ctx, "Gigafin operations") } <span class="text-light">CSV</span></label>
+						<label><input type="radio" name="source" value="tbank"/> { kit.T(ctx, "T-Bank operations") } <span class="text-light">CSV</span></label>
+						<label><input type="radio" name="source" value="zenmoney"/> { kit.T(ctx, "Zenmoney operations") } <span class="text-light">CSV</span></label>
+						<label><input type="radio" name="source" value="rates"/> { kit.T(ctx, "Exchange rates") } <span class="text-light">CSV</span></label>
+					</div>
+				</fieldset>
+				<div class="hstack mb-4">
+					@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
+					<button type="submit">{ kit.T(ctx, "Next") }</button>
+				</div>
+			</form>
+		} else if d.Rates {
+			{{ e := v.Errors.Get("file") }}
+			<form id="form-import-rates" method="post" action="/imports/rates" enctype="multipart/form-data" hx-disable="find button">
+				@kit.FormError(v.Errors.Form("import-rates"), "")
+				@kit.Field("", kit.T(ctx, "CSV file"), "", "", nil) {
+					@fileInput(e)
+					<small data-hint>{ kit.T(ctx, "exchange rates") }</small>
+				}
+				<div class="mb-4">
+					<p class="text-light">UTF-8, <code>,</code>{ kit.T(ctx, "-separated, header row. Columns:") }</p>
+					@csvColumns() {
+						<tr><td><code>date</code></td><td>YYYY-MM-DD</td></tr>
+						<tr><td><code>from</code></td><td>USD, EUR, …</td></tr>
+						<tr><td><code>to</code></td><td>{ kit.T(ctx, "the currency of your") } <a href="/settings">{ kit.T(ctx, "rate source") }</a>{ kit.T(ctx, ", e.g. RUB") }</td></tr>
+						<tr><td><code>rate</code></td><td>{ kit.T(ctx, "price of one") } <code>from</code> { kit.T(ctx, "in") } <code>to</code>{ kit.T(ctx, ", decimal point") }</td></tr>
+					}
+					<p class="text-light">{ kit.T(ctx, "Days missing between rows of a currency carry the previous rate. Imported rates replace stored ones and are kept by updates.") }</p>
+				</div>
+				@pasteField(d.Header, d.Content, e)
+				@uploadButtons()
+			</form>
+		} else {
+			{{ e := v.Errors.Get("file") }}
+			<form id="form-import" method="post" action="/imports" enctype="multipart/form-data" hx-disable="find button">
+				@kit.FormError(v.Errors.Form("import"), "")
+				<input type="hidden" name="source" value={ string(d.Source) }/>
+				switch d.Source {
+					case domain.ImportSourceTBank:
+						@kit.Field("", kit.T(ctx, "T-Bank CSV export"), "", "", nil) {
+							@fileInput(e)
+							<small data-hint>{ kit.T(ctx, "T-Bank app or site: Operations → Export → CSV.") }</small>
+						}
+					case domain.ImportSourceZenMoney:
+						@kit.Field("", kit.T(ctx, "Zenmoney CSV export"), "", "", nil) {
+							@fileInput(e)
+						}
+						<p class="text-light">{ kit.T(ctx, "Times are read in your") } <a href="/settings">{ kit.T(ctx, "time zone") }</a>{ kit.T(ctx, ", keep it equal to Zenmoney's. Cross-currency transfers are skipped.") }</p>
+					default:
+						@kit.Field("", kit.T(ctx, "CSV file"), "", "", nil) {
+							@fileInput(e)
+							<small data-hint>{ kit.T(ctx, "gigafin format") }</small>
+						}
+						<div class="mb-4">
+							<p class="text-light">UTF-8, <code>;</code>{ kit.T(ctx, "-separated, header row. Columns:") }</p>
+							@csvColumns() {
+								<tr><td><code>date</code></td><td>YYYY-MM-DD</td></tr>
+								<tr><td><code>time</code></td><td>HH:MM <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+								<tr><td><code>account</code></td><td>{ kit.T(ctx, "account name") }</td></tr>
+								<tr><td><code>amount</code></td><td>{ kit.T(ctx, "negative is money out") }</td></tr>
+								<tr><td><code>currency</code></td><td>RUB, USD, …</td></tr>
+								<tr><td><code>category</code></td><td>Cat1 / Cat2 <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+								<tr><td><code>payee</code>, <code>note</code></td><td>{ kit.T(ctx, "free text") }</td></tr>
+								<tr><td><code>to_account</code></td><td>{ kit.T(ctx, "makes a transfer") } <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+								<tr><td><code>mcc</code></td><td>{ kit.T(ctx, "4 digits") } <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+								<tr><td><code>origin_id</code></td><td>{ kit.T(ctx, "rows sharing it form one split operation") } <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+								<tr><td><code>tags</code></td><td>{ kit.T(ctx, "names separated by") } <code>,</code> <span class="text-light">{ kit.T(ctx, "optional") }</span></td></tr>
+							}
+						</div>
+				}
+				@pasteField(d.Header, d.Content, e)
+				<p class="text-light">{ kit.T(ctx, "Rows imported before are skipped.") }</p>
+				@uploadButtons()
+			</form>
+		}
+	}
+}
+
+// steps renders the import wizard steps at step as Oat tabs: the current one is
+// selected, reachable ones are links, done ones are checked and unreachable ones are
+// disabled. The steps are of a file of exchange rates if rates, otherwise of the
+// staged import p, if any.
+templ steps(step string, rates bool, p *domain.Preview) {
+	{{ file := step != "type" }}
+	<div class="table mb-6">
+		<nav role="tablist" aria-label={ kit.T(ctx, "Import steps") }>
+			if step == "file" {
+				<a role="tab" aria-selected="false" href="/imports/new">✓ { kit.T(ctx, "Source") }</a>
+			} else {
+				<span role="tab" aria-selected={ strconv.FormatBool(step == "type") }>
+					if file {
+						✓
+					} else {
+						1.
+					}
+					{ kit.T(ctx, "Source") }
+				</span>
+			}
+			<span
+				role="tab"
+				aria-selected={ strconv.FormatBool(step == "file") }
+				if !file {
+					aria-disabled="true"
+				}
+			>
+				if file && step != "file" {
+					✓
+				} else {
+					2.
+				}
+				{ kit.T(ctx, "Upload|step") }
+			</span>
+			if rates {
+				{{ review := step == "preview" || step == "done" }}
+				<span
+					role="tab"
+					aria-selected={ strconv.FormatBool(review) }
+					if !review {
+						aria-disabled="true"
+					}
+				>
+					if step == "done" {
+						✓
+					} else {
+						3.
+					}
+					{ kit.T(ctx, "Review") }
+				</span>
+			} else if p != nil {
+				{{
+					base := fmt.Sprintf("/imports/%d", p.Import.ID)
+					staged := p.Import.Status == domain.ImportStaged
+				}}
+				@stepTab(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", kit.T(ctx, "Accounts"))
+				@stepTab(staged, step == "categories", base+"/categories", p.CategoriesMapped(), "4.", kit.T(ctx, "Categories"))
+				<a role="tab" aria-selected={ strconv.FormatBool(step == "preview") } href={ base + "/preview" }>
+					if staged {
+						5.
+					} else {
+						✓
+					}
+					{ kit.T(ctx, "Review") }
+				</a>
+			} else {
+				<span role="tab" aria-disabled="true">3. { kit.T(ctx, "Accounts") }</span>
+				<span role="tab" aria-disabled="true">4. { kit.T(ctx, "Categories") }</span>
+				<span role="tab" aria-disabled="true">5. { kit.T(ctx, "Review") }</span>
+			}
+		</nav>
+	</div>
+}
+
+// stepTab is a mapping step of a staged import: a link to href while staged,
+// selected if current, checked if done, numbered num otherwise.
+templ stepTab(staged, current bool, href string, done bool, num, label string) {
+	{{
+		mark := num
+		if done {
+			mark = "✓"
+		}
+	}}
+	if staged {
+		<a role="tab" aria-selected={ strconv.FormatBool(current) } href={ href }>{ mark } { label }</a>
+	} else {
+		<span role="tab" aria-selected="false">{ mark } { label }</span>
+	}
+}
+
+// csvColumns is the table of the columns of a CSV file, rows as children.
+templ csvColumns() {
+	<div class="table">
+		<table>
+			<tbody>
+				{ children... }
+			</tbody>
+		</table>
+	</div>
+}
+
+// fileInput picks a CSV file, with the message err about it.
+templ fileInput(err string) {
+	<input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2" { kit.Invalid(err, "file-error")... }/>
+}
+
+// pasteField takes the content of the file pasted instead, with the header of the
+// file as placeholder, and the message err about the file.
+templ pasteField(header, content, err string) {
+	@kit.Field("", kit.T(ctx, "Or paste the file content"), err, "file-error", nil) {
+		<textarea name="content" rows="8" placeholder={ header } { kit.Invalid(err, "file-error")... }>{ content }</textarea>
+	}
+}
+
+// uploadButtons cancel, go back to the source step or upload.
+templ uploadButtons() {
+	<div class="hstack mb-4">
+		@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
+		@kit.LinkButton("/imports/new", "secondary", kit.T(ctx, "Back"))
+		<button type="submit" data-spinner>{ kit.T(ctx, "Upload") }</button>
+	</div>
+}

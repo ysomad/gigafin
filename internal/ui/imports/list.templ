@@ -1,0 +1,45 @@
+package imports
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ listPage(v kit.Page, d listData) {
+	@kit.Layout(v, false, nil) {
+		<div class="hstack mb-4">
+			<a class="button" href="/imports/new">+ { kit.T(ctx, "New import") }</a>
+		</div>
+		<h2>{ kit.T(ctx, "Recent imports") }</h2>
+		<div class="table">
+			<table>
+				<thead><tr><th>#</th><th>{ kit.T(ctx, "File") }</th><th>{ kit.T(ctx, "Uploaded") }</th><th>{ kit.T(ctx, "Status") }</th><th class="align-right">{ kit.T(ctx, "New") }</th><th class="align-right">{ kit.T(ctx, "Duplicates") }</th><th class="align-right">{ kit.T(ctx, "Skipped") }</th></tr></thead>
+				<tbody>
+					for _, im := range d.Imports {
+						<tr>
+							<td><a href={ fmt.Sprintf("/imports/%d", im.ID) }>#{ im.ID }</a></td>
+							<td>{ im.Filename }</td>
+							<td>{ kit.Datetime(ctx, im.CreatedAt, v.User) }</td>
+							<td>
+								@statusBadge(im.Status)
+							</td>
+							<td class="align-right">{ im.RowsNew }</td>
+							<td class="align-right">{ im.RowsDup }</td>
+							<td class="align-right">{ im.RowsSkip }</td>
+						</tr>
+					}
+					if len(d.Imports) == 0 {
+						@kit.EmptyRow(7, kit.T(ctx, "Nothing imported yet."))
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+// statusBadge is the status of an import.
+templ statusBadge(status domain.ImportStatus) {
+	<span class="badge" { statusVariant(status)... }>{ kit.T(ctx, string(status)) }</span>
+}

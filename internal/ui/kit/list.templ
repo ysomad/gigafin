@@ -1,0 +1,75 @@
+package kit
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+)
+
+// EmptyRow is a table row of msg over colspan columns.
+templ EmptyRow(colspan int, msg string) {
+	<tr><td colspan={ colspan } class="text-light">{ msg }</td></tr>
+}
+
+templ ArchivedBadge() {
+	<span class="badge" data-variant="secondary">{ T(ctx, "archived") }</span>
+}
+
+// ArchiveDelete are the archive, or unarchive if archived, and delete buttons of the
+// edit form of an account or a category, which post the ArchiveDeleteForms of prefix.
+templ ArchiveDelete(prefix string, archived bool) {
+	<div class="hstack">
+		<button type="submit" form={ prefix + "-archive" } class="outline" data-variant="secondary">
+			if archived {
+				{ T(ctx, "Unarchive") }
+			} else {
+				{ T(ctx, "Archive") }
+			}
+		</button>
+		<button type="submit" form={ prefix + "-delete" } class="outline" data-variant="danger">{ T(ctx, "Delete") }</button>
+	</div>
+}
+
+// ArchiveDeleteForms are the forms of ArchiveDelete, put outside the edit form:
+// archiving at base + "/archive", deleting after confirm at base + "/delete".
+templ ArchiveDeleteForms(prefix, base string, archived bool, confirm string) {
+	<form id={ prefix + "-archive" } method="post" action={ base + "/archive" }>
+		<input
+			type="hidden"
+			name="archived"
+			if archived {
+				value="0"
+			} else {
+				value="1"
+			}
+		/>
+	</form>
+	<form id={ prefix + "-delete" } method="post" action={ base + "/delete" } hx-confirm={ confirm }></form>
+}
+
+// NoOperations is the text of a page that would list operations when the user has none.
+templ NoOperations() {
+	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>
+}
+
+// OpRows are the list items of operations by day, followed by the loader of moreURL,
+// the next page, if any.
+templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domain.Account, moreURL string) {
+	for _, day := range days {
+		if !day.Continued {
+			<li class="text-light mt-4">{ DayTitle(ctx, day.Date) }</li>
+		}
+		for _, op := range day.Ops {
+			<li class="card compact hstack justify-between">
+				<a href={ fmt.Sprintf("/operations/%d/edit", op.ID) }>
+					<div>{ OpTitle(ctx, op, catNames) }</div>
+					<div class="text-light">{ OpSubtitle(ctx, op, catNames, accByID) }</div>
+				</a>
+				<div class="align-right">{ OpAmount(ctx, op) } <span class="text-light">{ op.Currency }</span></div>
+			</li>
+		}
+	}
+	if moreURL != "" {
+		<li id="more" hx-get={ moreURL } hx-trigger="revealed" hx-swap="outerHTML" aria-busy="true"></li>
+	}
+}

@@ -1,0 +1,189 @@
+package accounts
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ accountsPage(v kit.Page, d accountsData) {
+	@kit.Layout(v, false, nil) {
+		<div class="hstack mb-4">
+			<a class="button" href="/accounts/new">+ { kit.T(ctx, "New account") }</a>
+		</div>
+		<div class="table">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th>{ kit.T(ctx, "Currency") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th></tr></thead>
+				<tbody>
+					for _, a := range d.Assets {
+						<tr>
+							<td>
+								<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
+								if a.Archived {
+									@kit.ArchivedBadge()
+								}
+							</td>
+							<td>{ kit.T(ctx, string(a.Kind)) }</td>
+							<td>{ a.Currency }</td>
+							<td class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) }</td>
+						</tr>
+					}
+					if len(d.Assets) == 0 {
+						@kit.EmptyRow(4, kit.T(ctx, "No accounts yet."))
+					}
+				</tbody>
+			</table>
+		</div>
+		if len(d.Liabilities) > 0 {
+			<h2>{ kit.T(ctx, "Credit and loans") }</h2>
+			<div class="table">
+				<table>
+					<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th>{ kit.T(ctx, "Currency") }</th><th class="align-right">{ kit.T(ctx, "Owed") }</th><th class="align-right">{ kit.T(ctx, "Available") }</th></tr></thead>
+					<tbody>
+						for _, a := range d.Liabilities {
+							<tr>
+								<td>
+									<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
+									if a.Archived {
+										@kit.ArchivedBadge()
+									}
+								</td>
+								<td>{ kit.T(ctx, string(a.Kind)) }</td>
+								<td>{ a.Currency }</td>
+								<td class="align-right">{ kit.Money(ctx, a.Owed(), a.Currency) }</td>
+								<td class="align-right">
+									if !a.CreditLimit.IsZero() {
+										{ kit.Money(ctx, a.Available(), a.Currency) }
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ accountPage(v kit.Page, d accountData) {
+	{{
+		a, f := d.Account, d.Edit
+		base := fmt.Sprintf("/accounts/%d", a.ID)
+	}}
+	@kit.Layout(v, false, nil) {
+		<h1>
+			{ a.Name }
+			<span class="text-light">
+				{ kit.T(ctx, string(a.Kind)) } · { a.Currency }
+				if a.Archived {
+					· { kit.T(ctx, "archived") }
+				}
+			</span>
+		</h1>
+		<p class="text-light mb-4">
+			{ kit.T(ctx, "Balance:") } { kit.Money(ctx, a.Balance, a.Currency) } { a.Currency }
+			if a.Kind.Liability() {
+				· { kit.T(ctx, "owed %s", kit.Money(ctx, a.Owed(), a.Currency)) }
+			}
+			if !a.CreditLimit.IsZero() {
+				· { kit.T(ctx, "available %s of %s", kit.Money(ctx, a.Available(), a.Currency), kit.Money(ctx, a.CreditLimit, a.Currency)) }
+			}
+			· <a href={ fmt.Sprintf("/operations?account=%d", a.ID) }>{ kit.T(ctx, "Operations") }</a>
+		</p>
+		<form id="form-edit" class="form-compact" method="post" action={ base }>
+			@kit.FormError(v.Errors.Form("edit"), "")
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Account") }>
+				{{ e := v.Errors.Get("name") }}
+				@kit.Field("col-4", kit.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ f.Name } { kit.Invalid(e, "name-error")... }/>
+				}
+				{{ e = v.Errors.Get("kind") }}
+				@kit.Field("col-4", kit.T(ctx, "Kind"), e, "kind-error", nil) {
+					@kindSelect(d.Kinds, f.Kind, e)
+				}
+				@creditLimitField("col-4", f.Kind, f.CreditLimit, v.Errors.Get("credit_limit"))
+			</fieldset>
+			<div class="hstack justify-between">
+				<div class="hstack">
+					<button type="submit">{ kit.T(ctx, "Save") }</button>
+					@kit.LinkButton("/accounts", "secondary", kit.T(ctx, "Cancel"))
+				</div>
+				@kit.ArchiveDelete("account", a.Archived)
+			</div>
+			<p class="text-light">{ kit.T(ctx, "Accounts with operations can only be archived.") }</p>
+		</form>
+		@kit.ArchiveDeleteForms("account", base, a.Archived, kit.T(ctx, "Delete account %s?", a.Name))
+		<h2 class="mt-6">{ kit.T(ctx, "Set balance") }</h2>
+		<form id="form-balance" class="form-compact" method="post" action={ base + "/balance" }>
+			@kit.FormError(v.Errors.Form("balance"), "")
+			<p class="text-light">{ kit.T(ctx, "Records an adjustment for the difference. Use it for the opening balance or to reconcile with the bank.") }</p>
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Set balance") }>
+				{{ e = v.Errors.Get("balance") }}
+				@kit.Field("col-6", kit.T(ctx, "New balance"), e, "balance-error", nil) {
+					<input name="balance" inputmode="decimal" value={ kit.AmountInput(ctx, d.Balance.Target) } { kit.Invalid(e, "balance-error")... }/>
+				}
+				{{ e = v.Errors.Get("date") }}
+				@kit.Field("col-6", kit.T(ctx, "As of"), e, "date-error", nil) {
+					<input type="date" name="date" value={ d.Balance.Date } { kit.Invalid(e, "date-error")... }/>
+				}
+			</fieldset>
+			<div class="hstack">
+				<button type="submit">{ kit.T(ctx, "Set") }</button>
+			</div>
+		</form>
+	}
+}
+
+templ newAccountPage(v kit.Page, d newAccountData) {
+	{{ f := d.Form }}
+	@kit.Layout(v, false, nil) {
+		<h1>{ kit.T(ctx, "New account") }</h1>
+		<form id="form-account" class="form-compact" method="post" action="/accounts">
+			@kit.FormError(v.Errors.Form("account"), "")
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Account") }>
+				{{ e := v.Errors.Get("name") }}
+				@kit.Field("col-12", kit.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ f.Name } { kit.Invalid(e, "name-error")... }/>
+				}
+				{{ e = v.Errors.Get("kind") }}
+				@kit.Field("col-6", kit.T(ctx, "Kind"), e, "kind-error", nil) {
+					@kindSelect(d.Kinds, f.Kind, e)
+				}
+				{{ e = v.Errors.Get("currency") }}
+				@kit.Field("col-6", kit.T(ctx, "Currency"), e, "currency-error", nil) {
+					@kit.CurrencySelect(d.Currencies, f.Currency, e)
+				}
+				{{ e = v.Errors.Get("balance") }}
+				@kit.Field("col-6", kit.T(ctx, "Opening balance"), e, "balance-error", nil) {
+					<input name="balance" inputmode="decimal" placeholder="0" value={ kit.AmountInput(ctx, f.Balance) } { kit.Invalid(e, "balance-error")... }/>
+				}
+				@creditLimitField("col-6", f.Kind, f.CreditLimit, v.Errors.Get("credit_limit"))
+			</fieldset>
+			<p class="text-light">{ kit.T(ctx, "Credit card and loan balances are negative when you owe. Pay a card with a transfer to it.") }</p>
+			<div class="hstack">
+				<button type="submit">{ kit.T(ctx, "Create") }</button>
+				@kit.LinkButton("/accounts", "secondary", kit.T(ctx, "Cancel"))
+			</div>
+		</form>
+	}
+}
+
+// kindSelect picks the kind of an account, shows and hides the credit limit
+// field by app.js.
+templ kindSelect(kinds []domain.AccountKind, selected, err string) {
+	<select name="kind" data-account-kind { kit.Invalid(err, "kind-error")... }>
+		for _, k := range kinds {
+			<option value={ string(k) } selected?={ string(k) == selected }>{ kit.T(ctx, string(k)) }</option>
+		}
+	</select>
+}
+
+// creditLimitField is the credit limit of an account of kind, hidden and disabled
+// unless a credit card.
+templ creditLimitField(class, kind, value, err string) {
+	{{ credit := kind == string(domain.AccountCredit) }}
+	@kit.Field(class, kit.T(ctx, "Credit limit"), err, "credit-limit-error", templ.Attributes{"data-credit-limit": true, "hidden": !credit}) {
+		<input name="credit_limit" inputmode="decimal" value={ kit.AmountInput(ctx, value) } disabled?={ !credit } { kit.Invalid(err, "credit-limit-error")... }/>
+	}
+}

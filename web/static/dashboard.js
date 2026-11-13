@@ -44,10 +44,9 @@
       const full = new Intl.NumberFormat(locale, {
         maximumFractionDigits: fig.hasAttribute('data-minor-units') ? 2 : 0,
       });
-      const data = fig.querySelector('script');
-      const d = JSON.parse(data.textContent);
-      // translated series labels, see dashboard.html
-      const label = data.dataset;
+      const d = JSON.parse(fig.querySelector('script').textContent);
+      // translated series labels, see internal/ui/dashboard/dashboard.templ
+      const label = fig.dataset;
       const networth = d.balance != null;
       const axis = { stroke: palette['muted-foreground'], grid: { stroke: palette.border, width: 1 }, ticks: { show: false } };
       // With no cursor over the chart the legend shows the last (current) month.

@@ -125,6 +125,21 @@ func (m Month) Next() Month {
 	return Month{first: m.first.AddDate(0, 1, 0)}
 }
 
+// Neighbors returns the months before and after m within months, a contiguous range,
+// latest first, holding m; either is empty at an end of the range.
+func Neighbors(months []Month, m Month) (prev, next string) {
+	if len(months) == 0 {
+		return "", ""
+	}
+	if m.String() != months[len(months)-1].String() {
+		prev = m.Prev().String()
+	}
+	if m.String() != months[0].String() {
+		next = m.Next().String()
+	}
+	return prev, next
+}
+
 // First returns the first date of the month.
 func (m Month) First() time.Time {
 	return m.first

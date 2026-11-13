@@ -1,0 +1,150 @@
+package operations
+
+import (
+	"strings"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ listPage(v kit.Page, d opList) {
+	@kit.Layout(v, len(d.Days) > 0, nil) {
+		<div class="hstack justify-between mb-4">
+			<ot-dropdown>
+				<menu class="buttons">
+					<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
+					<li>
+						<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
+					</li>
+				</menu>
+				<menu popover id="op-actions">
+					<form
+						method="post"
+						action={ d.RunURL }
+						if d.Filtered {
+							hx-confirm={ kit.T(ctx, "Run rules on the filtered operations?") }
+						} else {
+							hx-confirm={ kit.T(ctx, "Run rules on all operations?") }
+						}
+					>
+						<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Run rules") }</button>
+					</form>
+					<a href="/rules" role="menuitem" class="button ghost">{ kit.T(ctx, "Rules") }</a>
+				</menu>
+			</ot-dropdown>
+			<form method="get" action="/operations">
+				<div class="hstack">
+					<fieldset class="group">
+						<input type="search" name="q" value={ d.Filter.Query } placeholder={ kit.T(ctx, "payee or note") } aria-label={ kit.T(ctx, "Search") }/>
+						<button type="submit">{ kit.T(ctx, "Search") }</button>
+					</fieldset>
+					<ot-dropdown>
+						<button type="button" class="outline" popovertarget="filter-popover">
+							{ kit.T(ctx, "Filter") }
+							if d.FilterCount > 0 {
+								<span class="badge">{ d.FilterCount }</span>
+							}
+						</button>
+						@filterPopover(d)
+					</ot-dropdown>
+					if d.Filtered {
+						<a class="button ghost" href="/operations">{ kit.T(ctx, "Reset") }</a>
+					}
+				</div>
+			</form>
+		</div>
+		if d.Changed >= 0 {
+			<p role="status" class="badge mb-4" data-variant="success">{ kit.T(ctx, "Rules changed %d operations.", d.Changed) }</p>
+		}
+		if len(d.Days) > 0 {
+			<ul class="unstyled vstack gap-1">
+				@kit.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL)
+			</ul>
+		} else if d.Filtered {
+			<p class="text-light">{ kit.T(ctx, "No operations yet.") }</p>
+		} else {
+			@kit.NoOperations()
+		}
+	}
+}
+
+// filterPopover is the dialog of the filters of the operations of d, but the query.
+templ filterPopover(d opList) {
+	<article class="card p-4 form-compact" popover id="filter-popover">
+		<div class="row">
+			@kit.Field("col-6", kit.T(ctx, "Account"), "", "", nil) {
+				<select name="account">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, a := range d.Accounts {
+						<option value={ a.ID } selected?={ a.ID == d.Filter.AccountID }>{ a.Name }</option>
+					}
+				</select>
+			}
+			@kit.Field("col-6", kit.T(ctx, "Type"), "", "", nil) {
+				<select name="type" data-category-type>
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, typ := range domain.OpTypes() {
+						<option value={ string(typ) } selected?={ typ == d.Filter.Type }>{ kit.T(ctx, string(typ)) }</option>
+					}
+				</select>
+			}
+			@kit.Field("col-12", kit.T(ctx, "Category"), "", "", templ.Attributes{"data-category-field": true}) {
+				<select name="category">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, parent := range d.Categories {
+						<option value={ parent.ID } data-kind={ string(parent.Kind) } selected?={ parent.ID == d.Filter.CategoryID }>{ parent.Name }</option>
+						for _, c := range parent.Children {
+							<option value={ c.ID } data-kind={ string(parent.Kind) } selected?={ c.ID == d.Filter.CategoryID }>{ parent.Name } / { c.Name }</option>
+						}
+					}
+				</select>
+			}
+			<div data-field class="col-12">
+				<label for="filter-from">{ kit.T(ctx, "Date") }</label>
+				<fieldset class="group">
+					<input type="date" id="filter-from" name="from" value={ timex.FormatDate(d.Filter.DateFrom) } aria-label={ kit.T(ctx, "From") }/>
+					<label for="filter-to" aria-hidden="true">—</label>
+					<input type="date" id="filter-to" name="to" value={ timex.FormatDate(d.Filter.DateTo) } aria-label={ kit.T(ctx, "To") }/>
+				</fieldset>
+			</div>
+			<div data-field class="col-12">
+				<label for="filter-min">{ kit.T(ctx, "Amount") }</label>
+				<fieldset class="group">
+					<input
+						id="filter-min"
+						name="min"
+						inputmode="decimal"
+						if d.Filter.AmountMin.Valid {
+							value={ kit.AmountInput(ctx, d.Filter.AmountMin.Amount.String()) }
+						} else {
+							value=""
+						}
+						placeholder={ kit.T(ctx, "min") }
+						aria-label={ kit.T(ctx, "Amount from") }
+					/>
+					<label for="filter-max" aria-hidden="true">—</label>
+					<input
+						id="filter-max"
+						name="max"
+						inputmode="decimal"
+						if d.Filter.AmountMax.Valid {
+							value={ kit.AmountInput(ctx, d.Filter.AmountMax.Amount.String()) }
+						} else {
+							value=""
+						}
+						placeholder={ kit.T(ctx, "max") }
+						aria-label={ kit.T(ctx, "Amount to") }
+					/>
+				</fieldset>
+			</div>
+			if len(d.Tags) > 0 {
+				@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12")
+			}
+		</div>
+		<footer class="hstack justify-end mt-4">
+			<button type="button" class="outline" popovertarget="filter-popover" popovertargetaction="hide">{ kit.T(ctx, "Close") }</button>
+			<button type="submit">{ kit.T(ctx, "Apply") }</button>
+		</footer>
+	</article>
+}

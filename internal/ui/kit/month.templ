@@ -1,0 +1,39 @@
+package kit
+
+import "github.com/ysomad/gigafin/internal/timex"
+
+// MonthNav picks month of months on the page at action: a select that loads on
+// change, between buttons to the adjacent prev and next, which are disabled when empty.
+templ MonthNav(action string, month timex.Month, months []timex.Month, prev, next string) {
+	<form
+		method="get"
+		action={ action }
+		class="hstack"
+		hx-boost="false"
+		hx-get={ action }
+		hx-trigger="change, submit"
+		hx-target="body"
+		hx-swap="outerSync"
+		hx-push-url="true"
+	>
+		<fieldset class="group">
+			@MonthButton(action+"?month="+prev, prev == "", T(ctx, "Previous month"), "‹")
+			<select name="month" aria-label={ T(ctx, "Month") }>
+				@MonthOptions(months, month)
+			</select>
+			@MonthButton(action+"?month="+next, next == "", T(ctx, "Next month"), "›")
+		</fieldset>
+	</form>
+}
+
+// MonthButton loads the page of url, the adjacent month, disabled when there is none.
+templ MonthButton(url string, disabled bool, label, arrow string) {
+	<button type="button" class="outline" hx-get={ url } hx-target="body" hx-swap="outerSync" hx-push-url="true" disabled?={ disabled } aria-label={ label }>{ arrow }</button>
+}
+
+// MonthOptions are the options of months, selected the one equal to selected.
+templ MonthOptions(months []timex.Month, selected timex.Month) {
+	for _, m := range months {
+		<option value={ m.String() } selected?={ m.String() == selected.String() }>{ MonthName(ctx, m.First()) }</option>
+	}
+}

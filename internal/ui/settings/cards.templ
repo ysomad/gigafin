@@ -1,0 +1,346 @@
+package settings
+
+import (
+	"cmp"
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+// generalCard is the settings form; the values of a failed post fill its inputs again.
+// oob marks it for htmx to swap in out of band.
+templ generalCard(v kit.Page, d pageData, oob bool) {
+	{{ f := d.General }}
+	<article
+		id="settings-general"
+		class="card mb-4 form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<h3>{ kit.T(ctx, "General") }</h3>
+		<form id="form-settings" method="post" action="/settings" class="vstack" hx-post="/settings" hx-swap="none" hx-trigger="change">
+			@kit.FormError(v.Errors.Form("settings"), "")
+			<div class="row">
+				{{ e := v.Errors.Get("settings.timezone") }}
+				@kit.Field("col-3", kit.T(ctx, "Time zone"), e, "timezone-error", nil) {
+					<input name="timezone" value={ f.Timezone } placeholder="Europe/Moscow" { kit.Invalid(e, "timezone-error")... }/>
+				}
+				{{ e = v.Errors.Get("settings.language") }}
+				@kit.Field("col-3", kit.T(ctx, "Language"), e, "language-error", nil) {
+					<select name="language" { kit.Invalid(e, "language-error")... }>
+						<option value="" selected?={ f.Language == "" }>{ kit.T(ctx, "Default") }</option>
+						for _, l := range d.Languages {
+							<option value={ l.Code } selected?={ f.Language == l.Code }>{ l.Name }</option>
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("settings.rate_source") }}
+				@kit.Field("col-3", kit.T(ctx, "Exchange rates"), e, "rate-source-error", nil) {
+					<select name="rate_source" { kit.Invalid(e, "rate-source-error")... }>
+						for _, rs := range d.RateSources {
+							<option value={ string(rs) } selected?={ string(rs) == f.RateSource }>
+								switch rs {
+									case domain.RateSourceNone:
+										{ kit.T(ctx, "Off") }
+									case domain.RateSourceCBR:
+										{ kit.T(ctx, "Central Bank of Russia") }
+									default:
+										{ string(rs) }
+								}
+							</option>
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("settings.primary_currency") }}
+				@kit.Field("col-3", kit.T(ctx, "Primary currency"), e, "primary-currency-error", nil) {
+					<select name="primary_currency" { kit.Invalid(e, "primary-currency-error")... }>
+						<option value=""></option>
+						for _, c := range d.Currencies {
+							<option value={ c } selected?={ c == f.PrimaryCurrency }>{ c }</option>
+						}
+					</select>
+				}
+			</div>
+			<div class="row">
+				<label data-field class="col-3"><input type="checkbox" role="switch" name="show_minor_units" checked?={ f.ShowMinorUnits }/> { kit.T(ctx, "Show minor units") }</label>
+				<label data-field class="col-6" title={ kit.T(ctx, "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee.") }><input type="checkbox" role="switch" name="auto_category_rules" checked?={ f.AutoCategoryRules }/> { kit.T(ctx, "Learn from my categories") }</label>
+			</div>
+		</form>
+	</article>
+}
+
+// passwordCard changes the password. oob marks it for htmx to swap in out of band.
+templ passwordCard(v kit.Page, oob bool) {
+	<article
+		id="settings-password"
+		class="card mb-4 form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<h3>{ kit.T(ctx, "Password") }</h3>
+		<form id="form-password" method="post" action="/settings/password" class="row" hx-post="/settings/password" hx-swap="none">
+			@kit.FormError(v.Errors.Form("password"), "col-12")
+			{{ e := v.Errors.Get("password.current") }}
+			@kit.Field("col-3", kit.T(ctx, "Current password"), e, "current-password-error", nil) {
+				<input type="password" name="current" autocomplete="current-password" { kit.Invalid(e, "current-password-error")... }/>
+			}
+			{{ e = v.Errors.Get("password.password") }}
+			@kit.Field("col-3", kit.T(ctx, "New password"), e, "new-password-error", nil) {
+				<input type="password" name="password" autocomplete="new-password" { kit.Invalid(e, "new-password-error")... }/>
+			}
+			@kit.SubmitColumn("col-3", "", kit.T(ctx, "Change password"))
+		</form>
+	</article>
+}
+
+// ratesCard shows the latest exchange rates and sets one by hand, hidden without a
+// rate source. oob marks it for htmx to swap in out of band.
+templ ratesCard(v kit.Page, d pageData, oob bool) {
+	{{ pivot := d.Settings.RateSource.Pivot() }}
+	<article
+		id="settings-rates"
+		class="card mb-4 form-compact"
+		hidden?={ d.Settings.RateSource == domain.RateSourceNone }
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<div class="hstack justify-between">
+			<h3>{ kit.T(ctx, "Exchange rates") }</h3>
+			if d.Settings.RateSource != domain.RateSourceNone {
+				<div class="hstack">
+					<a class="button outline small" href="/imports/new?source=rates" data-variant="secondary">{ kit.T(ctx, "Import from CSV") }</a>
+					if len(d.RateCurrencies) > 0 {
+						<form method="post" action="/settings/rates/sync" hx-post="/settings/rates/sync" hx-swap="none" hx-disable="find button"><button type="submit" class="small" data-spinner>{ kit.T(ctx, "Update rates") }</button></form>
+					}
+				</div>
+			}
+		</div>
+		if d.Settings.RateSource != domain.RateSourceNone {
+			if len(d.RateCurrencies) == 0 {
+				<p class="text-light">{ kit.T(ctx, "All your accounts and the primary currency are in %s, nothing to convert. Add an account in another currency to track its rate.", pivot) }</p>
+			} else if len(d.Rates) > 0 {
+				<div class="table">
+					<table>
+						<thead><tr><th>{ kit.T(ctx, "Currency") }</th><th>{ kit.T(ctx, "Last date") }</th><th>{ kit.T(ctx, "Rate, %s", pivot) }</th><th></th></tr></thead>
+						<tbody>
+							for _, r := range d.Rates {
+								<tr>
+									<td>{ r.Currency }</td>
+									<td>{ timex.FormatDate(r.Date) }</td>
+									<td>{ r.Rate.String() }</td>
+									<td>
+										if r.Manual {
+											<form method="post" action="/settings/rates/reset" hx-post="/settings/rates/reset" hx-swap="none" hx-confirm={ kit.T(ctx, "Replace the manual %s rate of %s with the source one?", r.Currency, timex.FormatDate(r.Date)) }>
+												<input type="hidden" name="currency" value={ r.Currency }/>
+												<input type="hidden" name="date" value={ timex.FormatDate(r.Date) }/>
+												<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Reset") }</button>
+											</form>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			} else {
+				<p class="text-light">{ kit.T(ctx, "No rates yet. Rates are kept for the currencies of your accounts and the primary currency other than %s, fetched hourly or now with Update rates.", pivot) }</p>
+			}
+			<form id="form-rate" method="post" action="/settings/rates/set" class="row" hx-post="/settings/rates/set" hx-swap="none">
+				@kit.FormError(v.Errors.Form("rate"), "col-12")
+				{{ e := v.Errors.Get("rate.currency") }}
+				@kit.Field("col-3", kit.T(ctx, "Currency"), e, "rate-currency-error", nil) {
+					<select name="currency" { kit.Invalid(e, "rate-currency-error")... }>
+						for _, c := range d.Currencies {
+							if c != pivot {
+								<option value={ c } selected?={ c == d.Rate.Currency }>{ c }</option>
+							}
+						}
+					</select>
+				}
+				{{ e = v.Errors.Get("rate.date") }}
+				@kit.Field("col-3", kit.T(ctx, "Date"), e, "rate-date-error", nil) {
+					<input
+						type="date"
+						name="date"
+						value={ d.Rate.Date }
+						{ kit.Invalid(e, "rate-date-error")... }
+					/>
+				}
+				{{ e = v.Errors.Get("rate.rate") }}
+				@kit.Field("col-3", kit.T(ctx, "Rate, %s", pivot), e, "rate-rate-error", nil) {
+					<input
+						name="rate"
+						inputmode="decimal"
+						placeholder="90.4040"
+						value={ d.Rate.Rate }
+						{ kit.Invalid(e, "rate-rate-error")... }
+					/>
+				}
+				@kit.SubmitColumn("col-3", "", kit.T(ctx, "Set rate"))
+			</form>
+		}
+	</article>
+}
+
+// accessCard lists the sessions and API keys of the user and creates a key: the new
+// key is shown once. oob marks it for htmx to swap in out of band.
+templ accessCard(v kit.Page, d pageData, oob bool) {
+	<article
+		id="settings-access"
+		class="card mb-4 form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<h3>{ kit.T(ctx, "Security & access") }</h3>
+		if d.NewToken != "" {
+			<div>
+				<p class="text-light">{ kit.T(ctx, "Copy this key and store it somewhere safe, like a password manager. It won't be shown again, and anyone who has it can access your data.") }</p>
+				<fieldset class="group">
+					<input readonly value={ d.NewToken } aria-label={ kit.T(ctx, "API key") } autocomplete="off" spellcheck="false" autofocus/>
+					<button type="button" class="icon outline" data-copy={ d.NewToken } aria-label={ kit.T(ctx, "Copy key") }>
+						<svg data-icon="copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+						<svg data-icon="check" hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+					</button>
+				</fieldset>
+			</div>
+		}
+		<div class="table">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "Type") }</th><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Scope") }</th><th>{ kit.T(ctx, "Last used") }</th><th>{ kit.T(ctx, "Expires") }</th><th></th></tr></thead>
+				<tbody>
+					for _, s := range d.Sessions {
+						<tr>
+							<td>{ kit.T(ctx, "Session") }</td>
+							<td>{ s.UserAgent }</td>
+							<td>{ kit.T(ctx, "full") }</td>
+							<td>{ kit.Datetime(ctx, s.LastUsedAt, v.User) }</td>
+							<td>{ kit.Datetime(ctx, s.ExpiresAt, v.User) }</td>
+							<td>
+								if s.Current {
+									<span class="badge" data-variant="success">{ kit.T(ctx, "this browser") }</span>
+								} else {
+									{{ action := fmt.Sprintf("/settings/sessions/%d/revoke", s.ID) }}
+									<form method="post" action={ action } hx-post={ action } hx-swap="none" hx-confirm={ kit.T(ctx, "Sign out this session?") }>
+										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Revoke") }</button>
+									</form>
+								}
+							</td>
+						</tr>
+					}
+					for _, k := range d.Keys {
+						<tr>
+							<td>{ kit.T(ctx, "API key") }</td>
+							<td>{ k.Name } <code>gf_{ k.Prefix }_…</code></td>
+							<td>{ kit.T(ctx, string(k.Scope)) }</td>
+							<td>
+								if k.LastUsedAt.IsZero() {
+									{ kit.T(ctx, "never") }
+								} else {
+									{ kit.Datetime(ctx, k.LastUsedAt, v.User) }
+								}
+							</td>
+							<td>
+								if k.ExpiresAt.IsZero() {
+									{ kit.T(ctx, "never") }
+								} else {
+									{ kit.Datetime(ctx, k.ExpiresAt, v.User) }
+								}
+							</td>
+							<td>
+								if k.Expired {
+									<span class="badge" data-variant="secondary">{ kit.T(ctx, "expired") }</span>
+								} else {
+									{{ action := fmt.Sprintf("/settings/api-keys/%d/revoke", k.ID) }}
+									<form method="post" action={ action } hx-post={ action } hx-swap="none" hx-confirm={ kit.T(ctx, "Revoke %s?", k.Name) }>
+										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Revoke") }</button>
+									</form>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<form id="form-apikey" method="post" action="/settings/api-keys" class="row" hx-post="/settings/api-keys" hx-swap="none">
+			@kit.FormError(v.Errors.Form("apikey"), "col-12")
+			{{ e := v.Errors.Get("apikey.name") }}
+			@kit.Field("col-3", kit.T(ctx, "API key name"), e, "apikey-name-error", nil) {
+				<input
+					name="name"
+					placeholder={ kit.T(ctx, "e.g. shortcuts") }
+					value={ d.APIKey.Name }
+					{ kit.Invalid(e, "apikey-name-error")... }
+				/>
+			}
+			{{ e = v.Errors.Get("apikey.scope") }}
+			@kit.Field("col-2", kit.T(ctx, "Scope"), e, "apikey-scope-error", nil) {
+				{{ scope := cmp.Or(d.APIKey.Scope, "read") }}
+				<select name="scope" { kit.Invalid(e, "apikey-scope-error")... }>
+					<option value="read" selected?={ scope == "read" }>{ kit.T(ctx, "read") }</option>
+					<option value="write" selected?={ scope == "write" }>{ kit.T(ctx, "write") }</option>
+				</select>
+			}
+			{{ e = v.Errors.Get("apikey.expires") }}
+			@kit.Field("col-2", kit.T(ctx, "Expiration"), e, "apikey-expiration-error", nil) {
+				{{ expires := cmp.Or(d.APIKey.Expires, "30") }}
+				<select name="expires" { kit.Invalid(e, "apikey-expiration-error")... }>
+					<option value="7" selected?={ expires == "7" }>{ kit.T(ctx, "7 days") }</option>
+					<option value="30" selected?={ expires == "30" }>{ kit.T(ctx, "30 days") }</option>
+					<option value="90" selected?={ expires == "90" }>{ kit.T(ctx, "90 days") }</option>
+					<option value="365" selected?={ expires == "365" }>{ kit.T(ctx, "1 year") }</option>
+					<option value="never" selected?={ expires == "never" }>{ kit.T(ctx, "No expiration") }</option>
+				</select>
+			}
+			{{ e = v.Errors.Get("apikey.password") }}
+			@kit.Field("col-3", kit.T(ctx, "Current password"), e, "apikey-password-error", nil) {
+				<input type="password" name="password" autocomplete="current-password" { kit.Invalid(e, "apikey-password-error")... }/>
+			}
+			@kit.SubmitColumn("col-2", "", kit.T(ctx, "Create key"))
+		</form>
+	</article>
+}
+
+// deleteCard deletes all data of the user. oob marks it for htmx to swap in out of band.
+templ deleteCard(v kit.Page, oob bool) {
+	<article
+		id="settings-delete"
+		class="card form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<h3>{ kit.T(ctx, "Danger zone") }</h3>
+		<p><strong>{ kit.T(ctx, "Delete all data") }</strong>: { kit.T(ctx, "every account, operation, category, plan and import, plus saved import mappings. Your login, password, time zone, sessions and API keys stay. This cannot be undone.") }</p>
+		<form id="form-delete" method="post" action="/settings/delete-data" class="row" hx-post="/settings/delete-data" hx-swap="none" hx-confirm={ kit.T(ctx, "Delete all accounts, operations, categories, plans and imports? This cannot be undone.") }>
+			@kit.FormError(v.Errors.Form("delete"), "col-12")
+			{{ e := v.Errors.Get("delete.password") }}
+			@kit.Field("col-3", kit.T(ctx, "Current password"), e, "delete-password-error", nil) {
+				<input type="password" name="password" autocomplete="current-password" { kit.Invalid(e, "delete-password-error")... }/>
+			}
+			@kit.SubmitColumn("col-3", "danger", kit.T(ctx, "Delete all data"))
+		</form>
+	</article>
+}
+
+// toasts are the toasts of an htmx post of a settings form.
+templ toasts(d pageData) {
+	if d.Notice != "" {
+		@kit.Toast("success", d.Notice)
+	}
+	if d.RatesSync.Done {
+		if d.RatesSync.Updated > 0 {
+			@kit.Toast("success", kit.T(ctx, "Daily rates updated: %d.", d.RatesSync.Updated))
+		} else {
+			@kit.Toast("success", kit.T(ctx, "Rates are up to date."))
+		}
+		if d.RatesSync.Err != nil {
+			@kit.Toast("danger", kit.T(ctx, "Some failed:")+" "+kit.ErrMsg(ctx, d.RatesSync.Err))
+		}
+	}
+}

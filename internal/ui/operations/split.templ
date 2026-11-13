@@ -1,0 +1,88 @@
+package operations
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ splitPage(v kit.Page, d opSplit) {
+	@kit.Layout(v, false, nil) {
+		<h1>{ kit.T(ctx, "Split") }</h1>
+		<p class="text-light">
+			if d.Payee != "" {
+				{ d.Payee } ·
+			}
+			{ kit.AmountInput(ctx, d.Amount) }
+		</p>
+		<form id="form-split" class="form-compact" method="post" action={ fmt.Sprintf("/operations/%d/split", d.ID) } data-split-total={ d.Amount }>
+			@kit.FormError(v.Errors.Form("split"), "")
+			<p class="text-light">
+				{ kit.T(ctx, "Divide the saved amount between categories. Each part becomes an operation of its own.") }
+				if d.OriginID != 0 {
+					{ kit.T(ctx, "Part of a split. Splitting it again adds parts to the same split.") }
+				}
+			</p>
+			<div id="splits" class="vstack">
+				for i, p := range d.Parts {
+					@splitRow(d.Categories, p, i == 0, i, v.Errors)
+				}
+			</div>
+			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
+			<div class="hstack justify-end">
+				@kit.LinkButton(fmt.Sprintf("/operations/%d/edit", d.ID), "secondary", kit.T(ctx, "Cancel"))
+				<button type="submit">{ kit.T(ctx, "Split") }</button>
+			</div>
+		</form>
+	}
+}
+
+// splitRow is a part of the split form. The first part is the operation itself: it
+// can't be removed and its amount is what the other parts leave of the saved total,
+// kept by app.js. errs and index are set on the rows of a re-rendered form, not on
+// added ones.
+templ splitRow(categories []domain.Category, s splitPart, first bool, index int, errs *kit.FormErrors) {
+	{{
+		catErr := errs.Get(fmt.Sprintf("split_category[%d]", index))
+		amountErr := errs.Get(fmt.Sprintf("split_amount[%d]", index))
+		noteErr := errs.Get(fmt.Sprintf("split_note[%d]", index))
+	}}
+	<div class="split row">
+		<div class="hstack justify-between col-12">
+			<small class="text-light">
+				if first {
+					{ kit.T(ctx, "This operation") }
+				} else {
+					{ kit.T(ctx, "New part") }
+				}
+			</small>
+			if !first {
+				<button type="button" class="outline small" data-split-remove data-variant="danger" aria-label={ kit.T(ctx, "Remove part") } title={ kit.T(ctx, "Remove part") }>✕</button>
+			}
+		</div>
+		@kit.Field("col-6", kit.T(ctx, "Category"), catErr, "", nil) {
+			<select name="split_category" { kit.Invalid(catErr, "")... }>
+				<option value="">—</option>
+				@kit.CategoryOptions(categories, s.CategoryID)
+			</select>
+		}
+		@kit.Field("col-6", kit.T(ctx, "Amount"), amountErr, "", nil) {
+			<input
+				name="split_amount"
+				inputmode="decimal"
+				autocomplete="off"
+				value={ kit.AmountInput(ctx, s.Amount) }
+				if first {
+					readonly
+					aria-disabled="true"
+					tabindex="-1"
+				}
+				{ kit.Invalid(amountErr, "")... }
+			/>
+		}
+		@kit.Field("col-12", "", noteErr, "", nil) {
+			<input name="split_note" value={ s.Note } placeholder={ kit.T(ctx, "Note") } aria-label={ kit.T(ctx, "Note") } { kit.Invalid(noteErr, "")... }/>
+		}
+	</div>
+}

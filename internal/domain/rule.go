@@ -105,6 +105,16 @@ type RuleFieldOps struct {
 	Ops   []CondOp
 }
 
+// CondOps returns the operators field takes, false when it is no condition field.
+func CondOps(field RuleField) ([]CondOp, bool) {
+	for _, f := range RuleFields() {
+		if f.Field == field {
+			return f.Ops, true
+		}
+	}
+	return nil, false
+}
+
 // ActionType is what an action does to a matching operation.
 type ActionType string
 

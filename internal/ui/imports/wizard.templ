@@ -1,0 +1,326 @@
+package imports
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ wizardPage(v kit.Page, d wizardData) {
+	{{
+		preview := d.Preview
+		base := fmt.Sprintf("/imports/%d", preview.Import.ID)
+		staged := preview.Import.Status == domain.ImportStaged
+	}}
+	@kit.Layout(v, true, nil) {
+		<h1>{ kit.T(ctx, "Import #%d", preview.Import.ID) }</h1>
+		<p class="hstack mb-4">
+			<span class="text-light">{ preview.Import.Filename }</span>
+			@statusBadge(preview.Import.Status)
+			<span class="badge" data-variant="success">{ kit.T(ctx, "%d new", preview.Import.RowsNew) }</span>
+			<span class="badge" data-variant="secondary">{ kit.T(ctx, "%d already imported", preview.Import.RowsDup) }</span>
+			if len(preview.Skipped) > 0 {
+				<a class="badge" data-variant="warning" href={ base + "/preview#skipped" }>{ kit.T(ctx, "%d skipped", preview.Import.RowsSkip) }</a>
+			} else {
+				<span class="badge" data-variant="secondary">{ kit.T(ctx, "%d skipped", preview.Import.RowsSkip) }</span>
+			}
+		</p>
+		@steps(d.Step, false, &preview)
+		switch d.Step {
+			case "accounts":
+				if len(preview.Accounts) > 0 {
+					@accountsStep(d, base)
+				} else {
+					<p class="text-light">{ kit.T(ctx, "No accounts to map.") }</p>
+					<div class="hstack mb-4">
+						@discardButton(base, kit.T(ctx, "Cancel"))
+						<a class="button" href={ base + "/categories" }>{ kit.T(ctx, "Next") }</a>
+					</div>
+				}
+			case "categories":
+				if len(preview.Categories) > 0 {
+					@categoriesStep(d, base)
+				} else {
+					<p class="text-light">{ kit.T(ctx, "No categories to map.") }</p>
+					<div class="hstack mb-4">
+						@discardButton(base, kit.T(ctx, "Cancel"))
+						@kit.LinkButton(base+"/accounts", "secondary", kit.T(ctx, "Back"))
+						<a class="button" href={ base + "/preview" }>{ kit.T(ctx, "Next") }</a>
+					</div>
+				}
+			case "preview":
+				<div class="hstack mb-4">
+					switch preview.Import.Status {
+						case domain.ImportStaged:
+							@discardButton(base, kit.T(ctx, "Cancel"))
+							@kit.LinkButton(base+"/categories", "secondary", kit.T(ctx, "Back"))
+							<form method="post" action={ base + "/commit" } hx-disable="find button">
+								<button type="submit" data-spinner disabled?={ !preview.Ready() }>{ kit.T(ctx, "Import %d rows", preview.Import.RowsNew) }</button>
+							</form>
+						case domain.ImportCommitted:
+							<form method="post" action={ base + "/undo" } hx-confirm={ kit.T(ctx, "Delete all operations created by this import?") }>
+								<button type="submit" class="outline" data-variant="secondary">{ kit.T(ctx, "Undo import") }</button>
+							</form>
+						default:
+							@discardButton(base, kit.T(ctx, "Delete from history"))
+					}
+				</div>
+				if staged && !preview.AccountsMapped() {
+					<p role="alert" data-variant="warning">{ kit.T(ctx, "Some accounts are not mapped yet.") } <a href={ base + "/accounts" }>{ kit.T(ctx, "Map accounts") }</a></p>
+				}
+				if staged && !preview.CategoriesMapped() {
+					<p role="alert" data-variant="warning">{ kit.T(ctx, "Some categories are not mapped yet.") } <a href={ base + "/categories" }>{ kit.T(ctx, "Map categories") }</a></p>
+				}
+				@rows(preview, base, v.User)
+		}
+	}
+}
+
+// accountsStep maps the accounts of the file of d to accounts of the user.
+templ accountsStep(d wizardData, base string) {
+	<form method="post" action={ base + "/accounts" }>
+		<p class="text-light">{ kit.T(ctx, "Accounts of the file the new rows belong to. Pick an existing account or create one; accounts with the same name are picked already.") }</p>
+		<div class="hstack mb-4">
+			<button type="submit" formaction={ base + "/discard" } class="outline" data-variant="secondary">{ kit.T(ctx, "Cancel") }</button>
+			<button type="submit">{ kit.T(ctx, "Save and continue") }</button>
+		</div>
+		<div class="table mb-4">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "In file") }</th><th>{ kit.T(ctx, "Account") }</th><th>{ kit.T(ctx, "New account name") }</th><th>{ kit.T(ctx, "Kind") }</th><th>{ kit.T(ctx, "Credit limit") }</th></tr></thead>
+				<tbody>
+					for _, a := range d.Preview.Accounts {
+						<tr data-account>
+							<td>
+								<input type="hidden" name="acc_name" value={ a.Name }/>
+								<input type="hidden" name="acc_currency" value={ a.Currency }/>
+								<strong>{ a.Name }</strong>
+								<div class="text-light">{ a.Currency } · { kit.T(ctx, "%d rows", a.Rows) }</div>
+							</td>
+							<td>
+								<select name="acc_id" aria-label={ kit.T(ctx, "Account") }>
+									<option value="0">{ kit.T(ctx, "Create new account") } →</option>
+									for _, acc := range d.Accounts {
+										if acc.Currency == a.Currency {
+											<option value={ acc.ID } selected?={ acc.ID == a.AccountID }>{ acc.Name }</option>
+										}
+									}
+								</select>
+							</td>
+							<td>
+								<input
+									name="acc_new"
+									if a.AccountID == 0 {
+										value={ a.Name }
+									} else {
+										value=""
+									}
+									aria-label={ kit.T(ctx, "New account name") }
+								/>
+							</td>
+							<td>
+								<select name="acc_kind" data-account-kind aria-label={ kit.T(ctx, "Kind") }>
+									for _, k := range d.AccountKinds {
+										<option value={ string(k) } selected?={ k == a.Kind }>{ kit.T(ctx, string(k)) }</option>
+									}
+								</select>
+							</td>
+							<td><div data-credit-limit hidden?={ a.Kind != domain.AccountCredit }><input name="acc_limit" inputmode="decimal" placeholder={ kit.T(ctx, "optional") } aria-label={ kit.T(ctx, "Credit limit") }/></div></td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</form>
+}
+
+// categoriesStep maps the categories of the file of d to categories of the user.
+templ categoriesStep(d wizardData, base string) {
+	<form method="post" action={ base + "/categories" }>
+		<p class="text-light">{ kit.T(ctx, `Categories of the file map separately for money out (expense) and money in (income, e.g. refunds). To create a new category inside another one, write "Parent / Child".`) }</p>
+		<div class="hstack mb-4">
+			<button type="submit" formaction={ base + "/discard" } class="outline" data-variant="secondary">{ kit.T(ctx, "Cancel") }</button>
+			@kit.LinkButton(base+"/accounts", "secondary", kit.T(ctx, "Back"))
+			<button type="submit">{ kit.T(ctx, "Save and continue") }</button>
+		</div>
+		<div class="table mb-4">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "In file") }</th><th>{ kit.T(ctx, "Category") }</th><th>{ kit.T(ctx, "New category") }</th></tr></thead>
+				<tbody>
+					for _, c := range d.Preview.Categories {
+						<tr>
+							<td>
+								<input type="hidden" name="cat_name" value={ c.Name }/>
+								<input type="hidden" name="cat_kind" value={ string(c.Kind) }/>
+								<strong>{ c.Name }</strong>
+								<div>
+									<span
+										class="badge"
+										if c.Kind == domain.KindIncome {
+											data-variant="success"
+										} else {
+											data-variant="danger"
+										}
+									>{ kit.T(ctx, string(c.Kind)) }</span> <span class="text-light">{ kit.T(ctx, "%d rows", c.Rows) }</span>
+								</div>
+							</td>
+							<td>
+								<select name="cat_id" aria-label={ kit.T(ctx, "Category") }>
+									<option value="0">{ kit.T(ctx, "Create new category") } →</option>
+									@kit.CategoryOptions(domain.ByKind(d.Categories, c.Kind), c.CategoryID)
+								</select>
+							</td>
+							<td>
+								<input
+									name="cat_new"
+									if c.CategoryID == 0 {
+										value={ c.Name }
+									} else {
+										value=""
+									}
+									aria-label={ kit.T(ctx, "New category") }
+								/>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</form>
+}
+
+// rows lists the rows of the import of p, then its skipped rows.
+templ rows(p domain.Preview, base string, user *domain.User) {
+	<div class="table">
+		<table>
+			<thead><tr><th>{ kit.T(ctx, "Time") }</th><th>{ kit.T(ctx, "Operation") }</th><th class="align-right">{ kit.T(ctx, "Amount") }</th><th>{ kit.T(ctx, "Status") }</th></tr></thead>
+			<tbody>
+				for _, row := range p.Rows {
+					{{
+						r := row.Row
+						transfer := row.PairID != 0 || r.ToAccount != ""
+					}}
+					<tr>
+						<td class="text-light nowrap">
+							@rowTime(r, user)
+						</td>
+						<td>
+							<div>
+								if transfer {
+									<em>{ kit.T(ctx, "transfer") }</em>
+								} else if r.Category != "" {
+									{ r.Category }
+								} else {
+									—
+								}
+								if r.Payee != "" {
+									· { r.Payee }
+								}
+							</div>
+							<div class="text-light">
+								{ r.Account }
+								if r.ToAccount != "" {
+									→ { r.ToAccount }
+								}
+								if r.Group != "" && !transfer {
+									· { kit.T(ctx, "split %s", r.Group) }
+								}
+								if r.Note != "" {
+									· { r.Note }
+								}
+								if r.MCC != "" {
+									· MCC { r.MCC }
+								}
+							</div>
+						</td>
+						<td class="align-right nowrap">{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span></td>
+						<td>
+							switch  {
+								case row.Status == domain.ImportRowDuplicate:
+									<span class="badge" data-variant="secondary">{ kit.T(ctx, "duplicate") }</span>
+								case row.OperationID != 0:
+									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }>{ kit.T(ctx, "imported") }</a>
+								case row.PairID != 0 && p.Import.Status == domain.ImportStaged:
+									<form method="post" action={ fmt.Sprintf("%s/unpair/%d", base, row.ID) }>
+										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Not a transfer") }</button>
+									</form>
+								default:
+									{ kit.T(ctx, "new") }
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	if len(p.Skipped) > 0 {
+		<h2 id="skipped" class="mt-6">{ kit.T(ctx, "Skipped") } <span class="text-light">{ kit.T(ctx, "Not imported: see the reason of each row.") }</span></h2>
+		<div class="table">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "Line") }</th><th>{ kit.T(ctx, "Time") }</th><th>{ kit.T(ctx, "Operation") }</th><th class="align-right">{ kit.T(ctx, "Amount") }</th><th>{ kit.T(ctx, "Reason") }</th></tr></thead>
+				<tbody>
+					for _, row := range p.Skipped {
+						{{ r := row.Row }}
+						<tr>
+							<td class="text-light">{ r.Line }</td>
+							<td class="text-light nowrap">
+								if r.Time.IsZero() {
+									—
+								} else {
+									@rowTime(r, user)
+								}
+							</td>
+							<td>
+								<div>
+									if r.Category != "" {
+										{ r.Category }
+									} else {
+										—
+									}
+									if r.Payee != "" {
+										· { r.Payee }
+									}
+								</div>
+								<div class="text-light">
+									if r.Account != "" {
+										{ r.Account }
+									} else {
+										—
+									}
+									if r.ToAccount != "" {
+										→ { r.ToAccount }
+									}
+									if r.Note != "" {
+										· { r.Note }
+									}
+								</div>
+							</td>
+							<td class="align-right nowrap">
+								if r.Currency != "" {
+									{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span>
+								} else {
+									—
+								}
+							</td>
+							<td>{ kit.T(ctx, r.SkipReason) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+// rowTime is the time of an import row, the day of a row without a time of day.
+templ rowTime(r domain.Record, user *domain.User) {
+	if r.DateOnly {
+		{ kit.DayTitle(ctx, r.Time) }
+	} else {
+		{ kit.Datetime(ctx, r.Time, user) }
+	}
+}
+
+// discardButton discards the import at base.
+templ discardButton(base, label string) {
+	<form method="post" action={ base + "/discard" }><button type="submit" class="outline" data-variant="secondary">{ label }</button></form>
+}

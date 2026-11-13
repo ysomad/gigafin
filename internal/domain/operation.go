@@ -26,6 +26,19 @@ func OpTypes() []OpType {
 	return []OpType{OpExpense, OpIncome, OpTransfer, OpAdjustment}
 }
 
+// Kind returns the kind of the categories of an operation of type t, false for a
+// transfer or an adjustment, which have no category.
+func (t OpType) Kind() (Kind, bool) {
+	switch t {
+	case OpExpense:
+		return KindExpense, true
+	case OpIncome:
+		return KindIncome, true
+	case OpTransfer, OpAdjustment:
+	}
+	return "", false
+}
+
 // ParseOpType validates an operation type string.
 func ParseOpType(s string) (OpType, error) {
 	t := OpType(s)
@@ -377,6 +390,20 @@ type Filter struct {
 func (f Filter) Filtered() bool {
 	return f.AccountID != 0 || f.CategoryID != 0 || f.Type != "" || !f.DateFrom.IsZero() ||
 		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || len(f.Tags) > 0
+}
+
+// Count returns the number of fields set, but Query.
+func (f Filter) Count() int {
+	var n int
+	for _, set := range []bool{
+		f.AccountID != 0, f.CategoryID != 0, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
+		f.AmountMin.Valid, f.AmountMax.Valid, len(f.Tags) > 0,
+	} {
+		if set {
+			n++
+		}
+	}
+	return n
 }
 
 // Validate checks that amount bounds are not negative and min is not above max.

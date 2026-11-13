@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"io"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -123,8 +122,7 @@ func TestRussianCoverage(t *testing.T) {
 	require.NoError(t, err)
 	ru := d["ru"]
 
-	keys := templateKeys(t)
-	maps.Copy(keys, goKeys(t))
+	keys := goKeys(t)
 	require.NotEmpty(t, keys)
 
 	letter := regexp.MustCompile(`[A-Za-z]`)
@@ -138,28 +136,10 @@ func TestRussianCoverage(t *testing.T) {
 	assert.Empty(t, missing, "untranslated keys")
 }
 
-// templateKeys returns the keys of t calls in the templates, mapped to the template.
-func templateKeys(t *testing.T) map[string]string {
-	t.Helper()
-	keys := map[string]string{}
-	re := regexp.MustCompile("[{(]-?\\s*t\\s+(\"(?:[^\"\\\\]|\\\\.)*\"|`[^`]*`)")
-	tmpls, err := fs.Glob(web.FS, "templates/*.html")
-	require.NoError(t, err)
-	for _, name := range tmpls {
-		b, err := fs.ReadFile(web.FS, name)
-		require.NoError(t, err)
-		for _, m := range re.FindAllStringSubmatch(string(b), -1) {
-			k, err := strconv.Unquote(m[1])
-			require.NoError(t, err, name)
-			keys[k] = name
-		}
-	}
-	return keys
-}
-
 // goKeys returns the literal keys of the Go code, mapped to their position: formats
 // of NewError and NewFieldError, fields of NewFieldError with the "|field" context,
-// keys of t calls, page titles and Msg constants.
+// keys of T calls, those of the templ components included through their generated
+// code, page titles and Msg constants.
 func goKeys(t *testing.T) map[string]string {
 	t.Helper()
 	keys := map[string]string{}
@@ -240,12 +220,11 @@ func keyLits(n ast.Node) (lits []ast.Expr, field bool) {
 var _runtimeGroups = []string{"dates", "values"}
 
 // TestUnused checks that every key of the locale files, but those of _runtimeGroups, is
-// used by the templates or the Go code.
+// used by the Go code.
 func TestUnused(t *testing.T) {
 	t.Parallel()
 
-	keys := templateKeys(t)
-	maps.Copy(keys, goKeys(t))
+	keys := goKeys(t)
 	var unused []string
 	for name, b := range localeFiles(t) {
 		var groups map[string]any

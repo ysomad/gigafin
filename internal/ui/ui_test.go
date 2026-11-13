@@ -136,13 +136,14 @@ func TestLoginRequired(t *testing.T) {
 	assert.NotContains(t, body, `class="toast"`)
 
 	b.login()
-	status, body = b.get("/")
-	assert.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "Dashboard")
-	assert.Contains(t, body, "No operations yet")
-	status, body = b.get("/operations")
-	assert.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "No operations yet")
+	// both pages show the same empty state
+	for _, path := range []string{"/", "/operations"} {
+		status, body = b.get(path)
+		assert.Equal(t, http.StatusOK, status, path)
+		assert.Contains(t, body, "No operations yet.", path)
+		assert.Contains(t, body, `href="/operations/new?type=expense">Add one</a>`, path)
+		assert.Contains(t, body, `href="/imports/new">import</a>`, path)
+	}
 }
 
 func TestPagesAndFlows(t *testing.T) {
@@ -194,7 +195,7 @@ func TestPagesAndFlows(t *testing.T) {
 	// a tampered id is a form error shown on the page, not a silent 0
 	status, body = b.postFrom("/categories", "/categories/new", url.Values{"parent": {"abc"}, "name": {"Bad"}})
 	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "invalid integer value")
+	assert.Contains(t, body, "invalid form")
 	tree, err = f.Categories.Tree(t.Context(), userID)
 	require.NoError(t, err)
 	assert.Len(t, tree, 2)
@@ -433,22 +434,23 @@ func TestChangePassword(t *testing.T) {
 	require.Equal(t, http.StatusUnprocessableEntity, status)
 	assert.Contains(t, body, `id="new-password-error" class="error" role="status">must differ from the current password<`)
 
-	// a boosted post keeps the URL of the form
+	// an htmx post gets just its card, swapped in out of band
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, b.srv.URL+"/settings/password",
 		strings.NewReader(url.Values{"current": {"wrong"}, "password": {"password5678"}}.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
-	req.Header.Set("HX-Boosted", "true")
 	resp, err := b.client.Do(req)
 	require.NoError(t, err)
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
+	body = string(raw)
 	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
-	assert.Equal(t, "false", resp.Header.Get("HX-Push-Url"))
-	assert.Equal(t, "outerHTML show:none", resp.Header.Get("HX-Reswap"), "no scroll to the top")
-	assert.Equal(t, "#form-password", resp.Header.Get("HX-Retarget"), "just the form is replaced")
-	assert.Equal(t, "#form-password", resp.Header.Get("HX-Reselect"))
-	assert.Contains(t, body, `<form id="form-password"`)
+	assert.Contains(t, body, `id="settings-password"`)
+	assert.Contains(t, body, `hx-swap-oob="true"`)
+	assert.Contains(t, body, `id="current-password-error" class="error" role="status">wrong password<`)
+	assert.NotContains(t, body, `id="settings-general"`, "other cards are not rendered")
 	assert.NotContains(t, body, `class="toast"`, "shown at the field, not as a toast")
 
 	status, body = b.postFrom("/settings/password", "/settings",

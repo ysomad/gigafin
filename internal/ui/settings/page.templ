@@ -1,0 +1,61 @@
+package settings
+
+import "github.com/ysomad/gigafin/internal/ui/kit"
+
+templ page(v kit.Page, d pageData) {
+	@kit.Layout(v, false, toasts(d)) {
+		<div class="hstack justify-between mb-4">
+			<div class="hstack">
+				@kit.LinkButton("/accounts", "secondary", kit.T(ctx, "Accounts"))
+				@kit.LinkButton("/categories", "secondary", kit.T(ctx, "Categories"))
+				@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Rules"))
+				@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Import"))
+			</div>
+			<form method="post" action="/logout" class="hstack">
+				<span>{ kit.T(ctx, "Signed in as") } <strong>{ v.User.Login }</strong></span>
+				<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Sign out") }</button>
+			</form>
+		</div>
+		// Settings are one form, saved as a whole on change. An htmx form gets back the
+		// cards showing what it changes and the toasts, swapped in out of band. Every
+		// action form is one row, its button in the last column under an empty caption,
+		// spaced as an input under its label.
+		@generalCard(v, d, false)
+		@ratesCard(v, d, false)
+		@passwordCard(v, false)
+		@accessCard(v, d, false)
+		<article class="card mb-4 form-compact">
+			<h3>{ kit.T(ctx, "Export") }</h3>
+			<p class="text-light">{ kit.T(ctx, "Without dates, data of all time is exported.") }</p>
+			<form method="get" action="/settings/export" hx-boost="false" class="row">
+				<input type="hidden" name="format" value="csv"/>
+				@kit.Field("col-3", kit.T(ctx, "From"), "", "", nil) {
+					<input type="date" name="from"/>
+				}
+				@kit.Field("col-3", kit.T(ctx, "To"), "", "", nil) {
+					<input type="date" name="to"/>
+				}
+				@kit.SubmitColumn("col-3", "", kit.T(ctx, "Export")+" CSV")
+			</form>
+		</article>
+		if d.CanBackup {
+			<article class="card mb-4 form-compact">
+				<h3>{ kit.T(ctx, "Backup") }</h3>
+				<p class="text-light">{ kit.T(ctx, "The whole database of all users, encrypted with") } <a href="https://age-encryption.org">age</a>.</p>
+				<form method="post" action="/settings/backup" hx-boost="false" class="row">
+					@kit.FormError(v.Errors.Form("backup"), "col-12")
+					{{ e := v.Errors.Get("backup.password") }}
+					@kit.Field("col-3", kit.T(ctx, "Current password"), e, "backup-password-error", nil) {
+						<input type="password" name="password" autocomplete="current-password" { kit.Invalid(e, "backup-password-error")... }/>
+					}
+					{{ e = v.Errors.Get("backup.passphrase") }}
+					@kit.Field("col-3", kit.T(ctx, "Backup passphrase"), e, "backup-passphrase-error", nil) {
+						<input type="password" name="passphrase" autocomplete="new-password" { kit.Invalid(e, "backup-passphrase-error")... }/>
+					}
+					@kit.SubmitColumn("col-3", "", kit.T(ctx, "Download backup"))
+				</form>
+			</article>
+		}
+		@deleteCard(v, false)
+	}
+}

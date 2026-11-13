@@ -1,6 +1,0 @@
-package components
-
-// MonthButton loads the page of url, the adjacent month, disabled when there is none.
-templ MonthButton(url string, disabled bool, label, arrow string) {
-	<button type="button" class="outline" hx-get={ url } hx-target="body" hx-swap="outerSync" hx-push-url="true" disabled?={ disabled } aria-label={ label }>{ arrow }</button>
-}

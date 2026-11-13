@@ -1,0 +1,134 @@
+package categories
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ categoriesPage(v kit.Page, d categoriesData) {
+	@kit.Layout(v, true, nil) {
+		<div class="hstack justify-between mb-4">
+			<a class="button" href={ fmt.Sprintf("/categories/new?kind=%s", d.Kind) }>+ { kit.T(ctx, "New category") }</a>
+			<div class="hstack">
+				for _, k := range domain.Kinds() {
+					@kit.SegmentLink(fmt.Sprintf("/categories?kind=%s", k), k == d.Kind, kit.KindLabel(ctx, k))
+				}
+			</div>
+		</div>
+		<div class="table">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "Name") }</th></tr></thead>
+				<tbody>
+					{{ tree := domain.ByKind(d.Categories, d.Kind) }}
+					for _, parent := range tree {
+						<tr>
+							<td>
+								<a href={ fmt.Sprintf("/categories/%d", parent.ID) }>{ parent.Name }</a>
+								if parent.Archived {
+									@kit.ArchivedBadge()
+								}
+							</td>
+						</tr>
+						for _, c := range parent.Children {
+							<tr>
+								<td>
+									<span class="text-light">{ parent.Name } › </span><a href={ fmt.Sprintf("/categories/%d", c.ID) }>{ c.Name }</a>
+									if c.Archived {
+										@kit.ArchivedBadge()
+									}
+								</td>
+							</tr>
+						}
+					}
+					if len(tree) == 0 {
+						<tr><td class="text-light">{ kit.T(ctx, "No categories yet.") }</td></tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ categoryPage(v kit.Page, d categoryData) {
+	{{
+		c := d.Category
+		base := fmt.Sprintf("/categories/%d", c.ID)
+	}}
+	@kit.Layout(v, false, nil) {
+		<h1>
+			if d.ParentName != "" {
+				{ d.ParentName } /
+			}
+			{ c.Name }
+			<span class="text-light">
+				{ kit.T(ctx, string(c.Kind)) }
+				if c.Archived {
+					· { kit.T(ctx, "archived") }
+				}
+			</span>
+		</h1>
+		<p class="text-light mb-4"><a href={ fmt.Sprintf("/operations?category=%d", c.ID) }>{ kit.T(ctx, "Operations") }</a></p>
+		<form id="form-category" class="form-compact" method="post" action={ base }>
+			@kit.FormError(v.Errors.Form("category"), "")
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Category") }>
+				{{ e := v.Errors.Get("name") }}
+				@kit.Field("col-6", kit.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ d.Name } { kit.Invalid(e, "name-error")... }/>
+				}
+				if c.ParentID != 0 {
+					@kit.Field("col-6", kit.T(ctx, "Inside"), "", "", nil) {
+						<select name="parent">
+							for _, p := range d.Parents {
+								<option value={ p.ID } selected?={ p.ID == d.Parent }>{ p.Name }</option>
+							}
+						</select>
+					}
+				}
+			</fieldset>
+			<div class="hstack justify-between">
+				<div class="hstack">
+					<button type="submit">{ kit.T(ctx, "Save") }</button>
+					@kit.LinkButton(fmt.Sprintf("/categories?kind=%s", c.Kind), "secondary", kit.T(ctx, "Cancel"))
+				</div>
+				@kit.ArchiveDelete("category", c.Archived)
+			</div>
+			<p class="text-light">{ kit.T(ctx, "Categories that contain other categories or have operations can only be archived.") }</p>
+		</form>
+		@kit.ArchiveDeleteForms("category", base, c.Archived, kit.T(ctx, "Delete category %s?", c.Name))
+	}
+}
+
+templ newCategoryPage(v kit.Page, d categoriesData) {
+	@kit.Layout(v, false, nil) {
+		<h1>
+			{ kit.T(ctx, "New category") }
+			<span class="text-light">{ kit.KindLabel(ctx, d.Kind) }</span>
+		</h1>
+		<form id="form-category" class="form-compact" method="post" action="/categories">
+			@kit.FormError(v.Errors.Form("category"), "")
+			<input type="hidden" name="kind" value={ string(d.Kind) }/>
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Category") }>
+				{{ e := v.Errors.Get("name") }}
+				@kit.Field("col-6", kit.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ d.Name } { kit.Invalid(e, "name-error")... }/>
+				}
+				@kit.Field("col-6", kit.T(ctx, "Inside"), "", "", nil) {
+					<select name="parent">
+						<option value="0">{ kit.T(ctx, "Top level") }</option>
+						for _, c := range domain.ByKind(d.Categories, d.Kind) {
+							if !c.Archived {
+								<option value={ c.ID } selected?={ c.ID == d.Parent }>{ c.Name }</option>
+							}
+						}
+					</select>
+				}
+			</fieldset>
+			<div class="hstack">
+				<button type="submit">{ kit.T(ctx, "Create") }</button>
+				@kit.LinkButton(fmt.Sprintf("/categories?kind=%s", d.Kind), "secondary", kit.T(ctx, "Cancel"))
+			</div>
+		</form>
+	}
+}

@@ -1,6 +1,0 @@
-package components
-
-// DiscardButton discards the import at base.
-templ DiscardButton(base, label string) {
-	<form method="post" action={ templ.SafeURL(base + "/discard") }><button type="submit" class="outline" data-variant="secondary">{ label }</button></form>
-}

@@ -1,0 +1,66 @@
+package rules
+
+import (
+	"fmt"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+templ listPage(v kit.Page, d rulesData) {
+	@kit.Layout(v, false, nil) {
+		<div class="hstack mb-4">
+			<a class="button" href="/rules/new">+ { kit.T(ctx, "New rule") }</a>
+		</div>
+		<p class="text-light">{ kit.T(ctx, "Rules run when importing or creating operations.") }</p>
+		for _, s := range d.Stages {
+			<h2>{ ruleStageLabel(ctx, s.Stage) }</h2>
+			<ul class="vstack">
+				for _, r := range s.Rules {
+					<li>
+						<a href={ fmt.Sprintf("/rules/%d", r.ID) }>
+							{ kit.T(ctx, "If") }
+							for i, c := range r.Conds {
+								{{
+									join := ""
+									if i > 0 && c.Any {
+										join = kit.T(ctx, "or") + " "
+									} else if i > 0 {
+										join = kit.T(ctx, "and") + " "
+									}
+								}}
+								{ join + ruleFieldLabel(ctx, c.Field) } { ruleOpLabel(ctx, c.Op) } <strong>{ c.Values }</strong>
+							}
+							→
+							for i, a := range r.Actions {
+								{{
+									sep := ""
+									if i < len(r.Actions)-1 {
+										sep = ", "
+									}
+								}}
+								if a.Value != "" {
+									{ ruleActionLabel(ctx, a.Type) } <strong>{ a.Value }</strong>{ sep }
+								} else {
+									{ ruleActionLabel(ctx, a.Type) + sep }
+								}
+							}
+						</a>
+						if r.Origin == domain.RuleOriginLearned {
+							@learnedBadge()
+						}
+					</li>
+				}
+			</ul>
+		}
+		if len(d.Stages) == 0 {
+			<p class="text-light">{ kit.T(ctx, "No rules yet.") }</p>
+		}
+	}
+}
+
+// learnedBadge marks a rule learned from the user's categories.
+templ learnedBadge() {
+	<span class="badge" data-variant="secondary">{ kit.T(ctx, "learned") }</span>
+}
+
