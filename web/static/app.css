@@ -1,5 +1,10 @@
 /* App styles on top of Oat. Use Oat tokens (var(--space-*), etc.) only. */
 
+/* Reserve the scrollbar's space so the nav does not shift between short and long pages. */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Field and form messages from the server start lowercase, as they follow the field in
    toasts. */
 :is([data-field] .error, .error[role="alert"])::first-letter {

@@ -30,7 +30,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 							@navLink("/", v.Nav == "dashboard", T(ctx, "Dashboard"))
 							@navLink("/operations", v.Nav == "operations", T(ctx, "Operations"))
 							@navLink("/plans", v.Nav == "plans", T(ctx, "Plans"))
-							@navLink("/settings", v.Nav == "settings", T(ctx, "Settings"))
+							@navLink("/settings", v.Nav == "settings", "...")
 						</div>
 					}
 				</nav>
