@@ -1,62 +1,29 @@
-# TODO
-## Core feats
-- [x] basic features
-    - [x] operations
-    - [x] accounts (remove not needed account types)
-    - [x] categories
-    - [x] tbank import
-    - [x] zenmoney import
-    - [x] gigafin CSV import format
-    - [x] credit cards
-    - [x] debts
-- [x]  simple ui for categories
-- [x] code architecture
-- [x] mcp server
-- [x] tbank whole history + zenmoney import
-- [x] tbank integration sync operations
-- [x] api
-- [x] dashboard
-- [x] export
-- [x] move import to its own package from domain and tbank/gigacsv/zenmoney packages
-- [x] better import documentation on first step
-- [x] up button
-- [x] more compact operation tables and wider
-- [x] loading indicators
-- [x] missing reports
-- [x] backup button
-- [x] auto-repeating monthly plans
-- [x] config
-- [x] tags
-- [x] scheduler for background tasks (https://github.com/go-co-op/gocron)
-- [x] money.Amount type
-- [x] auto planning better ui/ux  && tests
-- [x] month picker on dashboard
-- [x] consistent buttons (height vs input height)
-- [x] rename budget to plan (better for both income and expense)
-- [x] centralize currency (currency per account or how?)
-- [x] logging
-- [x] replace / remove deprecated picocss (https://github.com/picocss/pico). Reduce amount of custom css / js
-- [x] i18n + russian
-- [x] Auto-categorisation rules. Payee is free text, and the only mapping is the bank's own category name. Other apps let you write rules like "payee contains X → category Y, rename payee."
-- [x] UI revamp
-- [x] Use templ instead of go templates
-- [x] tbank sync, balance check (if does not count - show alert)
-- [x] rules event sourcing
-- [x] Rename dashboard to analytics
-- [ ] better categories ui/ux (icons, selectors)
-- [ ] operations tags filter
-- [ ] sber sync
-- [ ] alfa sync
-- [ ] raiifaizen sync
-- [ ] bybit sync?
-- [ ] alerts: when a plan is overspent or a bill is due (telegram?)
-- [ ] shared household plan (between multiple users)
-- [ ] 2fa
-- [ ] No Cross-currency transfers. An operation has one amount, so a RUB→USD transfer can't record both sides. It needs a to_amount.
-- [ ] No exchange rates or base currency. Totals stay split by currency, so there is no single net worth or "total spent this month."
-- [ ] Recurring and scheduled operations. No bills, subscriptions or planned future operations, and no "upcoming" view.
-- [ ] AI integration for categorization rules
-- [ ] zero-based "ready to assign" pool from income, carryover of unspent or overspent amounts, and moving money between categories. This is the main feature of YNAB and Actual.
-- [ ] custom themes per user
-- [ ] mobile web
-- [ ] Rules history
+# gigafin
+
+Self-hosted personal finance manager. Go + SQLite, server-rendered UI (templ + htmx), English and Russian.
+
+## Features
+- **Operations** — income, expense, transfers; split, tags, filters.
+- **Accounts** — debit, credit cards, cash, savings, loans/debts; balance adjustment, archive.
+- **Categories** — nested income/expense categories.
+- **Rules** — auto-categorisation (payee conditions → category, rename payee), preview, learn from history.
+- **Plans** — monthly income/expense plans with auto-repeat.
+- **Analytics** — monthly totals, income vs expense trends, category breakdown, net worth, top payees.
+- **Import** — T-Bank, ZenMoney and gigafin CSV, with undo; CBR exchange rates.
+- **Bank sync** — T-Bank background sync with balance check.
+- **Data** — CSV export, SQLite backup (admin), delete all data.
+- **API** — public JSON API (`/api`, OpenAPI at `/api/openapi.yaml`, docs at `/api/docs`) and MCP server (`/mcp`), both via bearer API keys.
+- **Security** — password login, session management, revocable API keys.
+
+## Quick start
+```sh
+make tools
+make user-add login=me role=admin
+make run            # migrates gigafin.db, serves on 127.0.0.1:8080
+```
+Config via env (`DB_PATH`, `HTTP_ADDR`, `BANKS_SECRET_KEY`, …), see `internal/config`.
+
+## Development
+`make generate` · `make test` · `make lint` · `make dev` (live reload). See [CLAUDE.md](CLAUDE.md) and [CODE_STYLE.md](CODE_STYLE.md).
+
+Roadmap: [ROADMAP.md](ROADMAP.md).

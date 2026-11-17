@@ -36,7 +36,6 @@ templ listPage(v kit.Page, d opList) {
 					</menu>
 				</ot-dropdown>
 				if d.BankSync {
-					<!-- a button group as New operation, so both line up -->
 					<menu class="buttons">
 						<li>
 							<form method="post" action="/operations/sync" hx-disable="find button">
