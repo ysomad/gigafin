@@ -77,11 +77,12 @@ func (h *Handler) renderPlans(
 		d.Day = d.Days
 	}
 	d.Pace = d.Day * 100 / d.Days
+	reports, err := h.app.Svc.Plans.Report(r.Context(), user.ID, month)
+	if err != nil {
+		return err
+	}
 	for _, kind := range []domain.Kind{domain.KindExpense, domain.KindIncome} {
-		rows, _, err := h.app.Svc.Plans.Report(r.Context(), user.ID, month, kind)
-		if err != nil {
-			return err
-		}
+		rows := reports[kind]
 		sec := planSection{Kind: kind, Totals: domain.PlanTotals(rows)}
 		// rows are groups of a cat1 followed by its cat2
 		parent := ""

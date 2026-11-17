@@ -181,8 +181,9 @@ func (q *Queries) ListRepeatingPlans(ctx context.Context, arg ListRepeatingPlans
 const upsertPlan = `-- name: UpsertPlan :exec
 INSERT INTO plans (user_id, category_id, month, currency, amount, is_repeating)
 VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT (category_id, month, currency) DO UPDATE SET amount = excluded.amount,
-    is_repeating = excluded.is_repeating
+ON CONFLICT (
+    category_id, month, currency) DO UPDATE SET amount = excluded.amount,
+is_repeating = excluded.is_repeating
 `
 
 type UpsertPlanParams struct {

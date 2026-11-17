@@ -1,8 +1,9 @@
 -- name: UpsertPlan :exec
 INSERT INTO plans (user_id, category_id, month, currency, amount, is_repeating)
 VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT (category_id, month, currency) DO UPDATE SET amount = excluded.amount,
-    is_repeating = excluded.is_repeating;
+ON CONFLICT (
+    category_id, month, currency) DO UPDATE SET amount = excluded.amount,
+is_repeating = excluded.is_repeating;
 
 -- name: DeletePlan :exec
 DELETE FROM plans WHERE user_id = ? AND category_id = ? AND month = ? AND currency = ?;

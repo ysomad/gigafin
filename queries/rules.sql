@@ -1,11 +1,11 @@
 -- name: CreateRule :one
-INSERT INTO rules (user_id, stage, match, conditions, actions, origin, created_at)
+INSERT INTO rules (user_id, stage, "match", conditions, actions, origin, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateRule :one
 UPDATE rules
-SET stage = ?, match = ?, conditions = ?, actions = ?, origin = ?, updated_at = ?
+SET stage = ?, "match" = ?, conditions = ?, actions = ?, origin = ?, updated_at = ?
 WHERE id = ? AND user_id = ?
 RETURNING *;
 

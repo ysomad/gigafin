@@ -80,15 +80,23 @@ func (s *Imports) Upload(
 	if err != nil {
 		return domain.Import{}, err
 	}
-	return s.stage(ctx, userID, src, filename, res)
+	return s.stage(ctx, userID, src, filename, res, false)
 }
 
 // stage stores parsed records as a new staged import, marks rows imported before as
-// duplicates and pairs transfers between own accounts.
+// duplicates and pairs transfers between own accounts. With newOnly the duplicates
+// are left out of the import.
 func (s *Imports) stage(
 	ctx context.Context, userID int64, src domain.ImportSource, filename string, res domain.ParseResult,
+	newOnly bool,
 ) (domain.Import, error) {
 	hashes := domain.HashRows(src, res.Rows)
+	var ids []string
+	for _, rec := range res.Rows {
+		if rec.ExternalID != "" {
+			ids = append(ids, rec.ExternalID)
+		}
+	}
 
 	var im domain.Import
 	err := s.store.InTx(ctx, func(r repository.Repos) error {
@@ -96,11 +104,28 @@ func (s *Imports) stage(
 		if err != nil {
 			return err
 		}
+		importedIDs, err := r.Imports.ImportedExternalIDs(ctx, userID, src, ids)
+		if err != nil {
+			return err
+		}
+		// a row with the id of an imported one is that row, though the source changed
+		// its payee or time since
+		for i, rec := range res.Rows {
+			if importedIDs[rec.ExternalID] {
+				imported[hashes[i]] = true
+			}
+		}
 		if im, err = r.Imports.Create(ctx, userID, src, filename, s.clock.Now()); err != nil {
 			return err
 		}
 		var staged []domain.ImportRow
 		im, staged = domain.StageImportRows(im, res.Rows, res.Skipped, hashes, imported)
+		if newOnly {
+			staged = slices.DeleteFunc(staged, func(row domain.ImportRow) bool {
+				return row.Status == domain.ImportRowDuplicate
+			})
+			im.RowsTotal, im.RowsDup = im.RowsNew, 0
+		}
 		for i := range staged {
 			if staged[i].ID, err = r.Imports.CreateRow(ctx, im.ID, staged[i]); err != nil {
 				return err
@@ -276,20 +301,25 @@ func (s *Imports) commit(
 		now := s.clock.Now()
 		for _, c := range commits {
 			ref := domain.ImportRef{ImportID: importID, Hash: c.Row.Hash}
-			op, err := createOperation(ctx, r, &refs, userID, c.Op, ref, now)
+			op, err := refs.newOperation(c.Op)
 			if err != nil {
+				return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
+			}
+			// parts after the first are stored with their origin; the first is its own
+			// origin, known once it is stored
+			origin, known := origins[c.Row.Row.Group]
+			if c.Split && known {
+				op.OriginID = origin
+			}
+			if op, err = r.Operations.Create(ctx, userID, op, ref, now); err != nil {
 				return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
 			}
 			if err := r.Imports.SetOperation(ctx, c.Row.ID, op.ID); err != nil {
 				return err
 			}
-			if c.Split {
-				g := c.Row.Row.Group
-				if _, ok := origins[g]; !ok {
-					origins[g] = op.ID
-				}
-				op.OriginID = origins[g]
-				if _, err := r.Operations.Update(ctx, userID, op, now); err != nil {
+			if c.Split && !known {
+				origins[c.Row.Row.Group] = op.ID
+				if err := r.Operations.SetOrigin(ctx, userID, op.ID, op.ID); err != nil {
 					return err
 				}
 			}

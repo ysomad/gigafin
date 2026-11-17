@@ -99,6 +99,9 @@ type BankAccount struct {
 	AccountID int64
 	// SyncedUntil is the end of the last synced period, zero before the first sync.
 	SyncedUntil time.Time
+	// SyncedFrom is where the sync of the linked account starts, zero when not linked.
+	// Operations before it were in gigafin when it was linked.
+	SyncedFrom time.Time
 	// TransfersTo is the account transfers with the bank account go to when it is not
 	// linked, zero when none.
 	TransfersTo int64

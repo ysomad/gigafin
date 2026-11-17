@@ -69,20 +69,22 @@ func (q *Queries) GetBankConnection(ctx context.Context, arg GetBankConnectionPa
 }
 
 const linkBankAccount = `-- name: LinkBankAccount :execrows
-UPDATE bank_accounts SET account_id = ?, updated_at = ?
+UPDATE bank_accounts SET account_id = ?, synced_from = ?, updated_at = ?
 WHERE user_id = ? AND id = ? AND account_id IS NULL
 `
 
 type LinkBankAccountParams struct {
-	AccountID sql.NullInt64
-	UpdatedAt sql.NullInt64
-	UserID    int64
-	ID        int64
+	AccountID  sql.NullInt64
+	SyncedFrom sql.NullInt64
+	UpdatedAt  sql.NullInt64
+	UserID     int64
+	ID         int64
 }
 
 func (q *Queries) LinkBankAccount(ctx context.Context, arg LinkBankAccountParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, linkBankAccount,
 		arg.AccountID,
+		arg.SyncedFrom,
 		arg.UpdatedAt,
 		arg.UserID,
 		arg.ID,
@@ -94,7 +96,7 @@ func (q *Queries) LinkBankAccount(ctx context.Context, arg LinkBankAccountParams
 }
 
 const listBankAccounts = `-- name: ListBankAccounts :many
-SELECT id, user_id, bank, external_id, name, currency, kind, balance, credit_limit, account_id, synced_until, created_at, updated_at FROM bank_accounts WHERE user_id = ? ORDER BY bank, name, id
+SELECT id, user_id, bank, external_id, name, currency, kind, balance, credit_limit, account_id, synced_until, synced_from, created_at, updated_at FROM bank_accounts WHERE user_id = ? ORDER BY bank, name, id
 `
 
 func (q *Queries) ListBankAccounts(ctx context.Context, userID int64) ([]BankAccount, error) {
@@ -118,6 +120,44 @@ func (q *Queries) ListBankAccounts(ctx context.Context, userID int64) ([]BankAcc
 			&i.CreditLimit,
 			&i.AccountID,
 			&i.SyncedUntil,
+			&i.SyncedFrom,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBankConnections = `-- name: ListBankConnections :many
+SELECT user_id, bank, login, status, secret, last_sync_at, last_error, created_at, updated_at FROM bank_connections WHERE user_id = ? ORDER BY bank
+`
+
+func (q *Queries) ListBankConnections(ctx context.Context, userID int64) ([]BankConnection, error) {
+	rows, err := q.db.QueryContext(ctx, listBankConnections, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BankConnection
+	for rows.Next() {
+		var i BankConnection
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Bank,
+			&i.Login,
+			&i.Status,
+			&i.Secret,
+			&i.LastSyncAt,
+			&i.LastError,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

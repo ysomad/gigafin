@@ -89,6 +89,9 @@ type Record struct {
 	Tags []string `json:"tags,omitempty"`
 	// SkipReason is set on rows that are not imported.
 	SkipReason string `json:"skip_reason,omitempty"`
+	// ExternalID is the id of the operation at the source, empty when the source has
+	// none. A row with the id of an imported row is a duplicate whatever else changed.
+	ExternalID string `json:"external_id,omitempty"`
 }
 
 // ParseResult is a parsed file.

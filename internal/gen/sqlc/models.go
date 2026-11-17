@@ -49,6 +49,7 @@ type BankAccount struct {
 	CreditLimit int64
 	AccountID   sql.NullInt64
 	SyncedUntil sql.NullInt64
+	SyncedFrom  sql.NullInt64
 	CreatedAt   int64
 	UpdatedAt   sql.NullInt64
 }
@@ -123,6 +124,7 @@ type ImportRow struct {
 	Status      string
 	PairRowID   sql.NullInt64
 	OperationID sql.NullInt64
+	ExternalID  sql.NullString
 }
 
 type Operation struct {

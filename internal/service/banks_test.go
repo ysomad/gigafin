@@ -95,7 +95,7 @@ func (f *fakeBank) add(id, amount string, at time.Time) {
 		if a.ExternalID == id {
 			f.records[id] = append(f.records[id], domain.Record{
 				Account: a.Name, Time: at, Amount: dec(amount), Currency: a.Currency, Category: "Супермаркеты",
-				Payee: "Магазин",
+				Payee: "Магазин", ExternalID: id + "-" + strconv.Itoa(len(f.records[id])),
 			})
 		}
 	}
@@ -347,6 +347,68 @@ func TestBanksSyncNoCategoryAndRules(t *testing.T) {
 	assert.Len(t, tree, 1, "no category is created")
 }
 
+func TestBanksSyncNewOnly(t *testing.T) {
+	t.Parallel()
+
+	f := newBankFixture(t)
+	ctx := t.Context()
+	oct1 := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	f.bank.add("1001", "-100", oct1.Add(10*time.Hour))
+	f.bank.add("1001", "-200", oct1.Add(11*time.Hour))
+	res, err := f.link(t, f.black.ID, "1001")
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Operations)
+
+	// the bank renames the payee and moves the time of a synced operation: it is the
+	// same operation, by its id
+	f.bank.records["1001"][1].Payee = "Магазин у дома"
+	f.bank.records["1001"][1].Time = oct1.Add(11*time.Hour + time.Minute)
+	f.clock.add(time.Hour)
+	assert.Zero(t, f.sync(t, true).Operations, "an operation the bank changed is not imported again")
+
+	f.bank.add("1001", "-50", f.clock.Now().Add(-time.Minute))
+	f.clock.add(30 * time.Minute)
+	assert.Equal(t, 1, f.sync(t, true).Operations)
+	assert.Len(t, f.ops(t, f.black.ID), 4, "the opening balance and the operations")
+
+	imports, err := f.svc.Imports.List(ctx, f.userID)
+	require.NoError(t, err)
+	require.Len(t, imports, 2, "the link and the sync with a new operation")
+	assert.Equal(t, int64(1), imports[0].RowsTotal, "only the new operation is staged")
+	assert.Zero(t, imports[0].RowsDup)
+	p, err := f.svc.Imports.Preview(ctx, f.userID, imports[0].ID)
+	require.NoError(t, err)
+	require.Len(t, p.Rows, 1)
+	assert.Equal(t, "1001-2", p.Rows[0].Row.ExternalID)
+}
+
+func TestBanksSyncCreditLimit(t *testing.T) {
+	t.Parallel()
+
+	f := newBankFixture(t)
+	ctx := t.Context()
+	f.bank.accounts = append(f.bank.accounts, domain.BankAccount{
+		ExternalID: "1005", Name: "Platinum", Currency: "RUB", Kind: domain.AccountCredit,
+		Balance: dec("-20000"), CreditLimit: dec("100000"),
+	})
+	f.sync(t, true)
+
+	// an account created before it is linked takes the kind and limit of the card
+	_, err := f.link(t, f.black.ID, "1005")
+	require.NoError(t, err)
+	a, err := f.svc.Accounts.Get(ctx, f.userID, f.black.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.AccountCredit, a.Kind)
+	assert.Equal(t, "100000", a.CreditLimit.String())
+
+	f.bank.accounts[len(f.bank.accounts)-1].CreditLimit = dec("150000")
+	f.clock.add(time.Hour)
+	f.sync(t, true)
+	a, err = f.svc.Accounts.Get(ctx, f.userID, f.black.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "150000", a.CreditLimit.String(), "a changed limit follows the bank")
+}
+
 func TestBanksTransferWithUnlinked(t *testing.T) {
 	t.Parallel()
 
@@ -412,6 +474,29 @@ func TestBanksLinkSeveral(t *testing.T) {
 	ops := f.ops(t, savings.ID)
 	require.Len(t, ops, 3)
 	assert.Equal(t, day(t, "2026-09-30"), ops[2].Date, "the opening balance is before the first operation")
+}
+
+func TestBanksSyncNotBeforeLink(t *testing.T) {
+	t.Parallel()
+
+	f := newBankFixture(t)
+	ctx := t.Context()
+	// the account has operations up to Nov 10, within the overlap of a sync on Nov 15
+	nov10 := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+	_, err := f.svc.Accounts.SetBalance(ctx, f.userID, f.black.ID, dec("800"), nov10)
+	require.NoError(t, err)
+	// in gigafin already, entered by hand, so its hash is not the bank's
+	f.bank.add("1001", "-200", nov10.Add(-24*time.Hour))
+	f.bank.add("1001", "-100", nov10.Add(36*time.Hour))
+
+	res, err := f.link(t, f.black.ID, "1001")
+	require.NoError(t, err)
+	assert.Equal(t, 1, res.Operations, "since the day after the last operation")
+	assert.Equal(t, "700", f.balance(t, f.black.ID))
+
+	f.clock.add(time.Hour)
+	assert.Zero(t, f.sync(t, true).Operations, "the overlap does not go back past the link")
+	assert.Equal(t, "700", f.balance(t, f.black.ID))
 }
 
 func TestBanksLinkStart(t *testing.T) {

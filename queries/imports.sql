@@ -19,8 +19,8 @@ WHERE id = ? AND user_id = ?;
 DELETE FROM imports WHERE id = ? AND user_id = ?;
 
 -- name: CreateImportRow :one
-INSERT INTO import_rows (import_id, line, payload, import_hash, status)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO import_rows (import_id, line, payload, import_hash, status, external_id)
+VALUES (?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: ListImportRows :many
@@ -58,10 +58,22 @@ ON CONFLICT (user_id, source, source_name, kind) DO UPDATE SET category_id = exc
 SELECT r.import_hash
 FROM import_rows AS r
 JOIN imports AS b ON b.id = r.import_id
-WHERE b.user_id = sqlc.arg(user_id)
-  AND b.status = sqlc.arg(import_status)
-  AND r.status = sqlc.arg(row_status)
-  AND r.import_hash IN (sqlc.slice(hashes));
+WHERE
+    b.user_id = sqlc.arg(user_id)
+    AND b.status = sqlc.arg(import_status)
+    AND r.status = sqlc.arg(row_status)
+    AND r.import_hash IN (sqlc.slice(hashes));
+
+-- name: ListImportedExternalIDs :many
+SELECT r.external_id
+FROM import_rows AS r
+JOIN imports AS b ON b.id = r.import_id
+WHERE
+    b.user_id = sqlc.arg(user_id)
+    AND b.source = sqlc.arg(source)
+    AND b.status = sqlc.arg(import_status)
+    AND r.status = sqlc.arg(row_status)
+    AND r.external_id IN (sqlc.slice(ids));
 
 -- name: DeleteUserImports :exec
 DELETE FROM imports WHERE user_id = ?;

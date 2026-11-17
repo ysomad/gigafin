@@ -279,8 +279,8 @@ func TestPagesAndFlows(t *testing.T) {
 		"split_note":     {"", "coffee", ""},
 	})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "Food / Groceries · split")
-	assert.Contains(t, body, "Food / Cafe · split")
+	assert.Contains(t, body, `<div class="text-light">Groceries · split`, "rows show only the cat2 name")
+	assert.Contains(t, body, `<div class="text-light">Cafe · split`)
 	assert.Contains(t, body, "coffee")
 
 	ops, _, err = f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})

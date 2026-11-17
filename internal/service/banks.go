@@ -141,12 +141,22 @@ func (s *Banks) Connection(ctx context.Context, userID int64, bank domain.Bank) 
 	return s.store.Read().Banks.Connection(ctx, userID, bank)
 }
 
+// Connections returns the user's connections to banks.
+func (s *Banks) Connections(ctx context.Context, userID int64) ([]domain.BankConnection, error) {
+	return s.store.Read().Banks.Connections(ctx, userID)
+}
+
 // Accounts returns the user's accounts at the enabled banks as of the last sign-in or
 // sync, and the accounts the transfers with the ones not linked go to.
 func (s *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccount, error) {
+	r := s.store.Read()
+	all, err := r.Banks.Accounts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	var accounts []domain.BankAccount
 	for _, bank := range s.Enabled() {
-		ts, err := bankAccounts(ctx, s.store.Read(), userID, bank)
+		ts, err := bankAccounts(ctx, r, userID, bank, all)
 		if err != nil {
 			return nil, err
 		}
@@ -155,15 +165,12 @@ func (s *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccoun
 	return accounts, nil
 }
 
-// bankAccounts returns the user's accounts at bank with the accounts the transfers
-// with the ones not linked go to: those their names map to in imports of the bank.
+// bankAccounts returns the accounts at bank of all the user's bank accounts with the
+// accounts the transfers with the ones not linked go to: those their names map to in
+// imports of the bank.
 func bankAccounts(
-	ctx context.Context, r repository.Repos, userID int64, bank domain.Bank,
+	ctx context.Context, r repository.Repos, userID int64, bank domain.Bank, all []domain.BankAccount,
 ) ([]domain.BankAccount, error) {
-	all, err := r.Banks.Accounts(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
 	m, err := r.Imports.Mapping(ctx, userID, bank.ImportSource())
 	if err != nil {
 		return nil, err
@@ -375,7 +382,7 @@ func (s *Banks) Link(
 					start = time.Date(last.Year(), last.Month(), last.Day()+1, 0, 0, 0, 0, loc)
 				}
 			}
-			if err := r.Banks.Link(ctx, userID, t.ID, l.AccountID, now); err != nil {
+			if err := r.Banks.Link(ctx, userID, t.ID, l.AccountID, start, now); err != nil {
 				return err
 			}
 			// Commit maps records by name, and CSV exports of the account map with it too
@@ -464,10 +471,16 @@ func (s *Banks) Sync(
 		if t.Bank != bank || t.AccountID == 0 {
 			continue
 		}
-		starts[t.ExternalID] = now.Add(-s.opts.SyncOverlap)
+		start := now.Add(-s.opts.SyncOverlap)
 		if !t.SyncedUntil.IsZero() {
-			starts[t.ExternalID] = t.SyncedUntil.Add(-s.opts.SyncOverlap)
+			start = t.SyncedUntil.Add(-s.opts.SyncOverlap)
 		}
+		// the overlap must not reach the operations the account had when it was linked:
+		// those not imported from the bank would import again
+		if start.Before(t.SyncedFrom) {
+			start = t.SyncedFrom
+		}
+		starts[t.ExternalID] = start
 	}
 	n, _, err := s.run(ctx, userID, c, loc, &conn, starts, now)
 	return s.finish(ctx, userID, &conn, now, n, err)
@@ -574,7 +587,7 @@ func (s *Banks) run(
 	}
 	parsed, sums := syncRecords(accounts, data.Records, starts)
 	filename := conn.Bank.Name() + " " + now.In(loc).Format(time.DateTime)
-	im, err := s.imports.stage(ctx, userID, conn.Bank.ImportSource(), filename, parsed)
+	im, err := s.imports.stage(ctx, userID, conn.Bank.ImportSource(), filename, parsed, true /* newOnly */)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -671,8 +684,27 @@ func (s *Banks) saveAccounts(
 			if err := r.Imports.MapAccount(ctx, userID, bank.ImportSource(), t.Name, t.Currency, t.AccountID); err != nil {
 				return err
 			}
+			// the bank knows the limit of a credit card, also of an account linked after
+			// it was created or of a limit changed since
+			if t.Kind != domain.AccountCredit {
+				continue
+			}
+			a, err := r.Accounts.Get(ctx, userID, t.AccountID)
+			if err != nil {
+				return err
+			}
+			if a.Kind == domain.AccountCredit && a.CreditLimit.Equal(t.CreditLimit) {
+				continue
+			}
+			edited, err := a.Edit(domain.AccountInput{Name: a.Name, Kind: domain.AccountCredit, CreditLimit: t.CreditLimit})
+			if err != nil {
+				return err
+			}
+			if err := r.Accounts.Update(ctx, userID, edited); err != nil {
+				return err
+			}
 		}
-		stored, err = bankAccounts(ctx, r, userID, bank)
+		stored, err = bankAccounts(ctx, r, userID, bank, all)
 		return err
 	})
 	return stored, err

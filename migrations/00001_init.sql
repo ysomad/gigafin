@@ -10,19 +10,19 @@ CREATE TABLE users (
 ) STRICT;
 
 CREATE TABLE user_settings (
-    user_id              INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    show_minor_units     INTEGER NOT NULL,
-    primary_currency     TEXT    NOT NULL,
-    rate_source          TEXT    NOT NULL,
-    language             TEXT    NOT NULL,
-    auto_category_rules  INTEGER NOT NULL,
-    created_at           INTEGER NOT NULL,
-    updated_at           INTEGER
+    user_id             INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    show_minor_units    INTEGER NOT NULL,
+    primary_currency    TEXT    NOT NULL,
+    rate_source         TEXT    NOT NULL,
+    language            TEXT    NOT NULL,
+    auto_category_rules INTEGER NOT NULL,
+    created_at          INTEGER NOT NULL,
+    updated_at          INTEGER
 ) STRICT;
 
 CREATE TABLE sessions (
     id           INTEGER PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash   TEXT    NOT NULL,
     user_agent   TEXT    NOT NULL,
     expires_at   INTEGER NOT NULL,
@@ -35,7 +35,7 @@ CREATE INDEX sessions_token_hash_idx ON sessions (token_hash);
 
 CREATE TABLE api_keys (
     id           INTEGER PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name         TEXT    NOT NULL,
     prefix       TEXT    NOT NULL,
     key_hash     TEXT    NOT NULL,
@@ -50,21 +50,21 @@ CREATE INDEX api_keys_user_id_idx ON api_keys (user_id);
 CREATE INDEX api_keys_prefix_idx ON api_keys (prefix);
 
 CREATE TABLE accounts (
-    id          INTEGER PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    name        TEXT    NOT NULL,
-    currency    TEXT    NOT NULL,
-    kind        TEXT    NOT NULL,
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         TEXT    NOT NULL,
+    currency     TEXT    NOT NULL,
+    kind         TEXT    NOT NULL,
     credit_limit INTEGER,
-    archived_at INTEGER,
-    created_at  INTEGER NOT NULL,
+    archived_at  INTEGER,
+    created_at   INTEGER NOT NULL,
     UNIQUE (user_id, name)
 ) STRICT;
 
 CREATE TABLE categories (
     id          INTEGER PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    parent_id   INTEGER REFERENCES categories (id) ON DELETE RESTRICT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_id   INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
     kind        TEXT    NOT NULL,
     name        TEXT    NOT NULL,
     archived_at INTEGER,
@@ -76,7 +76,7 @@ CREATE UNIQUE INDEX categories_cat2_name_idx ON categories (parent_id, name) WHE
 
 CREATE TABLE imports (
     id         INTEGER PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     source     TEXT    NOT NULL,
     filename   TEXT    NOT NULL,
     status     TEXT    NOT NULL,
@@ -90,35 +90,38 @@ CREATE TABLE imports (
 CREATE INDEX imports_user_id_idx ON imports (user_id, id);
 
 CREATE TABLE operations (
-    id              INTEGER PRIMARY KEY,
-    user_id         INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    type            TEXT    NOT NULL,
-    account_id      INTEGER NOT NULL REFERENCES accounts (id) ON DELETE RESTRICT,
-    to_account_id   INTEGER REFERENCES accounts (id) ON DELETE RESTRICT,
-    category_id     INTEGER REFERENCES categories (id) ON DELETE RESTRICT,
-    origin_id       INTEGER,
-    amount          INTEGER NOT NULL,
-    date            TEXT    NOT NULL,
-    time            TEXT,
-    payee           TEXT,
-    source_payee    TEXT,
-    note            TEXT,
-    mcc             TEXT,
-    import_id       INTEGER REFERENCES imports (id) ON DELETE SET NULL,
-    import_hash     TEXT,
-    created_at      INTEGER NOT NULL,
-    updated_at      INTEGER,
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type          TEXT    NOT NULL,
+    account_id    INTEGER NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    to_account_id INTEGER REFERENCES accounts(id) ON DELETE RESTRICT,
+    category_id   INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+    origin_id     INTEGER,
+    amount        INTEGER NOT NULL,
+    date          TEXT    NOT NULL,
+    time          TEXT,
+    payee         TEXT,
+    source_payee  TEXT,
+    note          TEXT,
+    mcc           TEXT,
+    import_id     INTEGER REFERENCES imports(id) ON DELETE SET NULL,
+    import_hash   TEXT,
+    created_at    INTEGER NOT NULL,
+    updated_at    INTEGER,
     UNIQUE (user_id, import_hash)
 ) STRICT;
 
-CREATE INDEX operations_user_date_idx ON operations (user_id, date DESC, id DESC);
+-- the order of ListOperations: newest first by date and time, parts of a split together
+CREATE INDEX operations_user_order_idx ON operations (
+    user_id, date DESC, coalesce(time, '') DESC, coalesce(origin_id, id) DESC, id DESC
+);
 CREATE INDEX operations_account_date_idx ON operations (account_id, date);
 CREATE INDEX operations_to_account_date_idx ON operations (to_account_id, date) WHERE to_account_id IS NOT NULL;
 CREATE INDEX operations_import_idx ON operations (import_id) WHERE import_id IS NOT NULL;
 CREATE INDEX operations_category_idx ON operations (category_id) WHERE category_id IS NOT NULL;
 
-CREATE VIRTUAL TABLE operations_fts USING fts5(
-    body, content='', contentless_delete=1, tokenize='unicode61 remove_diacritics 2'
+CREATE VIRTUAL TABLE operations_fts USING fts5 (
+    body, content = '', contentless_delete = 1, tokenize = 'unicode61 remove_diacritics 2'
 );
 
 -- +goose StatementBegin
@@ -144,8 +147,8 @@ END;
 
 CREATE TABLE plans (
     id           INTEGER PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    category_id  INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category_id  INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     month        TEXT    NOT NULL,
     currency     TEXT    NOT NULL,
     amount       INTEGER NOT NULL,
@@ -156,7 +159,7 @@ CREATE TABLE plans (
 CREATE INDEX plans_user_month_idx ON plans (user_id, month);
 
 CREATE TABLE plan_carries (
-    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     month      TEXT    NOT NULL,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (user_id, month)
@@ -164,15 +167,15 @@ CREATE TABLE plan_carries (
 
 CREATE TABLE tags (
     id         INTEGER PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name       TEXT    NOT NULL,
     created_at INTEGER NOT NULL,
     UNIQUE (user_id, name)
 ) STRICT;
 
 CREATE TABLE operation_tags (
-    operation_id INTEGER NOT NULL REFERENCES operations (id) ON DELETE CASCADE,
-    tag_id       INTEGER NOT NULL REFERENCES tags (id) ON DELETE CASCADE,
+    operation_id INTEGER NOT NULL REFERENCES operations(id) ON DELETE CASCADE,
+    tag_id       INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (operation_id, tag_id)
 ) STRICT;
 
@@ -180,34 +183,38 @@ CREATE INDEX operation_tags_tag_idx ON operation_tags (tag_id);
 
 CREATE TABLE import_rows (
     id           INTEGER PRIMARY KEY,
-    import_id    INTEGER NOT NULL REFERENCES imports (id) ON DELETE CASCADE,
+    import_id    INTEGER NOT NULL REFERENCES imports(id) ON DELETE CASCADE,
     line         INTEGER NOT NULL,
     payload      TEXT    NOT NULL,
     import_hash  TEXT    NOT NULL,
     status       TEXT    NOT NULL,
-    pair_row_id  INTEGER REFERENCES import_rows (id) ON DELETE SET NULL,
-    operation_id INTEGER REFERENCES operations (id) ON DELETE SET NULL
+    pair_row_id  INTEGER REFERENCES import_rows(id) ON DELETE SET NULL,
+    operation_id INTEGER REFERENCES operations(id) ON DELETE SET NULL,
+    -- the id of the operation at the source, for sources that have one: rows stay
+    -- duplicates after the source changes their other fields
+    external_id  TEXT
 ) STRICT;
 
 CREATE INDEX import_rows_import_idx ON import_rows (import_id, line);
 CREATE INDEX import_rows_hash_idx ON import_rows (import_hash);
+CREATE INDEX import_rows_external_id_idx ON import_rows (external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX import_rows_operation_idx ON import_rows (operation_id) WHERE operation_id IS NOT NULL;
 
 CREATE TABLE import_account_map (
-    user_id       INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    source        TEXT    NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source      TEXT    NOT NULL,
     source_name TEXT    NOT NULL,
-    currency      TEXT    NOT NULL,
-    account_id    INTEGER NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+    currency    TEXT    NOT NULL,
+    account_id  INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, source, source_name, currency)
 ) STRICT;
 
 CREATE TABLE import_category_map (
-    user_id       INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    source        TEXT    NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source      TEXT    NOT NULL,
     source_name TEXT    NOT NULL,
-    kind          TEXT    NOT NULL,
-    category_id   INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+    kind        TEXT    NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, source, source_name, kind)
 ) STRICT;
 
@@ -216,7 +223,7 @@ CREATE INDEX import_account_map_account_idx ON import_account_map (account_id);
 CREATE INDEX import_category_map_category_idx ON import_category_map (category_id);
 
 CREATE TABLE bank_connections (
-    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bank         TEXT    NOT NULL,
     login        TEXT    NOT NULL,
     status       TEXT    NOT NULL,
@@ -230,7 +237,7 @@ CREATE TABLE bank_connections (
 
 CREATE TABLE bank_accounts (
     id           INTEGER PRIMARY KEY,
-    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bank         TEXT    NOT NULL,
     external_id  TEXT    NOT NULL,
     name         TEXT    NOT NULL,
@@ -238,8 +245,11 @@ CREATE TABLE bank_accounts (
     kind         TEXT    NOT NULL,
     balance      INTEGER NOT NULL,
     credit_limit INTEGER NOT NULL,
-    account_id   INTEGER REFERENCES accounts (id) ON DELETE SET NULL,
+    account_id   INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
     synced_until INTEGER,
+    -- where the sync of the linked account starts: operations before it are in gigafin
+    -- already, so no overlap goes back past it
+    synced_from  INTEGER,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER,
     UNIQUE (user_id, bank, external_id)
@@ -250,9 +260,9 @@ CREATE UNIQUE INDEX bank_accounts_account_idx ON bank_accounts (account_id);
 
 CREATE TABLE rules (
     id         INTEGER PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     stage      TEXT    NOT NULL,
-    match      TEXT    NOT NULL,
+    "match"    TEXT    NOT NULL,
     conditions TEXT    NOT NULL,
     actions    TEXT    NOT NULL,
     origin     TEXT    NOT NULL,
@@ -276,12 +286,12 @@ CREATE TABLE exchange_rates (
 CREATE VIEW account_balances AS
 SELECT
     a.id AS account_id,
-    CAST(COALESCE((
-        SELECT SUM(CASE WHEN o.type IN ('expense', 'transfer') THEN -o.amount ELSE o.amount END)
+    cast(coalesce((
+        SELECT sum(CASE WHEN o.type IN ('expense', 'transfer') THEN -o.amount ELSE o.amount END)
         FROM operations AS o
         WHERE o.account_id = a.id
-    ), 0) + COALESCE((
-        SELECT SUM(o.amount) FROM operations AS o WHERE o.to_account_id = a.id
+    ), 0) + coalesce((
+        SELECT sum(o.amount) FROM operations AS o WHERE o.to_account_id = a.id
     ), 0) AS INTEGER) AS balance
 FROM accounts AS a;
 

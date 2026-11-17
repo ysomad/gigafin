@@ -59,8 +59,8 @@ func (q *Queries) CreateImport(ctx context.Context, arg CreateImportParams) (Imp
 }
 
 const createImportRow = `-- name: CreateImportRow :one
-INSERT INTO import_rows (import_id, line, payload, import_hash, status)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO import_rows (import_id, line, payload, import_hash, status, external_id)
+VALUES (?, ?, ?, ?, ?, ?)
 RETURNING id
 `
 
@@ -70,6 +70,7 @@ type CreateImportRowParams struct {
 	Payload    string
 	ImportHash string
 	Status     string
+	ExternalID sql.NullString
 }
 
 func (q *Queries) CreateImportRow(ctx context.Context, arg CreateImportRowParams) (int64, error) {
@@ -79,6 +80,7 @@ func (q *Queries) CreateImportRow(ctx context.Context, arg CreateImportRowParams
 		arg.Payload,
 		arg.ImportHash,
 		arg.Status,
+		arg.ExternalID,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -260,7 +262,7 @@ func (q *Queries) ListCategoryMap(ctx context.Context, arg ListCategoryMapParams
 }
 
 const listImportRows = `-- name: ListImportRows :many
-SELECT id, import_id, line, payload, import_hash, status, pair_row_id, operation_id FROM import_rows WHERE import_id = ? ORDER BY line
+SELECT id, import_id, line, payload, import_hash, status, pair_row_id, operation_id, external_id FROM import_rows WHERE import_id = ? ORDER BY line
 `
 
 func (q *Queries) ListImportRows(ctx context.Context, importID int64) ([]ImportRow, error) {
@@ -281,6 +283,7 @@ func (q *Queries) ListImportRows(ctx context.Context, importID int64) ([]ImportR
 			&i.Status,
 			&i.PairRowID,
 			&i.OperationID,
+			&i.ExternalID,
 		); err != nil {
 			return nil, err
 		}
@@ -295,14 +298,72 @@ func (q *Queries) ListImportRows(ctx context.Context, importID int64) ([]ImportR
 	return items, nil
 }
 
+const listImportedExternalIDs = `-- name: ListImportedExternalIDs :many
+SELECT r.external_id
+FROM import_rows AS r
+JOIN imports AS b ON b.id = r.import_id
+WHERE
+    b.user_id = ?1
+    AND b.source = ?2
+    AND b.status = ?3
+    AND r.status = ?4
+    AND r.external_id IN (/*SLICE:ids*/?)
+`
+
+type ListImportedExternalIDsParams struct {
+	UserID       int64
+	Source       string
+	ImportStatus string
+	RowStatus    string
+	Ids          []sql.NullString
+}
+
+func (q *Queries) ListImportedExternalIDs(ctx context.Context, arg ListImportedExternalIDsParams) ([]sql.NullString, error) {
+	query := listImportedExternalIDs
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	queryParams = append(queryParams, arg.Source)
+	queryParams = append(queryParams, arg.ImportStatus)
+	queryParams = append(queryParams, arg.RowStatus)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []sql.NullString
+	for rows.Next() {
+		var external_id sql.NullString
+		if err := rows.Scan(&external_id); err != nil {
+			return nil, err
+		}
+		items = append(items, external_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listImportedHashes = `-- name: ListImportedHashes :many
 SELECT r.import_hash
 FROM import_rows AS r
 JOIN imports AS b ON b.id = r.import_id
-WHERE b.user_id = ?1
-  AND b.status = ?2
-  AND r.status = ?3
-  AND r.import_hash IN (/*SLICE:hashes*/?)
+WHERE
+    b.user_id = ?1
+    AND b.status = ?2
+    AND r.status = ?3
+    AND r.import_hash IN (/*SLICE:hashes*/?)
 `
 
 type ListImportedHashesParams struct {

@@ -48,14 +48,15 @@ func bankData(accs []account, ops []operation, loc *time.Location) domain.BankDa
 			continue
 		}
 		r := domain.Record{
-			Line:     i + 1,
-			Account:  t.Name,
-			Time:     op.at().Truncate(time.Second).In(loc),
-			Amount:   op.value(),
-			Currency: t.Currency,
-			Category: op.SpendingCategory.Name,
-			Payee:    strings.TrimSpace(op.Description),
-			Note:     strings.TrimSpace(op.Message),
+			ExternalID: op.ID,
+			Line:       i + 1,
+			Account:    t.Name,
+			Time:       op.at().Truncate(time.Second).In(loc),
+			Amount:     op.value(),
+			Currency:   t.Currency,
+			Category:   op.SpendingCategory.Name,
+			Payee:      strings.TrimSpace(op.Description),
+			Note:       strings.TrimSpace(op.Message),
 		}
 		if r.Category == "" {
 			r.Category = _defaultCategory

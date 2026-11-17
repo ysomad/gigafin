@@ -86,6 +86,7 @@ func (r *Imports) CreateRow(ctx context.Context, importID int64, row domain.Impo
 		Payload:    string(payload),
 		ImportHash: row.Hash,
 		Status:     string(row.Status),
+		ExternalID: sql.NullString{String: row.Row.ExternalID, Valid: row.Row.ExternalID != ""},
 	})
 	if err != nil {
 		return 0, fmt.Errorf("create row: %w", err)
@@ -156,6 +157,36 @@ func (r *Imports) ImportedHashes(ctx context.Context, userID int64, hashes []str
 		}
 		for _, h := range found {
 			out[h] = true
+		}
+	}
+	return out, nil
+}
+
+// ImportedExternalIDs returns which of ids, the ids of operations at src, belong to
+// new rows of committed imports of src.
+func (r *Imports) ImportedExternalIDs(
+	ctx context.Context, userID int64, src domain.ImportSource, ids []string,
+) (map[string]bool, error) {
+	// keeps IN lists below SQLite's variable limit
+	const chunkSize = 500
+	out := make(map[string]bool, len(ids))
+	for chunk := range slices.Chunk(ids, chunkSize) {
+		params := sqlc.ListImportedExternalIDsParams{
+			UserID:       userID,
+			Source:       string(src),
+			ImportStatus: string(domain.ImportCommitted),
+			RowStatus:    string(domain.ImportRowNew),
+			Ids:          make([]sql.NullString, len(chunk)),
+		}
+		for i, id := range chunk {
+			params.Ids[i] = sql.NullString{String: id, Valid: true}
+		}
+		found, err := r.q.ListImportedExternalIDs(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("list imported external ids: %w", err)
+		}
+		for _, id := range found {
+			out[id.String] = true
 		}
 	}
 	return out, nil

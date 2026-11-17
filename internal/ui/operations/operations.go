@@ -3,6 +3,7 @@ package operations
 import (
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -78,7 +79,7 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		Accounts:    accounts,
 		AccByID:     domain.AccountsByID(accounts),
 		Categories:  tree,
-		CatNames:    domain.CategoryNames(tree),
+		CatNames:    domain.CategoryShortNames(tree),
 		Changed:     -1,
 	}
 	// negative counts are not shown
@@ -118,13 +119,14 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 // balance differs from their accounts in d.AccByID.
 func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error {
 	ctx := r.Context()
-	for _, bank := range h.app.Svc.Banks.Enabled() {
-		conn, err := h.app.Svc.Banks.Connection(ctx, user.ID, bank)
-		switch {
-		case errors.Is(err, errors.ErrNotFound):
+	conns, err := h.app.Svc.Banks.Connections(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	enabled := h.app.Svc.Banks.Enabled()
+	for _, conn := range conns {
+		if !slices.Contains(enabled, conn.Bank) {
 			continue
-		case err != nil:
-			return err
 		}
 		if conn.Status == domain.BankConnected {
 			d.BankSync = true

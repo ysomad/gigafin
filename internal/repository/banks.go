@@ -23,17 +23,20 @@ func (r *Banks) Connection(ctx context.Context, userID int64, bank domain.Bank) 
 	if err != nil {
 		return domain.BankConnection{}, notFound(err, "bank connection")
 	}
-	conn := domain.BankConnection{
-		Bank:      domain.Bank(c.Bank),
-		Login:     c.Login,
-		Status:    domain.BankStatus(c.Status),
-		Secret:    c.Secret,
-		LastError: c.LastError,
+	return connectionFromRow(c), nil
+}
+
+// Connections returns the user's connections to banks.
+func (r *Banks) Connections(ctx context.Context, userID int64) ([]domain.BankConnection, error) {
+	rows, err := r.q.ListBankConnections(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list bank connections: %w", err)
 	}
-	if c.LastSyncAt.Valid {
-		conn.LastSyncAt = time.Unix(c.LastSyncAt.Int64, 0)
+	conns := make([]domain.BankConnection, len(rows))
+	for i, c := range rows {
+		conns[i] = connectionFromRow(c)
 	}
-	return conn, nil
+	return conns, nil
 }
 
 // SaveConnection creates or replaces the user's connection to c.Bank.
@@ -87,6 +90,9 @@ func (r *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccoun
 		if a.SyncedUntil.Valid {
 			out[i].SyncedUntil = time.Unix(a.SyncedUntil.Int64, 0)
 		}
+		if a.SyncedFrom.Valid {
+			out[i].SyncedFrom = time.Unix(a.SyncedFrom.Int64, 0)
+		}
 	}
 	return out, nil
 }
@@ -122,12 +128,13 @@ func (r *Banks) SaveAccount(ctx context.Context, userID int64, a domain.BankAcco
 // Link links the bank account id to accountID for good. It fails with
 // errors.ErrConflict when the bank account syncs with an account already and
 // errors.ErrExists when the account syncs with another bank account.
-func (r *Banks) Link(ctx context.Context, userID, id, accountID int64, now time.Time) error {
+func (r *Banks) Link(ctx context.Context, userID, id, accountID int64, from, now time.Time) error {
 	n, err := r.q.LinkBankAccount(ctx, sqlc.LinkBankAccountParams{
-		AccountID: sql.NullInt64{Int64: accountID, Valid: true},
-		UpdatedAt: sql.NullInt64{Int64: now.Unix(), Valid: true},
-		UserID:    userID,
-		ID:        id,
+		AccountID:  sql.NullInt64{Int64: accountID, Valid: true},
+		SyncedFrom: nullUnix(from),
+		UpdatedAt:  sql.NullInt64{Int64: now.Unix(), Valid: true},
+		UserID:     userID,
+		ID:         id,
 	})
 	if k, ok := constraint(err); ok {
 		return fmt.Errorf("link bank account: %w", k)
@@ -164,4 +171,18 @@ func (r *Banks) DeleteAll(ctx context.Context, userID int64) error {
 		return fmt.Errorf("delete bank connections: %w", err)
 	}
 	return nil
+}
+
+func connectionFromRow(c sqlc.BankConnection) domain.BankConnection {
+	conn := domain.BankConnection{
+		Bank:      domain.Bank(c.Bank),
+		Login:     c.Login,
+		Status:    domain.BankStatus(c.Status),
+		Secret:    c.Secret,
+		LastError: c.LastError,
+	}
+	if c.LastSyncAt.Valid {
+		conn.LastSyncAt = time.Unix(c.LastSyncAt.Int64, 0)
+	}
+	return conn
 }

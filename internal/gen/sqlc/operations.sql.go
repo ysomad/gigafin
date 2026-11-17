@@ -171,31 +171,46 @@ const listOperations = `-- name: ListOperations :many
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1
-  AND (o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL)
-  AND (o.type = ?3 OR ?3 IS NULL)
-  AND (o.date >= ?4 OR ?4 IS NULL)
-  AND (o.date <= ?5 OR ?5 IS NULL)
-  AND (o.category_id = ?6
-       OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
-       OR ?6 IS NULL)
-  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
-       OR NOT CAST(?7 AS INTEGER))
-  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
-       OR ?8 IS NULL)
-  -- amount bounds are JSON objects of minor units by currency, see Operations.List
-  AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
-  AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
-  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
-  -- matches any of them
-  AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0)
-       OR ?11 IS NULL)
-  -- seeks past the cursor in the order below, see pagination.Cursor
-  AND ((o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
-         < (CAST(?12 AS TEXT), CAST(?13 AS TEXT),
-            CAST(?14 AS INTEGER), CAST(?15 AS INTEGER))
-       OR ?12 IS NULL)
+WHERE
+    o.user_id = ?1
+    AND (
+        o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL
+    )
+    AND (o.type = ?3 OR ?3 IS NULL)
+    AND (o.date >= ?4 OR ?4 IS NULL)
+    AND (o.date <= ?5 OR ?5 IS NULL)
+    AND (
+        o.category_id = ?6
+        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
+        OR ?6 IS NULL
+    )
+    AND (
+        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
+        OR NOT cast(?7 AS INTEGER)
+    )
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
+        OR ?8 IS NULL
+    )
+    -- amount bounds are JSON objects of minor units by currency, see Operations.List
+    AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
+    AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
+    -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+    -- matches any of them
+    AND (o.id IN (
+        SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
+        WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0
+    )
+    OR ?11 IS NULL)
+    -- seeks past the cursor in the order below, see pagination.Cursor
+    AND (
+        (o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
+        < (
+            cast(?12 AS TEXT), cast(?13 AS TEXT),
+            cast(?14 AS INTEGER), cast(?15 AS INTEGER)
+        )
+        OR ?12 IS NULL
+    )
 ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
 LIMIT ?16
 `
@@ -288,8 +303,9 @@ const listOperationsByPayee = `-- name: ListOperationsByPayee :many
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1 AND o.payee = ?2
-  AND o.date >= ?3 AND o.date <= ?4
+WHERE
+    o.user_id = ?1 AND o.payee = ?2
+    AND o.date >= ?3 AND o.date <= ?4
 ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
 `
 
@@ -354,7 +370,7 @@ func (q *Queries) ListOperationsByPayee(ctx context.Context, arg ListOperationsB
 }
 
 const operationDateRange = `-- name: OperationDateRange :one
-SELECT CAST(COALESCE(MIN(date), '') AS TEXT) AS first_date, CAST(COALESCE(MAX(date), '') AS TEXT) AS last_date
+SELECT cast(coalesce(min(date), '') AS TEXT) AS first_date, cast(coalesce(max(date), '') AS TEXT) AS last_date
 FROM operations
 WHERE user_id = ?1
 `
@@ -371,11 +387,28 @@ func (q *Queries) OperationDateRange(ctx context.Context, userID int64) (Operati
 	return i, err
 }
 
+const setOperationOrigin = `-- name: SetOperationOrigin :exec
+UPDATE operations SET origin_id = ? WHERE id = ? AND user_id = ?
+`
+
+type SetOperationOriginParams struct {
+	OriginID sql.NullInt64
+	ID       int64
+	UserID   int64
+}
+
+func (q *Queries) SetOperationOrigin(ctx context.Context, arg SetOperationOriginParams) error {
+	_, err := q.db.ExecContext(ctx, setOperationOrigin, arg.OriginID, arg.ID, arg.UserID)
+	return err
+}
+
 const sumBalanceChangesByMonth = `-- name: SumBalanceChangesByMonth :many
-SELECT CAST(c.month AS TEXT) AS month, c.account_id, CAST(c.currency AS TEXT) AS currency,
-    CAST(SUM(c.delta) AS INTEGER) AS total
+SELECT
+    cast(c.month AS TEXT) AS month, c.account_id, cast(c.currency AS TEXT) AS currency,
+    cast(sum(c.delta) AS INTEGER) AS total
 FROM (
-    SELECT substr(o.date, 1, 7) AS month, a.id AS account_id, a.currency AS currency,
+    SELECT
+        substr(o.date, 1, 7) AS month, a.id AS account_id, a.currency,
         CASE WHEN o.type IN ('expense', 'transfer') THEN -o.amount ELSE o.amount END AS delta
     FROM operations AS o
     JOIN accounts AS a ON a.id = o.account_id
@@ -433,29 +466,40 @@ func (q *Queries) SumBalanceChangesByMonth(ctx context.Context, arg SumBalanceCh
 }
 
 const sumFilteredOperations = `-- name: SumFilteredOperations :many
-SELECT o.type, a.currency, CAST(SUM(o.amount) AS INTEGER) AS total
+SELECT o.type, a.currency, cast(sum(o.amount) AS INTEGER) AS total
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1
-  AND (o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL)
-  AND (o.type = ?3 OR ?3 IS NULL)
-  AND (o.date >= ?4 OR ?4 IS NULL)
-  AND (o.date <= ?5 OR ?5 IS NULL)
-  AND (o.category_id = ?6
-       OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
-       OR ?6 IS NULL)
-  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
-       OR NOT CAST(?7 AS INTEGER))
-  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
-       OR ?8 IS NULL)
-  -- amount bounds are JSON objects of minor units by currency, see Operations.List
-  AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
-  AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
-  -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
-  -- matches any of them
-  AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0)
-       OR ?11 IS NULL)
+WHERE
+    o.user_id = ?1
+    AND (
+        o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL
+    )
+    AND (o.type = ?3 OR ?3 IS NULL)
+    AND (o.date >= ?4 OR ?4 IS NULL)
+    AND (o.date <= ?5 OR ?5 IS NULL)
+    AND (
+        o.category_id = ?6
+        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
+        OR ?6 IS NULL
+    )
+    AND (
+        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
+        OR NOT cast(?7 AS INTEGER)
+    )
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
+        OR ?8 IS NULL
+    )
+    -- amount bounds are JSON objects of minor units by currency, see Operations.List
+    AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
+    AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
+    -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
+    -- matches any of them
+    AND (o.id IN (
+        SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
+        WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0
+    )
+    OR ?11 IS NULL)
 GROUP BY o.type, a.currency
 `
 
@@ -517,11 +561,12 @@ func (q *Queries) SumFilteredOperations(ctx context.Context, arg SumFilteredOper
 }
 
 const sumOperationsByCategory = `-- name: SumOperationsByCategory :many
-SELECT CAST(o.category_id AS INTEGER) AS category_id, a.currency, CAST(SUM(o.amount) AS INTEGER) AS total
+SELECT cast(o.category_id AS INTEGER) AS category_id, a.currency, cast(sum(o.amount) AS INTEGER) AS total
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
-  AND o.category_id IS NOT NULL
+WHERE
+    o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
+    AND o.category_id IS NOT NULL
 GROUP BY o.category_id, a.currency
 `
 
@@ -561,12 +606,14 @@ func (q *Queries) SumOperationsByCategory(ctx context.Context, arg SumOperations
 }
 
 const sumOperationsByCategoryMonth = `-- name: SumOperationsByCategoryMonth :many
-SELECT CAST(substr(o.date, 1, 7) AS TEXT) AS month, CAST(o.category_id AS INTEGER) AS category_id, a.currency,
-    CAST(SUM(o.amount) AS INTEGER) AS total
+SELECT
+    cast(substr(o.date, 1, 7) AS TEXT) AS month, cast(o.category_id AS INTEGER) AS category_id, a.currency,
+    cast(sum(o.amount) AS INTEGER) AS total
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
-  AND o.category_id IS NOT NULL
+WHERE
+    o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
+    AND o.category_id IS NOT NULL
 GROUP BY month, o.category_id, a.currency
 `
 
@@ -612,7 +659,7 @@ func (q *Queries) SumOperationsByCategoryMonth(ctx context.Context, arg SumOpera
 }
 
 const sumOperationsByMonth = `-- name: SumOperationsByMonth :many
-SELECT CAST(substr(o.date, 1, 7) AS TEXT) AS month, o.type, a.currency, CAST(SUM(o.amount) AS INTEGER) AS total
+SELECT cast(substr(o.date, 1, 7) AS TEXT) AS month, o.type, a.currency, cast(sum(o.amount) AS INTEGER) AS total
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
 WHERE o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
@@ -662,12 +709,14 @@ func (q *Queries) SumOperationsByMonth(ctx context.Context, arg SumOperationsByM
 }
 
 const sumOperationsByPayee = `-- name: SumOperationsByPayee :many
-SELECT CAST(o.payee AS TEXT) AS payee, o.type, a.currency, CAST(SUM(o.amount) AS INTEGER) AS total,
-    COUNT(*) AS ops
+SELECT
+    cast(o.payee AS TEXT) AS payee, o.type, a.currency, cast(sum(o.amount) AS INTEGER) AS total,
+    count(*) AS ops
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
-  AND o.payee IS NOT NULL
+WHERE
+    o.user_id = ?1 AND o.date >= ?2 AND o.date <= ?3
+    AND o.payee IS NOT NULL
 GROUP BY o.payee, o.type, a.currency
 `
 
@@ -716,7 +765,8 @@ func (q *Queries) SumOperationsByPayee(ctx context.Context, arg SumOperationsByP
 
 const updateOperation = `-- name: UpdateOperation :one
 UPDATE operations
-SET type = ?, account_id = ?, to_account_id = ?, category_id = ?, origin_id = ?, amount = ?, date = ?,
+SET
+    type = ?, account_id = ?, to_account_id = ?, category_id = ?, origin_id = ?, amount = ?, date = ?,
     time = ?, payee = ?, note = ?, updated_at = ?
 WHERE id = ? AND user_id = ?
 RETURNING id, user_id, type, account_id, to_account_id, category_id, origin_id, amount, date, time, payee, source_payee, note, mcc, import_id, import_hash, created_at, updated_at

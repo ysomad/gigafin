@@ -193,7 +193,7 @@ func (h *Handler) renderAccount(
 	if err != nil {
 		return err
 	}
-	d.Days, d.CatNames, d.AccByID = kit.GroupByDay(ops), domain.CategoryNames(tree), domain.AccountsByID(accounts)
+	d.Days, d.CatNames, d.AccByID = kit.GroupByDay(ops), domain.CategoryShortNames(tree), domain.AccountsByID(accounts)
 	if !next.IsZero() {
 		d.MoreURL = fmt.Sprintf("/operations?account=%d&cursor=%s", a.ID, url.QueryEscape(next.String()))
 	}

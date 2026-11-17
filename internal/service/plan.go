@@ -20,26 +20,29 @@ type Plans struct {
 	log   *slog.Logger
 }
 
-// Report returns plan vs actual for every category of kind that has a plan or
-// operations in month, ordered as the category tree, and the tree itself.
+// Report returns, by expense and income, plan vs actual for every category of the
+// kind that has a plan or operations in month, ordered as the category tree.
 func (s *Plans) Report(
-	ctx context.Context, userID int64, month timex.Month, kind domain.Kind,
-) ([]domain.PlanRow, []domain.Category, error) {
+	ctx context.Context, userID int64, month timex.Month,
+) (map[domain.Kind][]domain.PlanRow, error) {
 	r := s.store.Read()
 	cats, err := r.Categories.List(ctx, userID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	plans, err := r.Plans.List(ctx, userID, month)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sums, err := r.Operations.SumByCategory(ctx, userID, month.First(), month.Last())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	tree := domain.NewTree(cats)
-	return domain.PlanReport(tree, sums, plans, kind), tree, nil
+	return map[domain.Kind][]domain.PlanRow{
+		domain.KindExpense: domain.PlanReport(tree, sums, plans, domain.KindExpense),
+		domain.KindIncome:  domain.PlanReport(tree, sums, plans, domain.KindIncome),
+	}, nil
 }
 
 // Set sets the plan of a category for a month and currency. The latest repeating

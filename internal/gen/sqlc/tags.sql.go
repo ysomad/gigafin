@@ -24,13 +24,32 @@ func (q *Queries) CreateOperationTag(ctx context.Context, arg CreateOperationTag
 	return err
 }
 
-const deleteOperationTags = `-- name: DeleteOperationTags :exec
+const deleteOperationTags = `-- name: DeleteOperationTags :many
 DELETE FROM operation_tags WHERE operation_id = ?
+RETURNING tag_id
 `
 
-func (q *Queries) DeleteOperationTags(ctx context.Context, operationID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteOperationTags, operationID)
-	return err
+func (q *Queries) DeleteOperationTags(ctx context.Context, operationID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, deleteOperationTags, operationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var tag_id int64
+		if err := rows.Scan(&tag_id); err != nil {
+			return nil, err
+		}
+		items = append(items, tag_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deleteUnusedTags = `-- name: DeleteUnusedTags :exec
@@ -39,6 +58,26 @@ DELETE FROM tags WHERE user_id = ? AND id NOT IN (SELECT ot.tag_id FROM operatio
 
 func (q *Queries) DeleteUnusedTags(ctx context.Context, userID int64) error {
 	_, err := q.db.ExecContext(ctx, deleteUnusedTags, userID)
+	return err
+}
+
+const deleteUnusedTagsByID = `-- name: DeleteUnusedTagsByID :exec
+DELETE FROM tags
+WHERE id IN (/*SLICE:ids*/?) AND NOT EXISTS (SELECT 1 FROM operation_tags AS ot WHERE ot.tag_id = tags.id)
+`
+
+func (q *Queries) DeleteUnusedTagsByID(ctx context.Context, ids []int64) error {
+	query := deleteUnusedTagsByID
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
 	return err
 }
 

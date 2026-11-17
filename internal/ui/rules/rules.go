@@ -455,7 +455,7 @@ func (h *Handler) previewRule(w http.ResponseWriter, r *http.Request, user domai
 	if err != nil {
 		return err
 	}
-	d.Total, d.Days, d.CatNames = total, kit.GroupByDay(ops), domain.CategoryNames(tree)
+	d.Total, d.Days, d.CatNames = total, kit.GroupByDay(ops), domain.CategoryShortNames(tree)
 	d.AccByID = domain.AccountsByID(accounts)
 	return h.app.Fragment(w, r, http.StatusOK, previewList(d))
 }

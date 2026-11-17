@@ -33,7 +33,9 @@ SELECT
     s.rate_source,
     s.primary_currency,
     CAST(COALESCE((SELECT MIN(o.date) FROM operations AS o WHERE o.user_id = s.user_id), '') AS TEXT) AS first_date,
-    CAST(COALESCE((SELECT group_concat(DISTINCT a.currency) FROM accounts AS a WHERE a.user_id = s.user_id), '') AS TEXT) AS currencies
+    CAST(
+        COALESCE((SELECT GROUP_CONCAT(DISTINCT a.currency) FROM accounts AS a WHERE a.user_id = s.user_id), '') AS TEXT
+    ) AS currencies
 FROM user_settings AS s;
 
 -- name: ListRates :many

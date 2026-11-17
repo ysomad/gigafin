@@ -156,6 +156,19 @@ func CategoryNames(tree []Category) map[int64]string {
 	return names
 }
 
+// CategoryShortNames maps every category id to its own name, without the parent of a
+// cat2.
+func CategoryShortNames(tree []Category) map[int64]string {
+	names := make(map[int64]string, len(tree))
+	for _, c1 := range tree {
+		names[c1.ID] = c1.Name
+		for _, c2 := range c1.Children {
+			names[c2.ID] = c2.Name
+		}
+	}
+	return names
+}
+
 // ParentChoices returns the cat1 a cat2 c can move under, without their children, and
 // the name of its current parent. Both are empty for a cat1.
 func ParentChoices(tree []Category, c Category) ([]Category, string) {

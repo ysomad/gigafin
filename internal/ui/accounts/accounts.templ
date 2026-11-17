@@ -24,15 +24,15 @@ templ accountsPage(v kit.Page, d accountsData) {
 							<tr>
 								<td>
 									<div class="hstack gap-1">
-										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
 										if t, ok := d.Banks[a.ID]; ok {
 											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 										}
+										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
 										if a.Archived {
 											@kit.ArchivedBadge()
 										}
 										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
-											@kit.BankBadge(t, a, false)
+											@kit.BankBadge(t, a)
 										}
 									</div>
 								</td>
@@ -54,15 +54,15 @@ templ accountsPage(v kit.Page, d accountsData) {
 							<tr>
 								<td>
 									<div class="hstack gap-1">
-										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
 										if t, ok := d.Banks[a.ID]; ok {
 											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 										}
+										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
 										if a.Archived {
 											@kit.ArchivedBadge()
 										}
 										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
-											@kit.BankBadge(t, a, false)
+											@kit.BankBadge(t, a)
 										}
 									</div>
 								</td>
@@ -89,14 +89,11 @@ templ accountPage(v kit.Page, d accountData) {
 	}}
 	@kit.Layout(v, false, nil) {
 		<div class="hstack mb-4">
+			if d.Linked.ID != 0 {
+				@kit.BankLogo(d.Linked.Bank, kit.T(ctx, d.Linked.Bank.Name())+" · "+d.Linked.Name)
+			}
 			<h1>{ a.Name }</h1>
 			<span class="badge outline">{ kit.T(ctx, string(a.Kind)) }</span>
-			if d.Linked.ID != 0 {
-				<span class="badge outline hstack gap-1">
-					@kit.BankLogo(d.Linked.Bank, kit.T(ctx, d.Linked.Bank.Name()))
-					{ d.Linked.Name }
-				</span>
-			}
 			if a.Archived {
 				@kit.ArchivedBadge()
 			}
@@ -108,7 +105,7 @@ templ accountPage(v kit.Page, d accountData) {
 					<h2>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></h2>
 				</div>
 				if d.Linked.Mismatch(a) {
-					@kit.BankBadge(d.Linked, a, false)
+					@kit.BankBadge(d.Linked, a)
 				}
 			</div>
 			if !a.CreditLimit.IsZero() {

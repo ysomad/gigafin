@@ -18,24 +18,23 @@ import (
 func (h *Handler) loadBanks(r *http.Request, user domain.User, d *banksData) error {
 	ctx := r.Context()
 	svc := h.app.Svc.Banks
+	conns, err := svc.Connections(ctx, user.ID)
+	if err != nil {
+		return err
+	}
 	for _, bank := range svc.Enabled() {
 		b := bankData{Bank: bank}
-		conn, err := svc.Connection(ctx, user.ID, bank)
-		switch {
-		case err == nil:
-			b.Conn = conn
-		case !errors.Is(err, errors.ErrNotFound):
-			return err
+		if i := slices.IndexFunc(conns, func(c domain.BankConnection) bool { return c.Bank == bank }); i >= 0 {
+			b.Conn = conns[i]
 		}
 		var phone string
 		b.Step, phone = svc.LoginStep(user.ID, bank)
-		b.Phone = cmp.Or(phone, conn.Login)
+		b.Phone = cmp.Or(phone, b.Conn.Login)
 		if d.Posted.Bank == bank {
 			b.Phone = d.Posted.Phone
 		}
 		d.Banks = append(d.Banks, b)
 	}
-	var err error
 	if d.Accounts, err = svc.Accounts(ctx, user.ID); err != nil {
 		return err
 	}

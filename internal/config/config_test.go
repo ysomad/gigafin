@@ -73,8 +73,8 @@ func TestLoadPartialEnv(t *testing.T) {
 
 func TestLoadInvalidEnv(t *testing.T) {
 	for k, v := range map[string]string{
-		"LOGGER_LEVEL":             "loud",
-		"LOGGER_ADD_SOURCE":        "maybe",
+		"LOGGER_LEVEL":          "loud",
+		"LOGGER_ADD_SOURCE":     "maybe",
 		"HTTP_SECURE_COOKIES":   "maybe",
 		"HTTP_MAX_UPLOAD_BYTES": "1MB",
 		"SESSION_TTL":           "month",
@@ -110,7 +110,7 @@ func TestDefaultAccountKinds(t *testing.T) {
 	want := map[domain.AccountKind][]string{
 		domain.AccountLoan: {
 			"Ипотека", "Автокредит", "Кредит наличными", "Потребительский кредит", "Кредит",
-			"Рефинансирование", "Кредит под залог авто", "Car loan", "Mortgage",
+			"Рефинансирование", "Кредит под залог авто", "Долги", "Долг", "Car loan", "Mortgage", "Debts",
 		},
 		domain.AccountCredit: {
 			"Кредитная карта", "Кредитка", "Tinkoff Platinum", "Кредитная СберКарта", "Халва",
@@ -119,7 +119,7 @@ func TestDefaultAccountKinds(t *testing.T) {
 		domain.AccountCash: {"Наличные", "Кошелёк", "Cash", "Wallet"},
 		domain.AccountSavings: {
 			"Накопительный счёт", "Вклад", "Вклад (RUB)", "Депозит", "Сберегательный счёт", "Копилка",
-			"Savings", "Deposit",
+			"Долгосрочный вклад", "Savings", "Deposit",
 		},
 		domain.AccountDebit: {
 			"Tinkoff Black", "СберКарта", "Альфа-Карта", "Мультикарта ВТБ", "Зарплатная карта",

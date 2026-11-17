@@ -11,7 +11,7 @@ import (
 )
 
 const createRule = `-- name: CreateRule :one
-INSERT INTO rules (user_id, stage, match, conditions, actions, origin, created_at)
+INSERT INTO rules (user_id, stage, "match", conditions, actions, origin, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 RETURNING id, user_id, stage, "match", conditions, actions, origin, created_at, updated_at
 `
@@ -142,7 +142,7 @@ func (q *Queries) ListRules(ctx context.Context, userID int64) ([]Rule, error) {
 
 const updateRule = `-- name: UpdateRule :one
 UPDATE rules
-SET stage = ?, match = ?, conditions = ?, actions = ?, origin = ?, updated_at = ?
+SET stage = ?, "match" = ?, conditions = ?, actions = ?, origin = ?, updated_at = ?
 WHERE id = ? AND user_id = ?
 RETURNING id, user_id, stage, "match", conditions, actions, origin, created_at, updated_at
 `

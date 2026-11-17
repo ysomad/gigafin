@@ -41,11 +41,14 @@
 - [x] UI revamp
 - [x] Use templ instead of go templates
 - [x] tbank sync, balance check (if does not count - show alert)
-- [ ] rules event sourcing
+- [x] rules event sourcing
 - [x] Rename dashboard to analytics
-- [ ] category icons
-
-## Extra feats
+- [ ] better categories ui/ux (icons, selectors)
+- [ ] operations tags filter
+- [ ] sber sync
+- [ ] alfa sync
+- [ ] raiifaizen sync
+- [ ] bybit sync?
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)
 - [ ] shared household plan (between multiple users)
 - [ ] 2fa

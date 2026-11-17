@@ -58,7 +58,8 @@ func (r *Operations) Create(
 	if err != nil {
 		return domain.Operation{}, fmt.Errorf("create operation: %w", err)
 	}
-	if err := r.setTags(ctx, userID, row.ID, op.Tags, now); err != nil {
+	// a new operation has no tags to replace, so no tag becomes unused
+	if err := r.addTags(ctx, userID, row.ID, op.Tags, now); err != nil {
 		return domain.Operation{}, err
 	}
 	created, err := operationFromRow(row, op.Currency)
@@ -102,8 +103,18 @@ func (r *Operations) Update(
 	if err != nil {
 		return domain.Operation{}, fmt.Errorf("update operation: %w", err)
 	}
-	if err := r.setTags(ctx, userID, op.ID, op.Tags, now); err != nil {
+	removed, err := r.q.DeleteOperationTags(ctx, op.ID)
+	if err != nil {
+		return domain.Operation{}, fmt.Errorf("delete operation tags: %w", err)
+	}
+	if err := r.addTags(ctx, userID, op.ID, op.Tags, now); err != nil {
 		return domain.Operation{}, err
+	}
+	// only the tags the operation had may become unused
+	if len(removed) > 0 {
+		if err := r.q.DeleteUnusedTagsByID(ctx, removed); err != nil {
+			return domain.Operation{}, fmt.Errorf("delete unused tags: %w", err)
+		}
 	}
 	updated, err := operationFromRow(row, op.Currency)
 	if err != nil {
@@ -113,12 +124,8 @@ func (r *Operations) Update(
 	return updated, nil
 }
 
-// setTags replaces the tags of the operation id, creating new ones and deleting the
-// ones no operation has any more.
-func (r *Operations) setTags(ctx context.Context, userID, id int64, tags []string, now time.Time) error {
-	if err := r.q.DeleteOperationTags(ctx, id); err != nil {
-		return fmt.Errorf("delete operation tags: %w", err)
-	}
+// addTags links tags to the operation id, creating the new ones.
+func (r *Operations) addTags(ctx context.Context, userID, id int64, tags []string, now time.Time) error {
 	for _, name := range tags {
 		tagID, err := r.q.UpsertTag(ctx, sqlc.UpsertTagParams{UserID: userID, Name: name, CreatedAt: now.Unix()})
 		if err != nil {
@@ -128,8 +135,18 @@ func (r *Operations) setTags(ctx context.Context, userID, id int64, tags []strin
 			return fmt.Errorf("create operation tag: %w", err)
 		}
 	}
-	if err := r.q.DeleteUnusedTags(ctx, userID); err != nil {
-		return fmt.Errorf("delete unused tags: %w", err)
+	return nil
+}
+
+// SetOrigin sets the operation the split part id started from, leaving the rest of it.
+func (r *Operations) SetOrigin(ctx context.Context, userID, id, originID int64) error {
+	err := r.q.SetOperationOrigin(ctx, sqlc.SetOperationOriginParams{
+		OriginID: sql.NullInt64{Int64: originID, Valid: originID != 0},
+		ID:       id,
+		UserID:   userID,
+	})
+	if err != nil {
+		return fmt.Errorf("set operation origin: %w", err)
 	}
 	return nil
 }

@@ -304,8 +304,9 @@ func TestTopLevelCategoryOnSplit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, f.groceries.ParentID, parts[0].CategoryID)
 
-	rows, _, err := f.svc.Plans.Report(ctx, f.userID, month(t, "2026-10"), domain.KindExpense)
+	reports, err := f.svc.Plans.Report(ctx, f.userID, month(t, "2026-10"))
 	require.NoError(t, err)
+	rows := reports[domain.KindExpense]
 	require.Len(t, rows, 2)
 	assert.Equal(t, "Food", rows[0].Category.Name)
 	assert.Equal(t, "10", rows[0].Spent.String(), "cat1 counts its own operations and its children")
@@ -465,8 +466,9 @@ func TestPlanReport(t *testing.T) {
 	require.NoError(t, f.svc.Plans.Set(
 		ctx, f.userID, f.cafe.ID, month(t, "2026-10"), "RUB", dec("150"), true /* repeating */))
 
-	rows, _, err := f.svc.Plans.Report(ctx, f.userID, month(t, "2026-10"), domain.KindExpense)
+	reports, err := f.svc.Plans.Report(ctx, f.userID, month(t, "2026-10"))
 	require.NoError(t, err)
+	rows := reports[domain.KindExpense]
 	require.Len(t, rows, 3)
 
 	assert.Equal(t, "Food", rows[0].Category.Name)

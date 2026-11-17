@@ -126,7 +126,7 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 		@kit.FormError(v.Errors.Form(string(bank)+"-link"), "")
 		<div class="table">
 			<table>
-				<thead><tr><th>{ kit.T(ctx, "Account") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th><th>{ kit.T(ctx, "Syncs with") }</th></tr></thead>
+				<thead><tr><th>{ kit.T(ctx, "Account") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th><th class="align-right">{ kit.T(ctx, "Credit limit") }</th><th>{ kit.T(ctx, "Syncs with") }</th></tr></thead>
 				<tbody>
 					{{ n := 0 }}
 					for _, t := range d.Accounts {
@@ -134,18 +134,23 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 							{{ n++ }}
 							<tr>
 								<td>
-									<div>{ t.Name }</div>
-									if !t.CreditLimit.IsZero() {
-										<small class="text-light">{ kit.T(ctx, "limit %s", kit.Money(ctx, t.CreditLimit, t.Currency)) }</small>
-									}
+									<div class="hstack gap-1">
+										@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
+										{ t.Name }
+									</div>
 								</td>
 								<td class="align-right nowrap">{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ t.Currency }</span></td>
+								<td class="align-right nowrap">
+									if !t.CreditLimit.IsZero() {
+										{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ t.Currency }</span>
+									}
+								</td>
 								<td>
 									if a, ok := d.Linked[t.AccountID]; ok {
 										<div class="hstack gap-1">
 											<a class="badge" data-variant="success" href={ fmt.Sprintf("/accounts/%d", a.ID) }>✓ { a.Name }</a>
 											if t.Mismatch(a) {
-												@kit.BankBadge(t, a, false)
+												@kit.BankBadge(t, a)
 											}
 										</div>
 									} else {
@@ -165,7 +170,7 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 						}
 					}
 					if n == 0 {
-						@kit.EmptyRow(3, kit.T(ctx, "No accounts yet."))
+						@kit.EmptyRow(4, kit.T(ctx, "No accounts yet."))
 					}
 				</tbody>
 			</table>

@@ -26,7 +26,8 @@ INSERT INTO sessions (user_id, token_hash, user_agent, expires_at, last_used_at,
 VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: GetSession :one
-SELECT sqlc.embed(users), sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
+SELECT
+    sqlc.embed(users), sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
     sessions.created_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id

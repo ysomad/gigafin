@@ -1,6 +1,9 @@
 -- name: GetBankConnection :one
 SELECT * FROM bank_connections WHERE user_id = ? AND bank = ?;
 
+-- name: ListBankConnections :many
+SELECT * FROM bank_connections WHERE user_id = ? ORDER BY bank;
+
 -- name: UpsertBankConnection :exec
 INSERT INTO bank_connections (user_id, bank, login, status, secret, last_sync_at, last_error, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -30,7 +33,7 @@ ON CONFLICT (user_id, bank, external_id) DO UPDATE SET
     updated_at = excluded.created_at;
 
 -- name: LinkBankAccount :execrows
-UPDATE bank_accounts SET account_id = ?, updated_at = ?
+UPDATE bank_accounts SET account_id = ?, synced_from = ?, updated_at = ?
 WHERE user_id = ? AND id = ? AND account_id IS NULL;
 
 -- name: SetBankAccountSyncedUntil :exec

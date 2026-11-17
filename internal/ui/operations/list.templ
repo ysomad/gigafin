@@ -36,15 +36,20 @@ templ listPage(v kit.Page, d opList) {
 					</menu>
 				</ot-dropdown>
 				if d.BankSync {
-					<form method="post" action="/operations/sync" hx-disable="find button">
-						<button
-							type="submit"
-							class="outline"
-							if !d.BankSyncAt.IsZero() {
-								title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
-							}
-						>↻ { kit.T(ctx, "Sync") }</button>
-					</form>
+					<!-- a button group as New operation, so both line up -->
+					<menu class="buttons">
+						<li>
+							<form method="post" action="/operations/sync" hx-disable="find button">
+								<button
+									type="submit"
+									class="outline"
+									if !d.BankSyncAt.IsZero() {
+										title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
+									}
+								>↻ { kit.T(ctx, "Sync") }</button>
+							</form>
+						</li>
+					</menu>
 				}
 			</div>
 			<form method="get" action="/operations">
@@ -75,8 +80,9 @@ templ listPage(v kit.Page, d opList) {
 					<div role="alert" data-variant="warning">
 						<span class="hstack gap-1">
 							{ kit.T(ctx, "Balance differs from the bank:") }
+							@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 							<a href={ fmt.Sprintf("/accounts/%d", a.ID) }><strong>{ a.Name }</strong></a>
-							@kit.BankBadge(t, a, true)
+							@kit.BankBadge(t, a)
 						</span>
 					</div>
 				}

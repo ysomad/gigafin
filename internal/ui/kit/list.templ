@@ -22,16 +22,16 @@ templ BankLogo(bank domain.Bank, title string) {
 }
 
 // BankBadge warns that the balance of account a differs from the balance of the bank
-// account t it syncs with, showing the bank's, after the bank logo if logo is set, for
-// pages that do not show the bank otherwise. Amounts show minor units, as the
-// difference may be less than one.
-templ BankBadge(t domain.BankAccount, a domain.Account, logo bool) {
-	<span class="badge hstack gap-1" data-variant="warning" title={ T(ctx, "Bank balance, differs by %s", a.Balance.Sub(t.Balance).Format(t.Currency)) }>
-		if logo {
-			@BankLogo(t.Bank, T(ctx, t.Bank.Name()))
+// account t it syncs with by the difference, signed as a is off, titled with the
+// bank's balance. Amounts show minor units, as the difference may be less than one.
+templ BankBadge(t domain.BankAccount, a domain.Account) {
+	{{
+		diff := a.Balance.Sub(t.Balance).Format(t.Currency)
+		if a.Balance.Cmp(t.Balance) > 0 {
+			diff = "+" + diff
 		}
-		{ t.Balance.Format(t.Currency) }
-	</span>
+	}}
+	<span class="badge" data-variant="warning" title={ T(ctx, "Bank balance: %s", t.Balance.Format(t.Currency)) }>{ diff }</span>
 }
 
 templ ArchivedBadge() {

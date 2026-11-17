@@ -183,7 +183,8 @@ func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, prefix string) (ApiKey,
 }
 
 const getSession = `-- name: GetSession :one
-SELECT users.id, users.login, users.password_hash, users.timezone, users.role, users.created_at, users.updated_at, sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
+SELECT
+    users.id, users.login, users.password_hash, users.timezone, users.role, users.created_at, users.updated_at, sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
     sessions.created_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id
