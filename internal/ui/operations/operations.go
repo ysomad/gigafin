@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"POST /operations":             h.createOperation,
 		"POST /operations/fill":        h.fillOperation,
 		"POST /operations/rules":       h.categorizeOperations,
+		"POST /operations/sync":        h.syncBanks,
 		"GET /operations/{id}/edit":    h.editOperation,
 		"POST /operations/{id}":        h.updateOperation,
 		"POST /operations/{id}/delete": h.deleteOperation,
@@ -97,6 +99,9 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	if d.Tags, err = h.app.Svc.Operations.Tags(r.Context(), user.ID); err != nil {
 		return err
 	}
+	if err := h.loadBanks(r, user, &d); err != nil {
+		return err
+	}
 	return kit.Render(
 		h.app,
 		w,
@@ -107,6 +112,50 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		d,
 		kit.Failure{},
 	)
+}
+
+// loadBanks sets in d whether the user syncs a bank and the bank accounts whose
+// balance differs from their accounts in d.AccByID.
+func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error {
+	if h.app.Svc.TBank.Enabled() {
+		conn, err := h.app.Svc.TBank.Connection(r.Context(), user.ID)
+		switch {
+		case err == nil:
+			d.BankSync, d.BankSyncAt = conn.Status == domain.BankConnected, conn.LastSyncAt
+		case !errors.Is(err, errors.ErrNotFound):
+			return err
+		}
+	}
+	bankAccounts, err := h.app.Svc.Banks.Accounts(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	for _, t := range bankAccounts {
+		if t.Mismatch(d.AccByID[t.AccountID]) {
+			d.Mismatched = append(d.Mismatched, t)
+		}
+	}
+	return nil
+}
+
+// syncBanks syncs the banks now and goes back to the operations with the outcome.
+func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	ctx := r.Context()
+	res, err := h.app.Svc.TBank.Sync(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	switch {
+	case err != nil:
+		// a failing bank is not a fault of this server
+		h.app.Log.WarnContext(ctx, "sync t-bank", slog.Any("error", err))
+		h.app.SetNotice(w, kit.T(ctx, "T-Bank sync failed: %s", err.Error()))
+	case res.NeedsLogin:
+		h.app.SetNotice(w, kit.T(ctx, "T-Bank asks to sign in again to keep syncing."))
+	case res.Operations > 0:
+		h.app.SetNotice(w, kit.T(ctx, "T-Bank synced: operations %d.", res.Operations))
+	default:
+		h.app.SetNotice(w, kit.T(ctx, "T-Bank is up to date."))
+	}
+	kit.Redirect(w, r, "/operations")
+	return nil
 }
 
 func (h *Handler) fillForm(r *http.Request, user domain.User, f *opForm) error {

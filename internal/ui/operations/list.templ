@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -11,28 +12,41 @@ import (
 templ listPage(v kit.Page, d opList) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
 		<div class="hstack justify-between mb-4">
-			<ot-dropdown>
-				<menu class="buttons">
-					<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
-					<li>
-						<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
-					</li>
-				</menu>
-				<menu popover id="op-actions">
-					<form
-						method="post"
-						action={ d.RunURL }
-						if d.Filtered {
-							hx-confirm={ kit.T(ctx, "Run rules on the filtered operations?") }
-						} else {
-							hx-confirm={ kit.T(ctx, "Run rules on all operations?") }
-						}
-					>
-						<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Run rules") }</button>
+			<div class="hstack">
+				<ot-dropdown>
+					<menu class="buttons">
+						<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
+						<li>
+							<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
+						</li>
+					</menu>
+					<menu popover id="op-actions">
+						<form
+							method="post"
+							action={ d.RunURL }
+							if d.Filtered {
+								hx-confirm={ kit.T(ctx, "Run rules on the filtered operations?") }
+							} else {
+								hx-confirm={ kit.T(ctx, "Run rules on all operations?") }
+							}
+						>
+							<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Run rules") }</button>
+						</form>
+						<a href="/rules" role="menuitem" class="button ghost">{ kit.T(ctx, "Rules") }</a>
+					</menu>
+				</ot-dropdown>
+				if d.BankSync {
+					<form method="post" action="/operations/sync" hx-disable="find button">
+						<button
+							type="submit"
+							class="outline"
+							if !d.BankSyncAt.IsZero() {
+								title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
+							}
+						>↻ { kit.T(ctx, "Sync") }</button>
 					</form>
-					<a href="/rules" role="menuitem" class="button ghost">{ kit.T(ctx, "Rules") }</a>
-				</menu>
-			</ot-dropdown>
+				}
+			</div>
 			<form method="get" action="/operations">
 				<div class="hstack">
 					<fieldset class="group">
@@ -54,6 +68,20 @@ templ listPage(v kit.Page, d opList) {
 				</div>
 			</form>
 		</div>
+		if len(d.Mismatched) > 0 {
+			<div class="vstack gap-2 mb-4">
+				for _, t := range d.Mismatched {
+					{{ a := d.AccByID[t.AccountID] }}
+					<div role="alert" data-variant="warning">
+						<span class="hstack gap-1">
+							{ kit.T(ctx, "Balance differs from the bank:") }
+							<a href={ fmt.Sprintf("/accounts/%d", a.ID) }><strong>{ a.Name }</strong></a>
+							@kit.BankBadge(t, a, true)
+						</span>
+					</div>
+				}
+			</div>
+		}
 		if d.Changed >= 0 {
 			<p role="status" class="badge mb-4" data-variant="success">{ kit.T(ctx, "Rules changed %d operations.", d.Changed) }</p>
 		}

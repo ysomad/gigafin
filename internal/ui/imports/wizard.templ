@@ -56,7 +56,7 @@ templ wizardPage(v kit.Page, d wizardData) {
 							@discardButton(base, kit.T(ctx, "Cancel"))
 							@kit.LinkButton(base+"/categories", "secondary", kit.T(ctx, "Back"))
 							<form method="post" action={ base + "/commit" } hx-disable="find button">
-								<button type="submit" data-spinner disabled?={ !preview.Ready() }>{ kit.T(ctx, "Import %d rows", preview.Import.RowsNew) }</button>
+								<button type="submit" disabled?={ !preview.Ready() }>{ kit.T(ctx, "Import %d rows", preview.Import.RowsNew) }</button>
 							</form>
 						case domain.ImportCommitted:
 							<form method="post" action={ base + "/undo" } hx-confirm={ kit.T(ctx, "Delete all operations created by this import?") }>

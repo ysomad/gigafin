@@ -154,7 +154,7 @@ func TestPagesAndFlows(t *testing.T) {
 
 	status, body := b.post("/accounts", url.Values{"name": {"Card"}, "currency": {"RUB"}, "balance": {"1 000,50"}})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "1\u202f001<", "minor units hidden and rounded by default")
+	assert.Contains(t, body, "1\u202f001 <span class=\"text-light\">RUB<", "minor units hidden and rounded by default")
 	assert.NotContains(t, body, "data-minor-units")
 	cards, err := f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
@@ -561,7 +561,7 @@ func TestCreditAccount(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Credit and loans")
-	assert.Contains(t, body, "49\u202f000<", "available")
+	assert.Contains(t, body, "49\u202f000 <span class=\"text-light\">RUB<", "available")
 
 	status, body = b.post("/accounts", url.Values{
 		"name": {"Cash"}, "kind": {"cash"}, "currency": {"RUB"}, "credit_limit": {"100"},
@@ -751,7 +751,9 @@ func TestDeleteAllData(t *testing.T) {
 
 	status, body = b.postFrom("/settings/delete-data", "/settings", url.Values{"password": {"password1234"}})
 	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "No accounts yet", "still signed in, accounts page is empty")
+	assert.Contains(t, body, `href="/accounts/new"`, "still signed in, on the accounts page")
+	assert.NotContains(t, body, "<table>", "no accounts, no table")
+	assert.Contains(t, body, "No accounts yet")
 	accounts, err = f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
 	assert.Empty(t, accounts)

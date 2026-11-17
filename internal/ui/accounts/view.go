@@ -1,11 +1,16 @@
 package accounts
 
-import "github.com/ysomad/gigafin/internal/domain"
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
 
 // accountsData is the accounts page.
 type accountsData struct {
 	Assets      []domain.Account
 	Liabilities []domain.Account
+	// Banks are the bank accounts by the account they sync with.
+	Banks map[int64]domain.BankAccount
 }
 
 // newAccountData is the new account page with the values of its form.
@@ -37,4 +42,13 @@ type accountData struct {
 	Kinds   []domain.AccountKind
 	Edit    accountForm
 	Balance balanceForm
+	// Linked is the bank account the account syncs with, zero when none.
+	Linked domain.BankAccount
+	// Open is the form shown open, "edit" or "balance", empty for none.
+	Open string
+	// Days are the first page of the account's operations, MoreURL the next one.
+	Days     []kit.DayGroup
+	CatNames map[int64]string
+	AccByID  map[int64]domain.Account
+	MoreURL  string
 }

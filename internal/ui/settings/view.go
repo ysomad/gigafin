@@ -28,6 +28,37 @@ type pageData struct {
 	RatesSync   ratesSync
 	// RateCurrencies are the currencies the user needs rates of
 	RateCurrencies []string
+
+	// Banks is the state of the banks card.
+	Banks banksData
+}
+
+// banksData is the state of the banks card: a section per bank and the accounts at
+// each, with the accounts they sync with.
+type banksData struct {
+	TBank    tbankData
+	Accounts []domain.BankAccount
+	// Linked are the accounts by id.
+	Linked map[int64]domain.Account
+	// Choices are the accounts no bank account syncs with, by the ids of the bank
+	// accounts of their currency not synced, to sync one with; Suggested is the one
+	// picked first, 0 for a new account.
+	Choices   map[int64][]domain.Account
+	Suggested map[int64]int64
+	// SyncErr is a failed sync of an htmx post, shown as a toast.
+	SyncErr string
+}
+
+// tbankData is the state of the T-Bank section of the banks card.
+type tbankData struct {
+	Enabled bool
+	// Connected is set when Conn is stored.
+	Connected bool
+	Conn      domain.BankConnection
+	// Step is the input a sign-in in progress waits for, empty when none.
+	Step string
+	// Phone fills the phone input again, the stored one when not posted.
+	Phone string
 }
 
 // generalForm is decoded from the general settings form.

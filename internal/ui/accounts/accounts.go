@@ -2,7 +2,9 @@
 package accounts
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/money"
+	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/timex"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
@@ -40,12 +43,21 @@ func (h *Handler) Routes() map[string]kit.Handler {
 }
 
 func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	accounts, err := h.app.Svc.Accounts.List(r.Context(), user.ID)
+	ctx := r.Context()
+	accounts, err := h.app.Svc.Accounts.List(ctx, user.ID)
 	if err != nil {
 		return err
 	}
-
-	var d accountsData
+	bankAccounts, err := h.app.Svc.Banks.Accounts(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	d := accountsData{Banks: make(map[int64]domain.BankAccount, len(bankAccounts))}
+	for _, t := range bankAccounts {
+		if t.AccountID != 0 {
+			d.Banks[t.AccountID] = t
+		}
+	}
 	for _, a := range accounts {
 		if a.Kind.Liability() {
 			d.Liabilities = append(d.Liabilities, a)
@@ -54,7 +66,7 @@ func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.U
 		}
 	}
 
-	return kit.Render(h.app, w, r, http.StatusOK, accountsPage, kit.Page{User: &user, Nav: "settings", Title: "Accounts"},
+	return kit.Render(h.app, w, r, http.StatusOK, accountsPage, kit.Page{User: &user, Nav: "accounts", Title: "Accounts"},
 		d, kit.Failure{})
 }
 
@@ -70,7 +82,7 @@ func (h *Handler) renderAccountForm(
 	}
 	d := newAccountData{Form: f, Currencies: money.Currencies(), Kinds: domain.AccountKinds()}
 
-	return kit.Render(h.app, w, r, status, newAccountPage, kit.Page{User: &user, Nav: "settings", Title: "New account"}, d,
+	return kit.Render(h.app, w, r, status, newAccountPage, kit.Page{User: &user, Nav: "accounts", Title: "New account"}, d,
 		kit.Failure{Err: viewErr, Form: "account"})
 }
 
@@ -146,9 +158,17 @@ func (h *Handler) createAccount(w http.ResponseWriter, r *http.Request, user dom
 func (h *Handler) renderAccount(
 	w http.ResponseWriter, r *http.Request, user domain.User, id int64, status int, d accountData, fail kit.Failure,
 ) error {
-	a, err := h.app.Svc.Accounts.Get(r.Context(), user.ID, id)
+	ctx := r.Context()
+	a, err := h.app.Svc.Accounts.Get(ctx, user.ID, id)
 	if err != nil {
 		return err
+	}
+	bankAccounts, err := h.app.Svc.Banks.Accounts(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	if i := slices.IndexFunc(bankAccounts, func(t domain.BankAccount) bool { return t.AccountID == a.ID }); i >= 0 {
+		d.Linked = bankAccounts[i]
 	}
 	if fail.Form != "edit" {
 		d.Edit = accountForm{Name: a.Name, Kind: string(a.Kind)}
@@ -159,9 +179,27 @@ func (h *Handler) renderAccount(
 	if fail.Form != "balance" {
 		d.Balance = balanceForm{Target: a.Balance.Fixed(a.Currency), Date: timex.FormatDate(h.app.Svc.Today(user))}
 	}
-	d.Account, d.Kinds = a, domain.AccountKinds()
+	// the first page of the operations; the operations list serves the next ones
+	f := domain.Filter{AccountID: a.ID}
+	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.Params{Limit: 20})
+	if err != nil {
+		return err
+	}
+	accounts, err := h.app.Svc.Accounts.List(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	tree, err := h.app.Svc.Categories.Tree(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	d.Days, d.CatNames, d.AccByID = kit.GroupByDay(ops), domain.CategoryNames(tree), domain.AccountsByID(accounts)
+	if !next.IsZero() {
+		d.MoreURL = fmt.Sprintf("/operations?account=%d&cursor=%s", a.ID, url.QueryEscape(next.String()))
+	}
+	d.Open, d.Account, d.Kinds = fail.Form, a, domain.AccountKinds()
 	return kit.Render(h.app, w, r, status, accountPage, kit.Page{
-		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{a.Name},
+		User: &user, Nav: "accounts", Title: "%s", TitleArgs: []any{a.Name},
 	}, d, fail)
 }
 

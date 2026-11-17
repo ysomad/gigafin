@@ -37,6 +37,35 @@ type ApiKey struct {
 	CreatedAt  int64
 }
 
+type BankAccount struct {
+	ID          int64
+	UserID      int64
+	Bank        string
+	ExternalID  string
+	Name        string
+	Currency    string
+	Kind        string
+	Balance     int64
+	CreditLimit int64
+	BalanceAt   int64
+	AccountID   sql.NullInt64
+	SyncedUntil sql.NullInt64
+	CreatedAt   int64
+	UpdatedAt   sql.NullInt64
+}
+
+type BankConnection struct {
+	UserID     int64
+	Bank       string
+	Login      string
+	Status     string
+	Secret     []byte
+	LastSyncAt sql.NullInt64
+	LastError  string
+	CreatedAt  int64
+	UpdatedAt  sql.NullInt64
+}
+
 type Category struct {
 	ID         int64
 	UserID     int64

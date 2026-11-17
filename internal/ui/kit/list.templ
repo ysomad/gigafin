@@ -11,6 +11,29 @@ templ EmptyRow(colspan int, msg string) {
 	<tr><td colspan={ colspan } class="text-light">{ msg }</td></tr>
 }
 
+// BankLogo is the logo of bank, titled with title, or its name for a bank without one.
+templ BankLogo(bank domain.Bank, title string) {
+	switch bank {
+		case domain.BankTBank:
+			<img src="/static/banks/tbank.svg" width="16" height="16" alt={ title } title={ title }/>
+		default:
+			<span class="badge outline" title={ title }>{ T(ctx, bank.Name()) }</span>
+	}
+}
+
+// BankBadge warns that the balance of account a differs from the balance of the bank
+// account t it syncs with, showing the bank's, after the bank logo if logo is set, for
+// pages that do not show the bank otherwise. Amounts show minor units, as the
+// difference may be less than one.
+templ BankBadge(t domain.BankAccount, a domain.Account, logo bool) {
+	<span class="badge hstack gap-1" data-variant="warning" title={ T(ctx, "Bank balance, differs by %s", a.Balance.Sub(t.Balance).Format(t.Currency)) }>
+		if logo {
+			@BankLogo(t.Bank, T(ctx, t.Bank.Name()))
+		}
+		{ t.Balance.Format(t.Currency) }
+	</span>
+}
+
 templ ArchivedBadge() {
 	<span class="badge" data-variant="secondary">{ T(ctx, "archived") }</span>
 }

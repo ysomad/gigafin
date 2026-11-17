@@ -215,6 +215,40 @@ CREATE INDEX import_rows_pair_idx ON import_rows (pair_row_id) WHERE pair_row_id
 CREATE INDEX import_account_map_account_idx ON import_account_map (account_id);
 CREATE INDEX import_category_map_category_idx ON import_category_map (category_id);
 
+CREATE TABLE bank_connections (
+    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    bank         TEXT    NOT NULL,
+    login        TEXT    NOT NULL,
+    status       TEXT    NOT NULL,
+    secret       BLOB,
+    last_sync_at INTEGER,
+    last_error   TEXT    NOT NULL,
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER,
+    PRIMARY KEY (user_id, bank)
+) STRICT;
+
+CREATE TABLE bank_accounts (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    bank         TEXT    NOT NULL,
+    external_id  TEXT    NOT NULL,
+    name         TEXT    NOT NULL,
+    currency     TEXT    NOT NULL,
+    kind         TEXT    NOT NULL,
+    balance      INTEGER NOT NULL,
+    credit_limit INTEGER NOT NULL,
+    balance_at   INTEGER NOT NULL,
+    account_id   INTEGER REFERENCES accounts (id) ON DELETE SET NULL,
+    synced_until INTEGER,
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER,
+    UNIQUE (user_id, bank, external_id)
+) STRICT;
+
+-- an account syncs with one bank account at most
+CREATE UNIQUE INDEX bank_accounts_account_idx ON bank_accounts (account_id);
+
 CREATE TABLE rules (
     id         INTEGER PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -256,6 +290,8 @@ FROM accounts AS a;
 DROP VIEW account_balances;
 DROP TABLE exchange_rates;
 DROP TABLE rules;
+DROP TABLE bank_accounts;
+DROP TABLE bank_connections;
 DROP TABLE import_category_map;
 DROP TABLE import_account_map;
 DROP TABLE import_rows;

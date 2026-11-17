@@ -29,6 +29,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 						<div class="hstack gap-1">
 							@navLink("/", v.Nav == "dashboard", T(ctx, "Dashboard"))
 							@navLink("/operations", v.Nav == "operations", T(ctx, "Operations"))
+							@navLink("/accounts", v.Nav == "accounts", T(ctx, "Accounts"))
 							@navLink("/plans", v.Nav == "plans", T(ctx, "Plans"))
 							@navLink("/settings", v.Nav == "settings", "...")
 						</div>
@@ -36,6 +37,9 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 				</nav>
 			</header>
 			<main class="container mb-8">
+				if v.BankSync {
+					<div id="bank-sync" hx-get="/settings/banks/autosync" hx-trigger="load" hx-swap="outerHTML"></div>
+				}
 				{ children... }
 				if toTop {
 					<a class="button to-top" href="#top" hx-boost="false" hidden aria-label={ T(ctx, "Scroll to top") }>↑ { T(ctx, "Top") }</a>

@@ -112,6 +112,16 @@ func TestCommitRows(t *testing.T) {
 	rows[2].Row.Category = "Unmapped"
 	_, err = domain.CommitRows(rows, nil, m, time.UTC)
 	require.ErrorIs(t, err, errors.ErrConflict)
+
+	// uncategorized replaces the mapped categories, even the mapped ones
+	m.Uncategorized = map[domain.Kind]domain.Category{domain.KindExpense: {ID: 99, Kind: domain.KindExpense}}
+	assert.True(t, domain.NewPreview(domain.Import{}, rows, m, nil).Ready())
+	rows[2].Row.Category = "Food"
+	commits, err = domain.CommitRows(rows, nil, m, time.UTC)
+	require.NoError(t, err)
+	require.Len(t, commits, 3)
+	assert.Equal(t, int64(99), commits[1].Op.CategoryID)
+	assert.Equal(t, int64(99), commits[2].Op.CategoryID)
 }
 
 func TestPreviewCheckReady(t *testing.T) {

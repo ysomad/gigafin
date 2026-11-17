@@ -1,0 +1,180 @@
+package settings
+
+import (
+	"fmt"
+	"slices"
+	"strconv"
+
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/ui/kit"
+)
+
+// banksCard has a section per bank: signing in to it and the accounts at it. oob marks
+// it for htmx to swap in out of band.
+templ banksCard(v kit.Page, d banksData, oob bool) {
+	<article
+		id="settings-banks"
+		class="card mb-4 form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<h3>{ kit.T(ctx, "Banks") }</h3>
+		@tbankSection(v, d)
+	</article>
+}
+
+// tbankSection signs in to T-Bank by phone, then by the SMS code and the password the
+// bank asks for, or shows the connection and the T-Bank accounts, or how to turn T-Bank
+// sync on. Its header has the state of the connection and its actions.
+templ tbankSection(v kit.Page, d banksData) {
+	{{ b := d.TBank }}
+	{{ connected := b.Connected && b.Conn.Status == domain.BankConnected && b.Step == "" }}
+	<section class="form-compact">
+		<div class="hstack justify-between">
+			<div class="hstack">
+				<h4>{ kit.T(ctx, "T-Bank") }</h4>
+				switch  {
+					case !b.Enabled:
+						<span class="badge" data-variant="secondary">{ kit.T(ctx, "Off") }</span>
+					case connected:
+						<span class="badge" data-variant="success">{ kit.T(ctx, "Connected") }</span>
+						<span class="badge outline">{ b.Conn.Login }</span>
+						if !b.Conn.LastSyncAt.IsZero() {
+							<span class="badge outline">{ kit.T(ctx, "synced %s", kit.Datetime(ctx, b.Conn.LastSyncAt, v.User)) }</span>
+						}
+					case b.Connected && b.Step == "":
+						<span class="badge" data-variant="warning">{ kit.T(ctx, "Sign-in needed") }</span>
+				}
+			</div>
+			if connected {
+				<div class="hstack">
+					<form method="post" action="/settings/banks/tbank/sync" hx-post="/settings/banks/tbank/sync" hx-swap="none" hx-disable="find button">
+						<button type="submit" class="small">{ kit.T(ctx, "Sync now") }</button>
+					</form>
+					<form method="post" action="/settings/banks/tbank/disconnect" hx-post="/settings/banks/tbank/disconnect" hx-swap="none" hx-confirm={ kit.T(ctx, "Disconnect T-Bank? Synced operations stay.") }>
+						<button type="submit" class="outline small" data-variant="danger">{ kit.T(ctx, "Disconnect") }</button>
+					</form>
+				</div>
+			}
+		</div>
+		if !b.Enabled {
+			<p class="text-light">{ kit.T(ctx, "Set TBANK_SECRET_KEY (openssl rand -base64 32) and restart gigafin.") }</p>
+		} else if b.Step != "" {
+			<p class="text-light">{ kit.T(ctx, "Signing in as %s.", b.Phone) }</p>
+			<form id="form-tbank" method="post" action="/settings/banks/tbank/confirm" class="row" hx-post="/settings/banks/tbank/confirm" hx-swap="none" hx-disable="find button">
+				@kit.FormError(v.Errors.Form("tbank"), "col-12")
+				{{ e := v.Errors.Get("tbank.value") }}
+				if b.Step == "password" {
+					@kit.Field("col-3", kit.T(ctx, "Password"), e, "tbank-value-error", nil) {
+						<input type="password" name="value" autocomplete="off" autofocus { kit.Invalid(e, "tbank-value-error")... }/>
+					}
+				} else {
+					@kit.Field("col-3", kit.T(ctx, "Code from SMS"), e, "tbank-value-error", nil) {
+						<input name="value" inputmode="numeric" autocomplete="one-time-code" autofocus { kit.Invalid(e, "tbank-value-error")... }/>
+					}
+				}
+				// cancel posts the form elsewhere, so it sits by Continue
+				<div class="col-3 vstack gap-1">
+					<label aria-hidden="true">&nbsp;</label>
+					<div class="hstack">
+						<button type="submit">{ kit.T(ctx, "Continue") }</button>
+						<button type="submit" class="outline" data-variant="secondary" formaction="/settings/banks/tbank/cancel" hx-post="/settings/banks/tbank/cancel">{ kit.T(ctx, "Cancel") }</button>
+					</div>
+				</div>
+			</form>
+		} else if !connected {
+			<form id="form-tbank" method="post" action="/settings/banks/tbank/login" class="row" hx-post="/settings/banks/tbank/login" hx-swap="none" hx-disable="find button">
+				@kit.FormError(v.Errors.Form("tbank"), "col-12")
+				{{ e := v.Errors.Get("tbank.phone") }}
+				@kit.Field("col-3", kit.T(ctx, "Phone"), e, "tbank-phone-error", nil) {
+					<input type="tel" name="phone" value={ b.Phone } placeholder="+79991234567" autocomplete="tel" { kit.Invalid(e, "tbank-phone-error")... }/>
+				}
+				// the bank answers slowly, so the button spins
+				<div class="col-3 vstack gap-1">
+					<label aria-hidden="true">&nbsp;</label>
+					<div>
+						<button type="submit">{ kit.T(ctx, "Get SMS code") }</button>
+					</div>
+				</div>
+			</form>
+		} else {
+			if b.Conn.LastError != "" {
+				<p class="text-danger">{ kit.T(ctx, "Last sync failed:") } { b.Conn.LastError }</p>
+			}
+			@bankAccounts(v, d, domain.BankTBank)
+		}
+	</section>
+}
+
+// bankAccounts lists the accounts at bank with the account each syncs with, or picks
+// one for each not synced, a new one or an account of its currency, suggested first, to
+// sync with alone or with all others at once.
+templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
+	{{ free := slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == bank && t.AccountID == 0 }) }}
+	<form id="form-banks" method="post" action="/settings/banks/link" class="form-compact">
+		@kit.FormError(v.Errors.Form("banks"), "")
+		<div class="table">
+			<table>
+				<thead><tr><th>{ kit.T(ctx, "Account") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th><th>{ kit.T(ctx, "Syncs with") }</th></tr></thead>
+				<tbody>
+					{{ n := 0 }}
+					for _, t := range d.Accounts {
+						if t.Bank == bank {
+							{{ n++ }}
+							<tr>
+								<td>
+									<div>{ t.Name }</div>
+									if !t.CreditLimit.IsZero() {
+										<small class="text-light">{ kit.T(ctx, "limit %s", kit.Money(ctx, t.CreditLimit, t.Currency)) }</small>
+									}
+								</td>
+								<td class="align-right nowrap">{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ t.Currency }</span></td>
+								<td>
+									if a, ok := d.Linked[t.AccountID]; ok {
+										<div class="hstack gap-1">
+											<a class="badge" data-variant="success" href={ fmt.Sprintf("/accounts/%d", a.ID) }>✓ { a.Name }</a>
+											if t.Mismatch(a) {
+												@kit.BankBadge(t, a, false)
+											}
+										</div>
+									} else {
+										{{ id := strconv.FormatInt(t.ID, 10) }}
+										<fieldset class="group">
+											<select name={ "account_" + id } aria-label={ kit.T(ctx, "Syncs with") }>
+												<option value="new">{ kit.T(ctx, "New account") }</option>
+												for _, a := range d.Choices[t.ID] {
+													<option value={ a.ID } selected?={ a.ID == d.Suggested[t.ID] }>{ a.Name }</option>
+												}
+											</select>
+											<button type="submit" name="bank_account" value={ id } class="outline" formaction="/settings/banks/link" hx-post="/settings/banks/link" hx-vals={ fmt.Sprintf(`{"bank_account":%q}`, id) } hx-swap="none" hx-disable="this">{ kit.T(ctx, "Sync") }</button>
+										</fieldset>
+									}
+								</td>
+							</tr>
+						}
+					}
+					if n == 0 {
+						@kit.EmptyRow(3, kit.T(ctx, "No accounts yet."))
+					}
+				</tbody>
+			</table>
+		</div>
+		if free {
+			<div class="hstack justify-end">
+				<button type="submit" formaction="/settings/banks/link" hx-post="/settings/banks/link" hx-swap="none" hx-disable="this" title={ kit.T(ctx, "Syncs all accounts at once, so transfers between them are imported as transfers.") }>{ kit.T(ctx, "Sync all") }</button>
+			</div>
+		}
+	</form>
+}
+
+// bankLoginAlert asks to sign in to T-Bank again on the settings page; it tops the
+// pages opened while the bank does not accept the session.
+templ bankLoginAlert() {
+	<div role="alert" data-variant="warning" class="mb-4">
+		<span>
+			{ kit.T(ctx, "T-Bank asks to sign in again to keep syncing.") }
+			<a href="/settings#settings-banks">{ kit.T(ctx, "Sign in") }</a>
+		</span>
+	</div>
+}

@@ -230,6 +230,7 @@ func Render[T any](
 	v.Errors = a.FormErrors(w, r.WithContext(ctx), fail)
 	v.Notice = a.takeFlash(w, r, noticeCookie)
 	v.Title = a.Dicts.T(p.Lang, v.Title, v.TitleArgs...)
+	v.BankSync = v.User != nil && r.Method == http.MethodGet && !IsHTMX(r) && len(a.Svc.Banks.Enabled()) > 0
 
 	var buf bytes.Buffer
 	if err := page(v, d).Render(ctx, &buf); err != nil {

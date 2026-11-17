@@ -28,6 +28,7 @@ type Repos struct {
 	Imports    *Imports
 	Rates      *Rates
 	Rules      *Rules
+	Banks      *Banks
 }
 
 // Store holds one write connection and a pool of read connections, since SQLite allows
@@ -108,6 +109,7 @@ func newRepos(q *sqlc.Queries) Repos {
 		Imports:    &Imports{q: q},
 		Rates:      &Rates{q: q},
 		Rules:      &Rules{q: q},
+		Banks:      &Banks{q: q},
 	}
 }
 

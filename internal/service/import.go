@@ -80,10 +80,18 @@ func (s *Imports) Upload(
 	if err != nil {
 		return domain.Import{}, err
 	}
+	return s.stage(ctx, userID, src, filename, res)
+}
+
+// stage stores parsed records as a new staged import, marks rows imported before as
+// duplicates and pairs transfers between own accounts.
+func (s *Imports) stage(
+	ctx context.Context, userID int64, src domain.ImportSource, filename string, res domain.ParseResult,
+) (domain.Import, error) {
 	hashes := domain.HashRows(src, res.Rows)
 
 	var im domain.Import
-	err = s.store.InTx(ctx, func(r repository.Repos) error {
+	err := s.store.InTx(ctx, func(r repository.Repos) error {
 		imported, err := r.Imports.ImportedHashes(ctx, userID, hashes)
 		if err != nil {
 			return err
@@ -198,14 +206,43 @@ func (s *Imports) Unpair(ctx context.Context, userID, importID, rowID int64) err
 // Commit creates operations for all new rows of a staged import. Dates and times are
 // converted to loc. Rules run on every row that is not a part of a split and override
 // the mapped category. It returns the number of operations created.
-//
-//nolint:cyclop // its read and write phases check the same state, so they stay together
 func (s *Imports) Commit(ctx context.Context, userID, importID int64, loc *time.Location) (int, error) {
+	return s.commit(ctx, userID, importID, loc, "" /* uncategorized */)
+}
+
+// commit is Commit; with uncategorized set the mapped categories are ignored and every
+// row goes to the root category of its kind of that name, created when missing, before
+// rules run.
+//
+//nolint:cyclop,funlen // its read and write phases check the same state, so they stay together
+func (s *Imports) commit(
+	ctx context.Context, userID, importID int64, loc *time.Location, uncategorized string,
+) (int, error) {
 	// rows are prepared and categorized outside the write transaction, as a categorizer
 	// may be slow; the transaction checks nothing changed meanwhile
 	im, rows, m, err := loadImport(ctx, s.store.Read(), userID, importID)
 	if err != nil {
 		return 0, err
+	}
+	if uncategorized != "" {
+		m.Uncategorized = make(map[domain.Kind]domain.Category, 2)
+		err := s.store.InTx(ctx, func(r repository.Repos) error {
+			// only the kinds the rows need, so no empty category is created
+			for _, need := range domain.NewPreview(im, rows, m, s.kindRules).Categories {
+				if _, ok := m.Uncategorized[need.Kind]; ok {
+					continue
+				}
+				c, err := ensureCategory(ctx, r, userID, need.Kind, uncategorized, "", s.clock.Now())
+				if err != nil {
+					return err
+				}
+				m.Uncategorized[need.Kind] = c
+			}
+			return nil
+		})
+		if err != nil {
+			return 0, err
+		}
 	}
 	if err := im.CheckStatus(domain.ImportStaged); err != nil {
 		return 0, err

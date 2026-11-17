@@ -115,7 +115,7 @@ templ ratesCard(v kit.Page, d pageData, oob bool) {
 				<div class="hstack">
 					<a class="button outline small" href="/imports/new?source=rates" data-variant="secondary">{ kit.T(ctx, "Import from CSV") }</a>
 					if len(d.RateCurrencies) > 0 {
-						<form method="post" action="/settings/rates/sync" hx-post="/settings/rates/sync" hx-swap="none" hx-disable="find button"><button type="submit" class="small" data-spinner>{ kit.T(ctx, "Update rates") }</button></form>
+						<form method="post" action="/settings/rates/sync" hx-post="/settings/rates/sync" hx-swap="none" hx-disable="find button"><button type="submit" class="small">{ kit.T(ctx, "Update rates") }</button></form>
 					}
 				</div>
 			}
@@ -342,5 +342,8 @@ templ toasts(d pageData) {
 		if d.RatesSync.Err != nil {
 			@kit.Toast("danger", kit.T(ctx, "Some failed:")+" "+kit.ErrMsg(ctx, d.RatesSync.Err))
 		}
+	}
+	if d.Banks.SyncErr != "" {
+		@kit.Toast("danger", kit.T(ctx, "Last sync failed:")+" "+d.Banks.SyncErr)
 	}
 }

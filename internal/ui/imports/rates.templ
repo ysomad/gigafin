@@ -23,7 +23,7 @@ templ ratesPage(v kit.Page, d ratesData) {
 				@kit.LinkButton("/imports/new?source=rates", "secondary", kit.T(ctx, "Back"))
 				<form method="post" action="/imports/rates/commit" hx-disable="find button">
 					<textarea name="content" hidden>{ d.Content }</textarea>
-					<button type="submit" data-spinner>{ kit.T(ctx, "Import %d rates", len(d.Changes)) }</button>
+					<button type="submit">{ kit.T(ctx, "Import %d rates", len(d.Changes)) }</button>
 				</form>
 			</div>
 			<div class="table">

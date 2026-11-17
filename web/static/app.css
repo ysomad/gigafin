@@ -12,16 +12,18 @@ html {
 }
 
 /* htmx marks the element running a request with .htmx-request: a button, or a form whose
-   [data-spinner] buttons then spin. Only slow actions opt in, such as updating rates. */
-button.htmx-request[data-spinner],
-form.htmx-request button[data-spinner] {
+   submit button then spins. Buttons posting elsewhere, by formaction or form, do not.
+   The spinner takes the text color of the button: Oat's primary arc would vanish on a
+   primary button. */
+button.htmx-request,
+form.htmx-request button:not([type="button"], [formaction], [form]) {
   &:before {
     content: "";
     display: inline-block;
     width: 1rem;
     height: 1rem;
-    border: 2px solid var(--muted);
-    border-top-color: var(--primary);
+    border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
     border-radius: var(--radius-full);
     animation: spin 1s linear infinite;
   }

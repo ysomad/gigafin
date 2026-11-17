@@ -1,16 +1,25 @@
 package operations
 
 import (
+	"time"
+
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
 // opList is the operations page: a page of operations matching Filter.
 type opList struct {
-	Days     []kit.DayGroup
-	MoreURL  string
-	Filter   domain.Filter
-	Filtered bool
+	// BankSync is set when the user syncs a bank, to sync it from the list, last at
+	// BankSyncAt, zero before the first sync.
+	BankSync   bool
+	BankSyncAt time.Time
+	// Mismatched are the bank accounts whose balance differs from the account each
+	// syncs with.
+	Mismatched []domain.BankAccount
+	Days       []kit.DayGroup
+	MoreURL    string
+	Filter     domain.Filter
+	Filtered   bool
 	// FilterCount is the number of Filter fields set in the filter dialog, all but Query.
 	FilterCount int
 	Accounts    []domain.Account

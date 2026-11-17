@@ -223,14 +223,16 @@ func StageImportRows(
 	return im, staged
 }
 
+// TransferWindow is how far apart the two sides of a transfer between own accounts
+// may be.
+const TransferWindow = 2 * time.Minute
+
 // PairTransfers matches new money out of one account with the same amount into
-// another account of the same currency within two minutes. Records that are
+// another account of the same currency within TransferWindow. Records that are
 // transfers already, parts of a split or without a time are left out: the time of a
 // date-only record is midnight, so any same-day expense and income of equal amounts
 // would pair. It returns [out, in] row ids.
 func PairTransfers(rows []ImportRow) [][2]int64 {
-	// how far apart the two sides of a transfer between own accounts may be
-	const window = 2 * time.Minute
 	sorted := slices.Clone(rows)
 	slices.SortStableFunc(sorted, func(a, b ImportRow) int { return a.Row.Time.Compare(b.Row.Time) })
 
@@ -255,7 +257,7 @@ func PairTransfers(rows []ImportRow) [][2]int64 {
 				continue
 			}
 			gap := in.Row.Time.Sub(out.Row.Time).Abs()
-			if gap > window {
+			if gap > TransferWindow {
 				continue
 			}
 			if best < 0 || gap < bestGap {
@@ -325,6 +327,18 @@ type ImportMapping struct {
 	Accounts map[string]Account
 	// Categories is keyed by CategoryKey.
 	Categories map[string]Category
+	// Uncategorized, when set, is the category of every row of a kind in place of
+	// Categories, such as for bank syncs.
+	Uncategorized map[Kind]Category
+}
+
+// category returns the category the bank category name of kind maps to.
+func (m ImportMapping) category(kind Kind, name string) (Category, bool) {
+	if c, ok := m.Uncategorized[kind]; ok {
+		return c, true
+	}
+	c, ok := m.Categories[CategoryKey(kind, name)]
+	return c, ok
 }
 
 // Preview is a staged import with what is still needed to commit it.
@@ -455,7 +469,7 @@ func NewPreview(im Import, rows []ImportRow, m ImportMapping, rules []AccountKin
 		j, ok := catIdx[ck]
 		if !ok {
 			need := CategoryNeed{Name: r.Row.Category, Kind: r.Row.Kind()}
-			if c, ok := m.Categories[ck]; ok && c.Kind == need.Kind {
+			if c, ok := m.category(need.Kind, need.Name); ok && c.Kind == need.Kind {
 				need.CategoryID = c.ID
 			}
 			j = len(p.Categories)
@@ -571,7 +585,7 @@ func rowOperation(r ImportRow, pair *ImportRow, m ImportMapping, loc *time.Locat
 	if r.Row.Kind() == KindIncome {
 		in.Type = OpIncome
 	}
-	cat, ok := m.Categories[CategoryKey(r.Row.Kind(), r.Row.Category)]
+	cat, ok := m.category(r.Row.Kind(), r.Row.Category)
 	if !ok {
 		return OperationInput{}, notReady
 	}

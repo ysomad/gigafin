@@ -26,7 +26,7 @@ type Data struct {
 }
 
 // DeleteAll checks the user's current password and deletes every account, category,
-// operation, plan, import and rule of the user in one transaction. The user, sessions
+// operation, plan, import, rule and bank connection of the user in one transaction. The user, sessions
 // and API keys are kept.
 func (s *Data) DeleteAll(ctx context.Context, userID int64, pass string) error {
 	if err := s.auth.CheckPassword(ctx, userID, pass); err != nil {
@@ -42,6 +42,7 @@ func (s *Data) DeleteAll(ctx context.Context, userID int64, pass string) error {
 			r.Rules.DeleteAll,
 			r.Categories.DeleteAll,
 			r.Accounts.DeleteAll,
+			r.Banks.DeleteAll,
 		}
 		for _, step := range steps {
 			if err := step(ctx, userID); err != nil {

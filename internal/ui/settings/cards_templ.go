@@ -740,14 +740,14 @@ func ratesCard(v kit.Page, d pageData, oob bool) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(d.RateCurrencies) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<form method=\"post\" action=\"/settings/rates/sync\" hx-post=\"/settings/rates/sync\" hx-swap=\"none\" hx-disable=\"find button\"><button type=\"submit\" class=\"small\" data-spinner>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<form method=\"post\" action=\"/settings/rates/sync\" hx-post=\"/settings/rates/sync\" hx-swap=\"none\" hx-disable=\"find button\"><button type=\"submit\" class=\"small\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Update rates"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/cards.templ`, Line: 118, Col: 204}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/cards.templ`, Line: 118, Col: 191}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -2300,6 +2300,12 @@ func toasts(d pageData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+			}
+		}
+		if d.Banks.SyncErr != "" {
+			templ_7745c5c3_Err = kit.Toast("danger", kit.T(ctx, "Last sync failed:")+" "+d.Banks.SyncErr).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
 			}
 		}
 		return nil

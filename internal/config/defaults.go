@@ -34,5 +34,9 @@ func Default() Config {
 				`платёжн|платежн|расч[её]тн|текущ|сберкарт|мультикарт|альфа-карт|black|junior|` +
 				`\bdebit\b|checking`,
 		},
+		TBank: TBank{
+			SyncInterval: 15 * time.Minute,
+			SyncOverlap:  14 * 24 * time.Hour,
+		},
 	}
 }

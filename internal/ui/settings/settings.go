@@ -35,18 +35,25 @@ func New(app *kit.App) *Handler {
 // Routes returns the routes of settings.
 func (h *Handler) Routes() map[string]kit.Handler {
 	return map[string]kit.Handler{
-		"GET /settings":                       h.settings,
-		"POST /settings":                      h.saveSettings,
-		"POST /settings/rates/sync":           h.syncRates,
-		"POST /settings/rates/set":            h.setRate,
-		"POST /settings/rates/reset":          h.resetRate,
-		"POST /settings/password":             h.changePassword,
-		"POST /settings/api-keys":             h.createAPIKey,
-		"POST /settings/delete-data":          h.deleteAllData,
-		"GET /settings/export":                h.exportData,
-		"POST /settings/backup":               h.backup,
-		"POST /settings/api-keys/{id}/revoke": h.revokeAPIKey,
-		"POST /settings/sessions/{id}/revoke": h.revokeSession,
+		"GET /settings":                         h.settings,
+		"POST /settings":                        h.saveSettings,
+		"POST /settings/rates/sync":             h.syncRates,
+		"POST /settings/rates/set":              h.setRate,
+		"POST /settings/rates/reset":            h.resetRate,
+		"POST /settings/password":               h.changePassword,
+		"POST /settings/api-keys":               h.createAPIKey,
+		"POST /settings/delete-data":            h.deleteAllData,
+		"GET /settings/export":                  h.exportData,
+		"POST /settings/backup":                 h.backup,
+		"POST /settings/api-keys/{id}/revoke":   h.revokeAPIKey,
+		"POST /settings/sessions/{id}/revoke":   h.revokeSession,
+		"POST /settings/banks/tbank/login":      h.tbankLogin,
+		"POST /settings/banks/tbank/confirm":    h.tbankConfirm,
+		"POST /settings/banks/tbank/cancel":     h.tbankCancel,
+		"POST /settings/banks/tbank/sync":       h.tbankSync,
+		"POST /settings/banks/link":             h.bankLink,
+		"POST /settings/banks/tbank/disconnect": h.tbankDisconnect,
+		"GET /settings/banks/autosync":          h.banksAutoSync,
 	}
 }
 
@@ -59,7 +66,8 @@ const (
 	_cardRates
 	_cardAccess
 	_cardDelete
-	_cardAll = _cardGeneral | _cardPassword | _cardRates | _cardAccess | _cardDelete
+	_cardBanks
+	_cardAll = _cardGeneral | _cardPassword | _cardRates | _cardAccess | _cardDelete | _cardBanks
 )
 
 // loadSettings sets the data of cards in d. The settings are read here, not taken from
@@ -96,6 +104,11 @@ func (h *Handler) loadSettings(r *http.Request, user domain.User, d *pageData, c
 			return err
 		}
 		if d.RateCurrencies, err = h.app.Svc.Rates.Currencies(ctx, user.ID); err != nil {
+			return err
+		}
+	}
+	if cards&_cardBanks != 0 {
+		if err := h.loadBanks(r, user, &d.Banks); err != nil {
 			return err
 		}
 	}
@@ -153,6 +166,9 @@ func (h *Handler) settingsReply(
 	}
 	if cards&_cardAccess != 0 {
 		cs = append(cs, accessCard(v, d, true))
+	}
+	if cards&_cardBanks != 0 {
+		cs = append(cs, banksCard(v, d.Banks, true))
 	}
 	if cards&_cardDelete != 0 {
 		cs = append(cs, deleteCard(v, true))

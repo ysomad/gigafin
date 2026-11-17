@@ -37,6 +37,9 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("IMPORT_ACCOUNT_CASH_PATTERN", "cash")
 	t.Setenv("IMPORT_ACCOUNT_SAVINGS_PATTERN", "savings")
 	t.Setenv("IMPORT_ACCOUNT_DEBIT_PATTERN", "debit")
+	t.Setenv("TBANK_SECRET_KEY", "a2V5")
+	t.Setenv("TBANK_SYNC_INTERVAL", "5m")
+	t.Setenv("TBANK_SYNC_OVERLAP", "72h")
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	assert.Equal(t, config.Config{
@@ -50,6 +53,11 @@ func TestLoadFromEnv(t *testing.T) {
 			AccountCashPattern:    "cash",
 			AccountSavingsPattern: "savings",
 			AccountDebitPattern:   "debit",
+		},
+		TBank: config.TBank{
+			SecretKey:    "a2V5",
+			SyncInterval: 5 * time.Minute,
+			SyncOverlap:  72 * time.Hour,
 		},
 	}, cfg)
 }

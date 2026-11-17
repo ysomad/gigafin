@@ -29,6 +29,8 @@ type Services struct {
 	Data       *Data
 	Rates      *Rates
 	Rules      *Rules
+	TBank      *TBank
+	Banks      *Banks
 
 	clock timex.Clock
 }
@@ -39,6 +41,7 @@ type Options struct {
 	Import  ImportOptions
 	// RateFetchers fetch exchange rates of each source users may pick.
 	RateFetchers map[domain.RateSource]RateFetcher
+	TBank        TBankOptions
 }
 
 // New returns services over store using clock for timestamps and today's date, logging
@@ -54,6 +57,10 @@ func New(store *repository.Store, clock timex.Clock, log *slog.Logger, opts Opti
 	rules := &Rules{store: store, clock: clock, log: log}
 	imports.categorizer = rules
 	auth := &Auth{store: store, clock: clock, log: log, session: opts.Session}
+	tbank, err := newTBank(store, clock, log, imports, opts.TBank)
+	if err != nil {
+		return nil, err
+	}
 	return &Services{
 		Auth:       auth,
 		Settings:   &Settings{store: store, clock: clock, log: log},
@@ -66,6 +73,8 @@ func New(store *repository.Store, clock timex.Clock, log *slog.Logger, opts Opti
 		Data:       &Data{store: store, auth: auth, log: log},
 		Rates:      &Rates{store: store, clock: clock, fetchers: opts.RateFetchers},
 		Rules:      rules,
+		TBank:      tbank,
+		Banks:      &Banks{store: store, tbank: tbank},
 		clock:      clock,
 	}, nil
 }

@@ -2,6 +2,8 @@ package app
 
 import (
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	apispec "github.com/ysomad/gigafin/api"
+	"github.com/ysomad/gigafin/certs"
 	"github.com/ysomad/gigafin/internal/api"
 	"github.com/ysomad/gigafin/internal/config"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -192,4 +195,23 @@ func newHTTPClient(timeout time.Duration) *http.Client {
 			MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
 		},
 	}
+}
+
+// newRussianHTTPClient returns an HTTP client that also trusts the Russian Trusted Root
+// CA, which Russian banks chain to and system trust stores lack.
+func newRussianHTTPClient(timeout time.Duration) (*http.Client, error) {
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		pool = x509.NewCertPool()
+	}
+	if !pool.AppendCertsFromPEM(certs.RussianTrustedRootCA) {
+		return nil, errors.Error("bad embedded Russian Trusted Root CA")
+	}
+	hc := newHTTPClient(timeout)
+	tr, ok := hc.Transport.(*http.Transport)
+	if !ok {
+		return nil, errors.Error("russian http client: unexpected transport")
+	}
+	tr.TLSClientConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
+	return hc, nil
 }

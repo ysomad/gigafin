@@ -23,6 +23,10 @@ type Page struct {
 	Errors *FormErrors
 	// Notice is a success message set before a redirect, shown as a toast.
 	Notice string
+	// BankSync is set by the renderer when the user opens the app, a signed-in page
+	// loaded in full rather than by htmx, and the sync of a bank is on: the page then
+	// syncs the banks.
+	BankSync bool
 }
 
 // Failure is a failed form post a page is rendered for: Err is FieldsError of its

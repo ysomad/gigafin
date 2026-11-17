@@ -6,7 +6,6 @@ templ page(v kit.Page, d pageData) {
 	@kit.Layout(v, false, toasts(d)) {
 		<div class="hstack justify-between mb-4">
 			<div class="hstack">
-				@kit.LinkButton("/accounts", "secondary", kit.T(ctx, "Accounts"))
 				@kit.LinkButton("/categories", "secondary", kit.T(ctx, "Categories"))
 				@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Rules"))
 				@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Import"))
@@ -21,9 +20,10 @@ templ page(v kit.Page, d pageData) {
 		// action form is one row, its button in the last column under an empty caption,
 		// spaced as an input under its label.
 		@generalCard(v, d, false)
+		@banksCard(v, d.Banks, false)
 		@ratesCard(v, d, false)
-		@passwordCard(v, false)
 		@accessCard(v, d, false)
+		@passwordCard(v, false)
 		<article class="card mb-4 form-compact">
 			<h3>{ kit.T(ctx, "Export") }</h3>
 			<p class="text-light">{ kit.T(ctx, "Without dates, data of all time is exported.") }</p>
