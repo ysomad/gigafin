@@ -73,13 +73,14 @@ func (s *Accounts) CreateWithBalance(
 	return a, nil
 }
 
-// Update changes the account name, kind and credit limit. in.Currency is ignored.
+// Update changes the account name and credit limit. in.Currency and in.Kind are ignored.
 func (s *Accounts) Update(ctx context.Context, userID, id int64, in domain.AccountInput) error {
 	err := s.store.InTx(ctx, func(r repository.Repos) error {
 		a, err := r.Accounts.Get(ctx, userID, id)
 		if err != nil {
 			return err
 		}
+		in.Kind = a.Kind
 		if a, err = a.Edit(in); err != nil {
 			return err
 		}

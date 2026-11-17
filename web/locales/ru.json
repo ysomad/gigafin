@@ -109,7 +109,6 @@
     "This operation": "Эта операция",
     "Time": "Время",
     "To": "По",
-    "Top": "Наверх",
     "Transfer": "Перевод",
     "Two-factor authentication": "Двухфакторная аутентификация",
     "Two-factor authentication is on. Other sessions are signed out.": "Двухфакторная аутентификация включена. Остальные сессии завершены.",
@@ -380,11 +379,13 @@
     "Back": "Назад",
     "CSV file": "CSV-файл",
     "Categories of the file map separately for money out (expense) and money in (income, e.g. refunds). To create a new category inside another one, write \"Parent / Child\".": "Категории из файла сопоставляются отдельно для списаний (расход) и поступлений (доход, например возвраты). Чтобы создать категорию внутри другой, напишите «Родитель / Дочерняя».",
+    "Choose a file": "Выбрать файл",
     "Create new account": "Создать новый счёт",
     "Create new category": "Создать новую категорию",
     "Days missing between rows of a currency carry the previous rate. Imported rates replace stored ones and are kept by updates.": "Для пропущенных дней между строками валюты берётся предыдущий курс. Импортированные курсы заменяют сохранённые и не перезаписываются обновлениями.",
     "Delete all operations created by this import?": "Удалить все операции, созданные этим импортом?",
     "Delete from history": "Удалить из истории",
+    "Drop a file here or click to choose": "Перетащите файл сюда или нажмите, чтобы выбрать",
     "Duplicates": "Дубликаты",
     "File": "Файл",
     "Gigafin operations": "Операции Gigafin",
@@ -430,7 +431,7 @@
     "Uploaded": "Загружен",
     "What are you importing?": "Что вы импортируете?",
     "Zenmoney CSV export": "Выгрузка CSV из Zenmoney",
-    "Zenmoney operations": "Операции Zenmoney",
+    "Zenmoney operations": "Операции Дзен-мани",
     "account name": "название счёта",
     "changed": "изменён",
     "duplicate": "дубликат",
@@ -482,8 +483,7 @@
     "Tags": "Теги",
     "import #%d": "№%d",
     "max": "до",
-    "min": "от",
-    "payee or note": "получатель или заметка"
+    "min": "от"
   },
   "plans": {
     "%d%% of plan": "%d%% от плана",
@@ -530,8 +530,7 @@
     "and": "и",
     "any condition": "любое условие",
     "learned": "выучено",
-    "mine": "мои",
-    "value or category": "значение или категория"
+    "mine": "мои"
   },
   "settings": {
     "%s asks to sign in again to keep syncing.": "%s просит войти заново, чтобы продолжить синхронизацию.",

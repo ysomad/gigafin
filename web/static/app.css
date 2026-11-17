@@ -12,11 +12,12 @@ html {
 }
 
 /* htmx marks the element running a request with .htmx-request: a button, or a form whose
-   submit button then spins. Buttons posting elsewhere, by formaction or form, do not.
+   submit button then spins. Buttons posting elsewhere, by formaction or form, and the
+   buttons of get forms, such as search, do not.
    The spinner takes the text color of the button: Oat's primary arc would vanish on a
    primary button. */
 button.htmx-request,
-form.htmx-request button:not([type="button"], [formaction], [form]) {
+form.htmx-request:not([method="get"]) button:not([type="button"], [formaction], [form]) {
   &:before {
     content: "";
     display: inline-block;

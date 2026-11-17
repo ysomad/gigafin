@@ -978,7 +978,7 @@ func TestAccountKinds(t *testing.T) {
 	card, err = svc.Accounts.Get(ctx, uid, card.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Old card", card.Name)
-	assert.Equal(t, domain.AccountDebit, card.Kind)
+	assert.Equal(t, domain.AccountCredit, card.Kind, "kind kept")
 	assert.True(t, card.CreditLimit.IsZero(), "limit cleared")
 	assert.Equal(t, "RUB", card.Currency)
 

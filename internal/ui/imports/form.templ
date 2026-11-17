@@ -32,10 +32,7 @@ templ formPage(v kit.Page, d formData) {
 			{{ e := v.Errors.Get("file") }}
 			<form id="form-import-rates" method="post" action="/imports/rates" enctype="multipart/form-data" hx-disable="find button">
 				@kit.FormError(v.Errors.Form("import-rates"), "")
-				@kit.Field("", kit.T(ctx, "CSV file"), "", "", nil) {
-					@fileInput(e)
-					<small data-hint>{ kit.T(ctx, "exchange rates") }</small>
-				}
+				@fileInput(kit.T(ctx, "CSV file"), kit.T(ctx, "exchange rates"), e)
 				<div class="mb-4">
 					<p class="text-light">UTF-8, <code>,</code>{ kit.T(ctx, "-separated, header row. Columns:") }</p>
 					@csvColumns() {
@@ -56,20 +53,12 @@ templ formPage(v kit.Page, d formData) {
 				<input type="hidden" name="source" value={ string(d.Source) }/>
 				switch d.Source {
 					case domain.ImportSourceTBank:
-						@kit.Field("", kit.T(ctx, "T-Bank CSV export"), "", "", nil) {
-							@fileInput(e)
-							<small data-hint>{ kit.T(ctx, "T-Bank app or site: Operations → Export → CSV.") }</small>
-						}
+						@fileInput(kit.T(ctx, "T-Bank CSV export"), kit.T(ctx, "T-Bank app or site: Operations → Export → CSV."), e)
 					case domain.ImportSourceZenMoney:
-						@kit.Field("", kit.T(ctx, "Zenmoney CSV export"), "", "", nil) {
-							@fileInput(e)
-						}
+						@fileInput(kit.T(ctx, "Zenmoney CSV export"), "", e)
 						<p class="text-light">{ kit.T(ctx, "Times are read in your") } <a href="/settings">{ kit.T(ctx, "time zone") }</a>{ kit.T(ctx, ", keep it equal to Zenmoney's. Cross-currency transfers are skipped.") }</p>
 					default:
-						@kit.Field("", kit.T(ctx, "CSV file"), "", "", nil) {
-							@fileInput(e)
-							<small data-hint>{ kit.T(ctx, "gigafin format") }</small>
-						}
+						@fileInput(kit.T(ctx, "CSV file"), kit.T(ctx, "gigafin format"), e)
 						<div class="mb-4">
 							<p class="text-light">UTF-8, <code>;</code>{ kit.T(ctx, "-separated, header row. Columns:") }</p>
 							@csvColumns() {
@@ -196,9 +185,24 @@ templ csvColumns() {
 	</div>
 }
 
-// fileInput picks a CSV file, with the message err about it.
-templ fileInput(err string) {
-	<input type="file" name="file" accept=".csv,text/csv" class="w-100 mt-2" { kit.Invalid(err, "file-error")... }/>
+// fileInput picks a CSV file by click or drop, under label with hint if set, with
+// the message err about it.
+templ fileInput(label, hint, err string) {
+	<ot-upload class="mb-4">
+		<div data-field class="vstack">
+			<input type="file" name="file" accept=".csv,text/csv" hidden { kit.Invalid(err, "file-error")... }/>
+			<strong>{ label }</strong>
+			if hint != "" {
+				<small data-hint>{ hint }</small>
+			}
+			<button type="button" class="ghost" aria-label={ kit.T(ctx, "Choose a file") }>
+				<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 16V4m0 0 4 4m-4-4-4 4"></path><path d="M20 16v4H4v-4"></path></svg>
+			</button>
+			<div data-files>
+				<small data-hint>{ kit.T(ctx, "Drop a file here or click to choose") }</small>
+			</div>
+		</div>
+	</ot-upload>
 }
 
 // pasteField takes the content of the file pasted instead, with the header of the

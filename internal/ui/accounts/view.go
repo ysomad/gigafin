@@ -21,7 +21,7 @@ type newAccountData struct {
 }
 
 // accountForm is decoded from the new account form and the edit form of an account,
-// which has no currency and balance.
+// which has no currency, kind and balance.
 type accountForm struct {
 	Name        string `form:"name"`
 	Currency    string `form:"currency"`
@@ -39,13 +39,10 @@ type balanceForm struct {
 // accountData is the account page: the account and the values of its forms.
 type accountData struct {
 	Account domain.Account
-	Kinds   []domain.AccountKind
 	Edit    accountForm
 	Balance balanceForm
 	// Linked is the bank account the account syncs with, zero when none.
 	Linked domain.BankAccount
-	// Open is the form shown open, "edit" or "balance", empty for none.
-	Open string
 	// Days are the first page of the account's operations, MoreURL the next one.
 	Days     []kit.DayGroup
 	CatNames map[int64]string

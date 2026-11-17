@@ -88,81 +88,72 @@ templ accountPage(v kit.Page, d accountData) {
 		base := fmt.Sprintf("/accounts/%d", a.ID)
 	}}
 	@kit.Layout(v, false, nil) {
-		<div class="hstack mb-4">
-			if d.Linked.ID != 0 {
-				@kit.BankLogo(d.Linked.Bank, kit.T(ctx, d.Linked.Bank.Name())+" · "+d.Linked.Name)
-			}
-			<h1>{ a.Name }</h1>
-			<span class="badge outline">{ kit.T(ctx, string(a.Kind)) }</span>
-			if a.Archived {
-				@kit.ArchivedBadge()
-			}
-		</div>
-		<article class="card mb-4">
-			<div class="hstack justify-between">
-				<div>
-					<div class="text-light">{ kit.T(ctx, "Balance") }</div>
-					<h2>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></h2>
-				</div>
+		<div class="hstack justify-between mb-4">
+			<div class="hstack">
+				if d.Linked.ID != 0 {
+					@kit.BankLogo(d.Linked.Bank, kit.T(ctx, d.Linked.Bank.Name())+" · "+d.Linked.Name)
+				}
+				<h1>{ a.Name }</h1>
+				<span class="badge outline">{ kit.T(ctx, string(a.Kind)) }</span>
+				if a.Archived {
+					@kit.ArchivedBadge()
+				}
+			</div>
+			<div class="hstack">
 				if d.Linked.Mismatch(a) {
 					@kit.BankBadge(d.Linked, a)
 				}
+				<h2 aria-label={ kit.T(ctx, "Balance") }>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></h2>
 			</div>
-			if !a.CreditLimit.IsZero() {
-				<progress class="mt-2" value={ a.Owed().Fixed(a.Currency) } max={ a.CreditLimit.Fixed(a.Currency) } aria-label={ kit.T(ctx, "Owed") }></progress>
+		</div>
+		if !a.CreditLimit.IsZero() {
+			<div class="mb-4">
+				<progress value={ a.Owed().Fixed(a.Currency) } max={ a.CreditLimit.Fixed(a.Currency) } aria-label={ kit.T(ctx, "Owed") }></progress>
 				<div class="hstack justify-between text-light">
 					<span>{ kit.T(ctx, "owed %s", kit.Money(ctx, a.Owed(), a.Currency)) }</span>
 					<span>{ kit.T(ctx, "available %s of %s", kit.Money(ctx, a.Available(), a.Currency), kit.Money(ctx, a.CreditLimit, a.Currency)) }</span>
 				</div>
-			}
+			</div>
+		}
+		<article class="card mb-4 form-compact">
+			<h3>{ kit.T(ctx, "Set balance") }</h3>
+			<form id="form-balance" method="post" action={ base + "/balance" } class="row">
+				@kit.FormError(v.Errors.Form("balance"), "col-12")
+				{{ e := v.Errors.Get("balance") }}
+				@kit.Field("col-3", kit.T(ctx, "New balance"), e, "balance-error", nil) {
+					<input name="balance" inputmode="decimal" value={ kit.AmountInput(ctx, d.Balance.Target) } { kit.Invalid(e, "balance-error")... }/>
+				}
+				{{ e = v.Errors.Get("date") }}
+				@kit.Field("col-3", kit.T(ctx, "As of"), e, "date-error", nil) {
+					<input type="date" name="date" value={ d.Balance.Date } { kit.Invalid(e, "date-error")... }/>
+				}
+				@kit.SubmitColumn("col-3", "", kit.T(ctx, "Set"))
+			</form>
 		</article>
-		<details class="mb-2" open?={ d.Open == "edit" }>
-			<summary>{ kit.T(ctx, "Settings") }</summary>
-			<form id="form-edit" class="form-compact mt-2" method="post" action={ base } hx-disable="find button">
-				@kit.FormError(v.Errors.Form("edit"), "")
-				<fieldset class="row" aria-label={ kit.T(ctx, "Account") }>
-					{{ e := v.Errors.Get("name") }}
-					@kit.Field("col-4", kit.T(ctx, "Name"), e, "name-error", nil) {
-						<input name="name" value={ f.Name } { kit.Invalid(e, "name-error")... }/>
+		<article class="card mb-4 form-compact">
+			<div class="hstack justify-between">
+				<h3>{ kit.T(ctx, "Settings") }</h3>
+				@kit.ArchiveDelete("account", a.Archived)
+			</div>
+			<form id="form-edit" method="post" action={ base } class="row" hx-disable="find button">
+				@kit.FormError(v.Errors.Form("edit"), "col-12")
+				{{ e = v.Errors.Get("name") }}
+				@kit.Field("col-3", kit.T(ctx, "Name"), e, "name-error", nil) {
+					<input name="name" value={ f.Name } { kit.Invalid(e, "name-error")... }/>
+				}
+				if a.Kind == domain.AccountCredit {
+					{{ e = v.Errors.Get("credit_limit") }}
+					@kit.Field("col-3", kit.T(ctx, "Credit limit"), e, "credit-limit-error", nil) {
+						<input name="credit_limit" inputmode="decimal" value={ kit.AmountInput(ctx, f.CreditLimit) } { kit.Invalid(e, "credit-limit-error")... }/>
 					}
-					{{ e = v.Errors.Get("kind") }}
-					@kit.Field("col-4", kit.T(ctx, "Kind"), e, "kind-error", nil) {
-						@kindSelect(d.Kinds, f.Kind, e)
-					}
-					@creditLimitField("col-4", f.Kind, f.CreditLimit, v.Errors.Get("credit_limit"))
-				</fieldset>
-				<div class="hstack justify-between">
-					<button type="submit">{ kit.T(ctx, "Save") }</button>
-					@kit.ArchiveDelete("account", a.Archived)
-				</div>
+				}
+				@kit.SubmitColumn("col-3", "", kit.T(ctx, "Save"))
 			</form>
 			@kit.ArchiveDeleteForms("account", base, a.Archived, kit.T(ctx, "Delete account %s?", a.Name))
-		</details>
-		<details class="mb-4" open?={ d.Open == "balance" }>
-			<summary>{ kit.T(ctx, "Set balance") }</summary>
-			<form id="form-balance" class="form-compact mt-2" method="post" action={ base + "/balance" }>
-				@kit.FormError(v.Errors.Form("balance"), "")
-				<fieldset class="row" aria-label={ kit.T(ctx, "Set balance") }>
-					{{ e = v.Errors.Get("balance") }}
-					@kit.Field("col-4", kit.T(ctx, "New balance"), e, "balance-error", nil) {
-						<input name="balance" inputmode="decimal" value={ kit.AmountInput(ctx, d.Balance.Target) } { kit.Invalid(e, "balance-error")... }/>
-					}
-					{{ e = v.Errors.Get("date") }}
-					@kit.Field("col-4", kit.T(ctx, "As of"), e, "date-error", nil) {
-						<input type="date" name="date" value={ d.Balance.Date } { kit.Invalid(e, "date-error")... }/>
-					}
-					<div class="col-4 vstack gap-1">
-						<label aria-hidden="true">&nbsp;</label>
-						<div>
-							<button type="submit">{ kit.T(ctx, "Set") }</button>
-						</div>
-					</div>
-				</fieldset>
-			</form>
-		</details>
+		</article>
 		<div class="hstack justify-between">
 			<h2>{ kit.T(ctx, "Operations") }</h2>
-			<a href={ fmt.Sprintf("/operations?account=%d", a.ID) }>{ kit.T(ctx, "Filter") }</a>
+			<a class="button icon ghost" href={ fmt.Sprintf("/operations?account=%d", a.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></a>
 		</div>
 		if len(d.Days) > 0 {
 			<ul class="unstyled vstack gap-1">

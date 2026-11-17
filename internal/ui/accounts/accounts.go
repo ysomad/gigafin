@@ -87,7 +87,8 @@ func (h *Handler) renderAccountForm(
 }
 
 // accountInput validates the decoded account form, of a new account if create, and
-// returns the errors of its invalid inputs.
+// returns the errors of its invalid inputs. The edit form has no kind, its credit
+// limit is posted for credit accounts only.
 func accountInput(d accountForm, create bool) (domain.AccountInput, kit.FieldsError) {
 	errs := kit.FieldsError{}
 	in := domain.AccountInput{
@@ -107,7 +108,7 @@ func accountInput(d accountForm, create bool) (domain.AccountInput, kit.FieldsEr
 	if create && !money.ValidCurrency(in.Currency) {
 		errs["currency"] = domain.NewError(errors.ErrInvalid, "choose from the list")
 	}
-	if d.CreditLimit == "" || in.Kind != domain.AccountCredit {
+	if d.CreditLimit == "" || create && in.Kind != domain.AccountCredit {
 		return in, errs
 	}
 	var err error
@@ -171,7 +172,7 @@ func (h *Handler) renderAccount(
 		d.Linked = bankAccounts[i]
 	}
 	if fail.Form != "edit" {
-		d.Edit = accountForm{Name: a.Name, Kind: string(a.Kind)}
+		d.Edit = accountForm{Name: a.Name}
 		if !a.CreditLimit.IsZero() {
 			d.Edit.CreditLimit = a.CreditLimit.Fixed(a.Currency)
 		}
@@ -197,7 +198,7 @@ func (h *Handler) renderAccount(
 	if !next.IsZero() {
 		d.MoreURL = fmt.Sprintf("/operations?account=%d&cursor=%s", a.ID, url.QueryEscape(next.String()))
 	}
-	d.Open, d.Account, d.Kinds = fail.Form, a, domain.AccountKinds()
+	d.Account = a
 	return kit.Render(h.app, w, r, status, accountPage, kit.Page{
 		User: &user, Nav: "accounts", Title: "%s", TitleArgs: []any{a.Name},
 	}, d, fail)

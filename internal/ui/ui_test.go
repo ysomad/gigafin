@@ -619,13 +619,13 @@ func TestCreditAccount(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `value="50000.00"`)
 	status, body = b.postFrom(cardPath, cardPath, url.Values{
-		"name": {"Platinum"}, "kind": {"debit"}, "credit_limit": {"50000"},
+		"name": {"Platinum"}, "kind": {"debit"}, "credit_limit": {"60000"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	card, err = f.Accounts.Get(t.Context(), userID, card.ID)
 	require.NoError(t, err)
-	assert.Equal(t, domain.AccountDebit, card.Kind)
-	assert.True(t, card.CreditLimit.IsZero())
+	assert.Equal(t, domain.AccountCredit, card.Kind, "kind kept")
+	assert.Equal(t, "60000.00", card.CreditLimit.Fixed(card.Currency))
 }
 
 func TestImportUpload(t *testing.T) {
