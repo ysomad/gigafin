@@ -58,7 +58,7 @@ func TestRulesCRUD(t *testing.T) {
 	err = f.svc.Categories.Delete(ctx, f.userID, f.cafe.ID)
 	require.ErrorIs(t, err, errors.ErrConflict, "used by the rule")
 
-	list, err := rules.List(ctx, f.userID)
+	list, err := rules.List(ctx, f.userID, domain.RuleFilter{})
 	require.NoError(t, err)
 	assert.Len(t, list, 1)
 	require.NoError(t, rules.Delete(ctx, f.userID, rule.ID))
@@ -104,8 +104,9 @@ func TestRulesOnCreate(t *testing.T) {
 	assert.Equal(t, "mine", op.Note)
 
 	in.Payee, in.CategoryID = "Shop", 0
-	_, err = f.svc.Operations.Create(ctx, f.userID, in)
-	require.ErrorIs(t, err, errors.ErrInvalid, "no rule, no category")
+	op, err = f.svc.Operations.Create(ctx, f.userID, in)
+	require.NoError(t, err)
+	assert.Zero(t, op.CategoryID, "no rule, no category")
 }
 
 func TestRulesOnImport(t *testing.T) {
@@ -176,7 +177,7 @@ func TestLearnCategory(t *testing.T) {
 	}
 	learned := func() []domain.Rule {
 		t.Helper()
-		rules, err := f.svc.Rules.List(ctx, f.userID)
+		rules, err := f.svc.Rules.List(ctx, f.userID, domain.RuleFilter{})
 		require.NoError(t, err)
 		return rules
 	}
@@ -223,6 +224,80 @@ func TestLearnCategory(t *testing.T) {
 	rules = learned()
 	require.Len(t, rules, 1)
 	assert.True(t, rules[0].UsesCategory(f.cafe.ID), "learning is off")
+}
+
+func TestRulesLearn(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	ctx := t.Context()
+	require.NoError(t, f.svc.Settings.Set(ctx, f.userID, domain.Settings{AutoCategoryRules: false}))
+
+	in := func(date string, catID int64) domain.OperationInput {
+		return domain.OperationInput{
+			Type: domain.OpExpense, AccountID: f.card.ID, Amount: dec("10"), Date: day(t, date), Payee: "Samokat",
+			CategoryID: catID,
+		}
+	}
+	_, err := f.svc.Operations.CreateMany(ctx, f.userID, []domain.OperationInput{
+		in("2026-10-01", f.groceries.ID), in("2026-10-02", f.groceries.ID), {Type: domain.OpExpense},
+	})
+	require.ErrorIs(t, err, errors.ErrNotFound, "the third has no account")
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{})
+	require.NoError(t, err)
+	assert.Empty(t, ops, "all or none")
+
+	ops, err = f.svc.Operations.CreateMany(ctx, f.userID, []domain.OperationInput{
+		in("2026-10-01", f.groceries.ID), in("2026-10-02", f.groceries.ID), in("2026-10-03", f.groceries.ID),
+		in("2026-10-04", 0),
+	})
+	require.NoError(t, err)
+	require.Len(t, ops, 4)
+	assert.Zero(t, ops[3].CategoryID, "no rule yet, learning is off")
+
+	n, err := f.svc.Rules.Learn(ctx, f.userID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n, "learned even when learning is off")
+	n, err = f.svc.Rules.Learn(ctx, f.userID)
+	require.NoError(t, err)
+	assert.Zero(t, n, "nothing new")
+
+	changed, err := f.svc.Operations.Categorize(ctx, f.userID, domain.Filter{Uncategorized: true})
+	require.NoError(t, err)
+	assert.Equal(t, 1, changed)
+	op, err := f.svc.Operations.Get(ctx, f.userID, ops[3].ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.groceries.ID, op.CategoryID)
+}
+
+func TestRulesListFilter(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	ctx := t.Context()
+	samokat, err := f.svc.Rules.Create(ctx, f.userID, payeeRule(domain.CondIs, "samokat", f.groceries.ID))
+	require.NoError(t, err)
+	_, err = f.svc.Rules.Create(ctx, f.userID, payeeRule(domain.CondIs, "shop", f.cafe.ID))
+	require.NoError(t, err)
+
+	for name, tc := range map[string]struct {
+		filter domain.RuleFilter
+		want   []int64
+	}{
+		"none":          {domain.RuleFilter{}, []int64{samokat.ID, samokat.ID + 1}},
+		"value":         {domain.RuleFilter{Query: "SAMO"}, []int64{samokat.ID}},
+		"category name": {domain.RuleFilter{Query: "grocer"}, []int64{samokat.ID}},
+		"category id":   {domain.RuleFilter{CategoryIDs: []int64{f.groceries.ID}}, []int64{samokat.ID}},
+		"no match":      {domain.RuleFilter{Origin: domain.RuleOriginLearned}, nil},
+	} {
+		rules, err := f.svc.Rules.List(ctx, f.userID, tc.filter)
+		require.NoError(t, err, name)
+		var ids []int64
+		for _, r := range rules {
+			ids = append(ids, r.ID)
+		}
+		assert.Equal(t, tc.want, ids, name)
+	}
+	_, err = f.svc.Rules.List(ctx, f.userID, domain.RuleFilter{Stage: "later"})
+	require.ErrorIs(t, err, errors.ErrInvalid)
 }
 
 func TestRulesRun(t *testing.T) {
@@ -372,7 +447,7 @@ func TestLearnCategoryOldOperation(t *testing.T) {
 		Date: old.Date, Payee: "Samokat",
 	})
 	require.NoError(t, err)
-	rules, err := f.svc.Rules.List(ctx, f.userID)
+	rules, err := f.svc.Rules.List(ctx, f.userID, domain.RuleFilter{})
 	require.NoError(t, err)
 	require.Len(t, rules, 1, "learned from the operations around the old one")
 	assert.True(t, rules[0].UsesCategory(f.groceries.ID))

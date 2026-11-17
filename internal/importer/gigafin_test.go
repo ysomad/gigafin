@@ -44,7 +44,7 @@ func TestGigaFinParse(t *testing.T) {
 	r = res.Rows[1]
 	assert.True(t, r.DateOnly)
 	assert.Equal(t, time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC), r.Time)
-	assert.Equal(t, "Uncategorized", r.Category)
+	assert.Empty(t, r.Category, "no category")
 
 	r = res.Rows[2]
 	assert.True(t, r.IsTransfer())
@@ -208,6 +208,6 @@ func TestWriteGigaFin(t *testing.T) {
 	assert.Equal(t, "1", res.Rows[1].Group)
 	assert.Equal(t, "lamp", res.Rows[1].Note)
 	assert.Equal(t, "Savings", res.Rows[3].ToAccount)
-	assert.Equal(t, "Uncategorized", res.Rows[4].Category)
+	assert.Empty(t, res.Rows[4].Category)
 	assert.Equal(t, "1", res.Rows[5].Group, "a part on another day stays in its split")
 }

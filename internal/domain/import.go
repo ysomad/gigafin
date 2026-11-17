@@ -327,18 +327,15 @@ type ImportMapping struct {
 	Accounts map[string]Account
 	// Categories is keyed by CategoryKey.
 	Categories map[string]Category
-	// Uncategorized, when set, is the category of every row of a kind in place of
-	// Categories, such as for bank syncs.
-	Uncategorized map[Kind]Category
+	// NoCategories leaves every expense and income without a category in place of
+	// Categories, such as for bank syncs, whose rows rules categorize.
+	NoCategories bool
 }
 
-// category returns the category the bank category name of kind maps to.
-func (m ImportMapping) category(kind Kind, name string) (Category, bool) {
-	if c, ok := m.Uncategorized[kind]; ok {
-		return c, true
-	}
-	c, ok := m.Categories[CategoryKey(kind, name)]
-	return c, ok
+// uncategorized reports whether rows of the bank category name get no category: all
+// rows with NoCategories, else rows without a bank category.
+func (m ImportMapping) uncategorized(name string) bool {
+	return m.NoCategories || name == ""
 }
 
 // Preview is a staged import with what is still needed to commit it.
@@ -462,14 +459,14 @@ func NewPreview(im Import, rows []ImportRow, m ImportMapping, rules []AccountKin
 			p.Accounts[i].Rows++
 		}
 
-		if r.PairID != 0 || r.Row.IsTransfer() {
+		if r.PairID != 0 || r.Row.IsTransfer() || m.uncategorized(r.Row.Category) {
 			continue
 		}
 		ck := CategoryKey(r.Row.Kind(), r.Row.Category)
 		j, ok := catIdx[ck]
 		if !ok {
 			need := CategoryNeed{Name: r.Row.Category, Kind: r.Row.Kind()}
-			if c, ok := m.category(need.Kind, need.Name); ok && c.Kind == need.Kind {
+			if c, ok := m.Categories[ck]; ok && c.Kind == need.Kind {
 				need.CategoryID = c.ID
 			}
 			j = len(p.Categories)
@@ -585,7 +582,10 @@ func rowOperation(r ImportRow, pair *ImportRow, m ImportMapping, loc *time.Locat
 	if r.Row.Kind() == KindIncome {
 		in.Type = OpIncome
 	}
-	cat, ok := m.category(r.Row.Kind(), r.Row.Category)
+	if m.uncategorized(r.Row.Category) {
+		return in, nil
+	}
+	cat, ok := m.Categories[CategoryKey(r.Row.Kind(), r.Row.Category)]
 	if !ok {
 		return OperationInput{}, notReady
 	}

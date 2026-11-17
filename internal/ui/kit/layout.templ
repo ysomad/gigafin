@@ -18,7 +18,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<script src="/static/lib/uplot.min.js" defer></script>
 			<script src="/static/lib/oat.min.js" defer></script>
 			<script src="/static/operation-tags.js" defer></script>
-			<script src="/static/dashboard.js" defer></script>
+			<script src="/static/analytics.js" defer></script>
 			<script src="/static/app.js" defer></script>
 		</head>
 		<body id="top" hx-boost:inherited="true">
@@ -27,7 +27,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 					<a href="/" class="unstyled brand"><strong>GIGAFIN</strong></a>
 					if v.User != nil {
 						<div class="hstack gap-1">
-							@navLink("/", v.Nav == "dashboard", T(ctx, "Dashboard"))
+							@navLink("/", v.Nav == "analytics", T(ctx, "Analytics"))
 							@navLink("/operations", v.Nav == "operations", T(ctx, "Operations"))
 							@navLink("/accounts", v.Nav == "accounts", T(ctx, "Accounts"))
 							@navLink("/plans", v.Nav == "plans", T(ctx, "Plans"))
@@ -92,6 +92,6 @@ templ Toast(variant, msg string) {
 templ NotFound(v Page, _ struct{}) {
 	@Layout(v, false, nil) {
 		<h1>{ T(ctx, "Not found") }</h1>
-		<p><a href="/">{ T(ctx, "Back to dashboard") }</a></p>
+		<p><a href="/">{ T(ctx, "Back to analytics") }</a></p>
 	}
 }

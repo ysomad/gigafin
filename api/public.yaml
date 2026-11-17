@@ -364,6 +364,24 @@ paths:
                 $ref: "#/components/schemas/RulesRunResult"
         default:
           $ref: "#/components/responses/Error"
+  /rules/learn:
+    post:
+      operationId: learnRules
+      tags: [Rules]
+      summary: Learn rules from all operations
+      description: >-
+        Each payee whose category is the same in 3 of its 5 latest expenses and income gets a
+        learned rule "payee is X → set category", or its learned rule is pointed at that category.
+        Runs even when learning is off.
+      responses:
+        "200":
+          description: Number of rules created or changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulesLearnResult"
+        default:
+          $ref: "#/components/responses/Error"
   /rules/settings:
     get:
       operationId: getRuleSettings
@@ -544,7 +562,7 @@ components:
         category_id:
           type: integer
           format: int64
-          description: Category of an expense or income, root or nested; not set for transfers and adjustments.
+          description: Category of an expense or income, root or nested; unset for none, and for transfers and adjustments.
         amount:
           allOf: [{$ref: "#/components/schemas/Amount"}]
           description: Positive, except for adjustments where the sign is the balance change.
@@ -568,7 +586,7 @@ components:
         category_id:
           type: integer
           format: int64
-          description: Category of an expense or income.
+          description: Category of an expense or income; unset when it has none.
         origin_id:
           type: integer
           format: int64
@@ -603,6 +621,9 @@ components:
           type: integer
           format: int64
           description: A root category also matches its nested categories.
+        uncategorized:
+          type: boolean
+          description: Only expenses and income without a category; not with category_id.
         type: {$ref: "#/components/schemas/OperationType"}
         date_from: {type: string, format: date}
         date_to: {type: string, format: date}
@@ -753,3 +774,10 @@ components:
         changed:
           type: integer
           description: Number of operations changed.
+    RulesLearnResult:
+      type: object
+      required: [learned]
+      properties:
+        learned:
+          type: integer
+          description: Number of rules created or changed.

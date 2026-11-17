@@ -8,6 +8,7 @@ import (
 )
 
 templ formPage(v kit.Page, d ruleForm) {
+	{{ base := fmt.Sprintf("/rules/%d", d.ID) }}
 	@kit.Layout(v, false, nil) {
 		<h1>
 			if d.ID != 0 {
@@ -20,21 +21,22 @@ templ formPage(v kit.Page, d ruleForm) {
 			}
 		</h1>
 		if d.Applied >= 0 {
-			<p role="status" class="badge" data-variant="success">{ kit.T(ctx, "Changed %d operations.", d.Applied) }</p>
+			<p role="status" class="badge mb-4" data-variant="success">{ kit.T(ctx, "Changed %d operations.", d.Applied) }</p>
 		}
 		<form
 			id="form-rule"
+			class="form-compact"
 			method="post"
 			if d.ID != 0 {
-				action={ fmt.Sprintf("/rules/%d", d.ID) }
+				action={ base }
 			} else {
 				action="/rules"
 			}
 		>
 			@kit.FormError(v.Errors.Form("rule"), "")
-			<div class="row mb-4">
+			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Rule") }>
 				{{ e := v.Errors.Get("stage") }}
-				@kit.Field("col-4", kit.T(ctx, "Runs"), e, "", nil) {
+				@kit.Field("col-6", kit.T(ctx, "Runs"), e, "", nil) {
 					<select name="stage" { kit.Invalid(e, "")... }>
 						for _, s := range domain.RuleStages() {
 							<option value={ string(s) } selected?={ s == d.Stage }>{ ruleStageLabel(ctx, s) }</option>
@@ -42,48 +44,50 @@ templ formPage(v kit.Page, d ruleForm) {
 					</select>
 				}
 				{{ e = v.Errors.Get("match") }}
-				@kit.Field("col-4", kit.T(ctx, "Match"), e, "", nil) {
+				@kit.Field("col-6", kit.T(ctx, "Match"), e, "", nil) {
 					<select name="match" { kit.Invalid(e, "")... }>
 						<option value="all" selected?={ d.Match == domain.RuleMatchAll }>{ kit.T(ctx, "all conditions") }</option>
 						<option value="any" selected?={ d.Match == domain.RuleMatchAny }>{ kit.T(ctx, "any condition") }</option>
 					</select>
 				}
-			</div>
-			<h2>{ kit.T(ctx, "If") }</h2>
-			<div id="conditions">
-				for i, c := range d.Conditions {
-					@condFields(c, d.Fields, d.Categories, d.Accounts, i, v.Errors)
-				}
-			</div>
-			<div class="hstack mb-4">
+			</fieldset>
+			<article class="card mb-4">
+				<h3>{ kit.T(ctx, "If") }</h3>
+				<div id="conditions">
+					for i, c := range d.Conditions {
+						@condFields(c, d.Fields, d.Categories, d.Accounts, i, v.Errors)
+					}
+				</div>
 				<button type="button" class="outline small" hx-get="/rules/condition" hx-target="#conditions" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add condition") }</button>
-			</div>
-			<h2>{ kit.T(ctx, "Then") }</h2>
-			<div id="rule-actions">
-				for i, a := range d.Actions {
-					@actionFields(a, d.Categories, i, v.Errors)
-				}
-			</div>
-			<div class="hstack mb-4">
+			</article>
+			<article class="card mb-4">
+				<h3>{ kit.T(ctx, "Then") }</h3>
+				<div id="rule-actions">
+					for i, a := range d.Actions {
+						@actionFields(a, d.Categories, i, v.Errors)
+					}
+				</div>
 				<button type="button" class="outline small" hx-get="/rules/action" hx-target="#rule-actions" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add action") }</button>
-			</div>
-			<div class="hstack mb-4">
-				<button type="submit">{ kit.T(ctx, "Save") }</button>
-				<button type="button" class="outline" hx-post="/rules/preview" hx-target="#preview" data-variant="secondary">{ kit.T(ctx, "Show matches") }</button>
-				@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Cancel"))
+			</article>
+			<div class="hstack justify-between mb-4">
+				<div class="hstack">
+					<button type="submit">{ kit.T(ctx, "Save") }</button>
+					<button type="button" class="outline" hx-post="/rules/preview" hx-target="#preview" data-variant="secondary">{ kit.T(ctx, "Show matches") }</button>
+					if d.ID != 0 {
+						<button type="submit" form="rule-apply" class="outline" data-variant="secondary">{ kit.T(ctx, "Apply to matching operations") }</button>
+					}
+					@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Cancel"))
+				</div>
+				if d.ID != 0 {
+					<button type="submit" form="rule-delete" class="outline" data-variant="danger">{ kit.T(ctx, "Delete") }</button>
+				}
 			</div>
 		</form>
-		<div id="preview"></div>
 		if d.ID != 0 {
-			<div class="hstack mb-4">
-				<form method="post" action={ fmt.Sprintf("/rules/%d/apply", d.ID) } hx-confirm={ kit.T(ctx, "Apply the saved rule to all operations it matches?") }>
-					<button type="submit" data-variant="secondary">{ kit.T(ctx, "Apply to matching operations") }</button>
-				</form>
-				<form method="post" action={ fmt.Sprintf("/rules/%d/delete", d.ID) } hx-confirm={ kit.T(ctx, "Delete this rule?") }>
-					<button type="submit" class="outline" data-variant="secondary">{ kit.T(ctx, "Delete rule") }</button>
-				</form>
-			</div>
+			<form id="rule-apply" method="post" action={ base + "/apply" } hx-confirm={ kit.T(ctx, "Apply the saved rule to all operations it matches?") }></form>
+			<form id="rule-delete" method="post" action={ base + "/delete" } hx-confirm={ kit.T(ctx, "Delete this rule?") }></form>
 		}
+		<div id="preview"></div>
 	}
 }
 
@@ -97,21 +101,21 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 		valueErr := errs.Get(fmt.Sprintf("cond_value[%d]", index))
 	}}
 	<div class="cond row mb-4">
-		@kit.Field("col-4", kit.T(ctx, "Field"), fieldErr, "", nil) {
+		@kit.Field("col-3", kit.T(ctx, "Field"), fieldErr, "", nil) {
 			<select name="cond_field" hx-get="/rules/condition" hx-include="closest .cond" hx-target="closest .cond" hx-swap="outerHTML">
 				for _, f := range fields {
 					<option value={ string(f.Field) } selected?={ f.Field == r.Field }>{ ruleFieldLabel(ctx, f.Field) }</option>
 				}
 			</select>
 		}
-		@kit.Field("col-4", kit.T(ctx, "Condition"), opErr, "", nil) {
+		@kit.Field("col-3", kit.T(ctx, "Condition"), opErr, "", nil) {
 			<select name="cond_op">
 				for _, op := range r.Ops {
 					<option value={ string(op) } selected?={ op == r.Op }>{ ruleOpLabel(ctx, op) }</option>
 				}
 			</select>
 		}
-		@kit.Field("col-4", kit.T(ctx, "Value"), valueErr, "", nil) {
+		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			switch r.Field {
 				case domain.RuleFieldCategory:
 					<select name="cond_value">
@@ -132,10 +136,10 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 						}
 					</select>
 				default:
-					<input name="cond_value" value={ r.Value } autocomplete="off" placeholder={ kit.T(ctx, "one of and between take values separated by |") }/>
+					<input name="cond_value" value={ r.Value } autocomplete="off" placeholder={ kit.T(ctx, "Several values:") + " a " + _ruleValueSep + " b" }/>
 			}
 		}
-		<div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .cond" hx-swap="delete" aria-label={ kit.T(ctx, "Remove condition") } data-variant="secondary">✕</button></div>
+		@removeColumn(".cond", kit.T(ctx, "Remove condition"))
 	</div>
 }
 
@@ -148,14 +152,14 @@ templ actionFields(r actionRow, categories []domain.Category, index int, errs *k
 		valueErr := errs.Get(fmt.Sprintf("act_value[%d]", index))
 	}}
 	<div class="act row mb-4">
-		@kit.Field("col-4", kit.T(ctx, "Action"), typeErr, "", nil) {
+		@kit.Field("col-6", kit.T(ctx, "Action"), typeErr, "", nil) {
 			<select name="act_type" hx-get="/rules/action" hx-include="closest .act" hx-target="closest .act" hx-swap="outerHTML">
 				for _, typ := range domain.ActionTypes() {
 					<option value={ string(typ) } selected?={ typ == r.Type }>{ ruleActionLabel(ctx, typ) }</option>
 				}
 			</select>
 		}
-		@kit.Field("col-4", kit.T(ctx, "Value"), valueErr, "", nil) {
+		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			if r.Type == domain.ActionSetCategory {
 				<select name="act_value">
 					<option value="">—</option>
@@ -165,7 +169,16 @@ templ actionFields(r actionRow, categories []domain.Category, index int, errs *k
 				<input name="act_value" value={ r.Value } autocomplete="off"/>
 			}
 		}
-		<div class="col-12 hstack"><button type="button" class="outline small" hx-get="/noop" hx-target="closest .act" hx-swap="delete" aria-label={ kit.T(ctx, "Remove action") } data-variant="secondary">✕</button></div>
+		@removeColumn(".act", kit.T(ctx, "Remove action"))
+	</div>
+}
+
+// removeColumn is the button removing the closest row of selector, labeled label, in
+// the last column of the row under an empty caption, so it lines up with the inputs.
+templ removeColumn(selector, label string) {
+	<div class="col-1 vstack gap-1">
+		<label aria-hidden="true">&nbsp;</label>
+		<div><button type="button" class="outline" hx-get="/noop" hx-target={ "closest " + selector } hx-swap="delete" aria-label={ label } title={ label } data-variant="secondary">✕</button></div>
 	</div>
 }
 
@@ -174,7 +187,7 @@ templ previewList(d rulePreview) {
 	if d.Error != nil {
 		<p role="alert" data-variant="danger">{ kit.ErrMsg(ctx, d.Error) }</p>
 	} else if d.Total > 0 {
-		<p>{ kit.T(ctx, "Matches %d operations, the latest:", d.Total) }</p>
+		<p class="text-light">{ kit.T(ctx, "Matches %d operations, the latest:", d.Total) }</p>
 		<ul class="unstyled vstack gap-1">
 			@kit.OpRows(d.Days, d.CatNames, d.AccByID, "")
 		</ul>

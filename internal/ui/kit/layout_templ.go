@@ -55,7 +55,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " · gigafin</title><link rel=\"stylesheet\" href=\"/static/lib/oat.min.css\"><link rel=\"stylesheet\" href=\"/static/lib/uplot.min.css\"><link rel=\"stylesheet\" href=\"/static/app.css\"><script src=\"/static/lib/htmx.min.js\" defer></script><script src=\"/static/lib/uplot.min.js\" defer></script><script src=\"/static/lib/oat.min.js\" defer></script><script src=\"/static/operation-tags.js\" defer></script><script src=\"/static/dashboard.js\" defer></script><script src=\"/static/app.js\" defer></script></head><body id=\"top\" hx-boost:inherited=\"true\"><header data-topnav><nav class=\"container hstack justify-between\"><a href=\"/\" class=\"unstyled brand\"><strong>GIGAFIN</strong></a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " · gigafin</title><link rel=\"stylesheet\" href=\"/static/lib/oat.min.css\"><link rel=\"stylesheet\" href=\"/static/lib/uplot.min.css\"><link rel=\"stylesheet\" href=\"/static/app.css\"><script src=\"/static/lib/htmx.min.js\" defer></script><script src=\"/static/lib/uplot.min.js\" defer></script><script src=\"/static/lib/oat.min.js\" defer></script><script src=\"/static/operation-tags.js\" defer></script><script src=\"/static/analytics.js\" defer></script><script src=\"/static/app.js\" defer></script></head><body id=\"top\" hx-boost:inherited=\"true\"><header data-topnav><nav class=\"container hstack justify-between\"><a href=\"/\" class=\"unstyled brand\"><strong>GIGAFIN</strong></a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -64,7 +64,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = navLink("/", v.Nav == "dashboard", T(ctx, "Dashboard")).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = navLink("/", v.Nav == "analytics", T(ctx, "Analytics")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -399,7 +399,7 @@ func NotFound(v Page, _ struct{}) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
-			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "Back to dashboard"))
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "Back to analytics"))
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 95, Col: 46}
 			}

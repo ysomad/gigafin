@@ -283,6 +283,45 @@ func TestFillEmpty(t *testing.T) {
 	assert.Equal(t, "mine", got.Note)
 }
 
+func TestLearnCategories(t *testing.T) {
+	t.Parallel()
+
+	date, err := timex.ParseDate("2026-10-29")
+	require.NoError(t, err)
+	var (
+		ops []domain.Operation
+		id  int64 = 100
+	)
+	add := func(payee string, cat int64) {
+		id--
+		ops = append(ops, domain.Operation{
+			ID: id, Type: domain.OpExpense, CategoryID: cat, Payee: payee, Date: date.AddDate(0, 0, -len(ops)),
+		})
+	}
+	// newest first; the newest of Shop has no category, so the one before it counts
+	add("Shop", 0)
+	add("Cafe Bar", 11)
+	add("SHOP", 10)
+	add("cafe bar", 11)
+	add("Shop", 10)
+	add("Cafe Bar", 10)
+	add("shop", 10)
+	add("Cafe bar", 11)
+	add("Once", 10)
+
+	got := domain.LearnCategories(ops, nil, _ruleCats)
+	require.Len(t, got, 2, "Once has too few uses")
+	assert.Equal(t, []domain.Condition{cond(domain.RuleFieldPayee, domain.CondIs, "SHOP")}, got[0].Conditions,
+		"payees ignore case; the rule takes the latest categorized spelling")
+	assert.Equal(t, []domain.Action{setCategory(10)}, got[0].Actions)
+	assert.Equal(t, []domain.Condition{cond(domain.RuleFieldPayee, domain.CondIs, "Cafe Bar")}, got[1].Conditions)
+	assert.Equal(t, []domain.Action{setCategory(11)}, got[1].Actions)
+
+	learned := []domain.Rule{got[0], got[1]}
+	learned[0].ID, learned[1].ID = 1, 2
+	assert.Empty(t, domain.LearnCategories(ops, learned, _ruleCats), "nothing new to learn")
+}
+
 func TestLearnCategory(t *testing.T) {
 	t.Parallel()
 
@@ -393,4 +432,62 @@ func TestRuleUsesCategory(t *testing.T) {
 	assert.True(t, rule.UsesCategory(11))
 	assert.True(t, rule.UsesCategory(20))
 	assert.False(t, rule.UsesCategory(12))
+}
+
+func TestRuleFilterMatch(t *testing.T) {
+	t.Parallel()
+
+	rule := domain.Rule{
+		Stage: domain.RuleStageDefault, Match: domain.RuleMatchAll, Origin: domain.RuleOriginLearned,
+		Conditions: []domain.Condition{
+			cond(domain.RuleFieldPayee, domain.CondIs, "Ёлка Market"),
+			cond(domain.RuleFieldAccount, domain.CondIs, "3"),
+		},
+		Actions: []domain.Action{setCategory(11), {Type: domain.ActionAddTag, Value: "trip"}},
+	}
+	names := map[int64]string{10: "Food", 11: "Food / Cafe"}
+	tests := []struct {
+		name string
+		give domain.RuleFilter
+		want bool
+	}{
+		{name: "empty", give: domain.RuleFilter{}, want: true},
+		{name: "query in a value ignoring case and ё", give: domain.RuleFilter{Query: " елка market "}, want: true},
+		{name: "query in a category name", give: domain.RuleFilter{Query: "cafe"}, want: true},
+		{name: "query in an action value", give: domain.RuleFilter{Query: "TRIP"}, want: true},
+		{name: "query not found", give: domain.RuleFilter{Query: "taxi"}},
+		{name: "stage", give: domain.RuleFilter{Stage: domain.RuleStageDefault}, want: true},
+		{name: "other stage", give: domain.RuleFilter{Stage: domain.RuleStagePre}},
+		{name: "origin", give: domain.RuleFilter{Origin: domain.RuleOriginLearned}, want: true},
+		{name: "other origin", give: domain.RuleFilter{Origin: domain.RuleOriginUser}},
+		{name: "field", give: domain.RuleFilter{Field: domain.RuleFieldAccount}, want: true},
+		{name: "other field", give: domain.RuleFilter{Field: domain.RuleFieldAmount}},
+		{name: "action", give: domain.RuleFilter{Action: domain.ActionAddTag}, want: true},
+		{name: "other action", give: domain.RuleFilter{Action: domain.ActionSetNote}},
+		{name: "category or its parent", give: domain.RuleFilter{CategoryIDs: []int64{10, 11}}, want: true},
+		{name: "other category", give: domain.RuleFilter{CategoryIDs: []int64{10}}},
+		{name: "account", give: domain.RuleFilter{AccountID: 3}, want: true},
+		{name: "other account", give: domain.RuleFilter{AccountID: 4}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.give.Match(rule, names))
+		})
+	}
+}
+
+func TestRuleFilterCountAndValidate(t *testing.T) {
+	t.Parallel()
+
+	f := domain.RuleFilter{Query: "x"}
+	assert.True(t, f.Filtered())
+	assert.Zero(t, f.Count(), "the query is not counted")
+	f = domain.RuleFilter{Stage: domain.RuleStagePost, CategoryIDs: []int64{1, 2}}
+	assert.Equal(t, 2, f.Count())
+	require.NoError(t, f.Validate())
+	require.ErrorIs(t, domain.RuleFilter{Stage: "late"}.Validate(), errors.ErrInvalid)
+	require.ErrorIs(t, domain.RuleFilter{Origin: "bot"}.Validate(), errors.ErrInvalid)
+	require.ErrorIs(t, domain.RuleFilter{Field: "color"}.Validate(), errors.ErrInvalid)
+	require.ErrorIs(t, domain.RuleFilter{Action: "delete"}.Validate(), errors.ErrInvalid)
 }

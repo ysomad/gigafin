@@ -17,9 +17,9 @@ import (
 	"github.com/ysomad/gigafin/internal/i18n"
 	"github.com/ysomad/gigafin/internal/service"
 	"github.com/ysomad/gigafin/internal/ui/accounts"
+	"github.com/ysomad/gigafin/internal/ui/analytics"
 	"github.com/ysomad/gigafin/internal/ui/auth"
 	"github.com/ysomad/gigafin/internal/ui/categories"
-	"github.com/ysomad/gigafin/internal/ui/dashboard"
 	"github.com/ysomad/gigafin/internal/ui/imports"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 	"github.com/ysomad/gigafin/internal/ui/operations"
@@ -96,7 +96,7 @@ func (u *UI) Register(mux *http.ServeMux) error {
 	mux.HandleFunc("GET /noop", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	features := []interface{ Routes() map[string]kit.Handler }{
-		dashboard.New(u.app),
+		analytics.New(u.app),
 		operations.New(u.app),
 		accounts.New(u.app),
 		categories.New(u.app),

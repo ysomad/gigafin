@@ -1,4 +1,4 @@
-// Draws dashboard trends with uPlot: income vs expense bars per month with a net worth
+// Draws analytics trends with uPlot: income vs expense bars per month with a net worth
 // line on its own scale and right axis. Each figure.trend holds its series as JSON, see
 // ui.trendChart.
 (() => {
@@ -45,7 +45,7 @@
         maximumFractionDigits: fig.hasAttribute('data-minor-units') ? 2 : 0,
       });
       const d = JSON.parse(fig.querySelector('script').textContent);
-      // translated series labels, see internal/ui/dashboard/dashboard.templ
+      // translated series labels, see internal/ui/analytics/analytics.templ
       const label = fig.dataset;
       const networth = d.balance != null;
       const axis = { stroke: palette['muted-foreground'], grid: { stroke: palette.border, width: 1 }, ticks: { show: false } };

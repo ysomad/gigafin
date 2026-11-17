@@ -59,14 +59,16 @@ func TestBuildOperationCategory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(10), op.CategoryID)
 
+	in.CategoryID = 0
+	op, err = domain.NewOperation(in, acc, nil, nil, nil)
+	require.NoError(t, err, "an expense may have no category")
+	assert.Zero(t, op.CategoryID)
+	in.CategoryID = 10
+
 	tests := map[string]struct {
 		in  func(domain.OperationInput) domain.OperationInput
 		cat *domain.Category
 	}{
-		"no category": {in: func(in domain.OperationInput) domain.OperationInput {
-			in.CategoryID = 0
-			return in
-		}},
 		"category not found": {in: func(in domain.OperationInput) domain.OperationInput { return in }},
 		"wrong kind": {
 			in: func(in domain.OperationInput) domain.OperationInput {

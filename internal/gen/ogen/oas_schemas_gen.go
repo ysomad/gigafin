@@ -550,7 +550,7 @@ type Operation struct {
 	Type        OperationType `json:"type"`
 	AccountID   int64         `json:"account_id"`
 	ToAccountID OptInt64      `json:"to_account_id"`
-	// Category of an expense or income.
+	// Category of an expense or income; unset when it has none.
 	CategoryID OptInt64 `json:"category_id"`
 	// Id of the operation a split started from, shared by all its parts; unset when never split.
 	OriginID OptInt64  `json:"origin_id"`
@@ -758,7 +758,7 @@ type OperationInput struct {
 	AccountID int64         `json:"account_id"`
 	// Destination of a transfer, same currency as account_id.
 	ToAccountID OptInt64 `json:"to_account_id"`
-	// Category of an expense or income, root or nested; not set for transfers and adjustments.
+	// Category of an expense or income, root or nested; unset for none, and for transfers and adjustments.
 	CategoryID OptInt64 `json:"category_id"`
 	// Positive, except for adjustments where the sign is the balance change.
 	Amount Amount    `json:"amount"`
@@ -900,10 +900,12 @@ func (s *OperationList) SetNextCursor(val OptString) {
 type OperationQuery struct {
 	AccountID OptInt64 `json:"account_id"`
 	// A root category also matches its nested categories.
-	CategoryID OptInt64         `json:"category_id"`
-	Type       OptOperationType `json:"type"`
-	DateFrom   OptDate          `json:"date_from"`
-	DateTo     OptDate          `json:"date_to"`
+	CategoryID OptInt64 `json:"category_id"`
+	// Only expenses and income without a category; not with category_id.
+	Uncategorized OptBool          `json:"uncategorized"`
+	Type          OptOperationType `json:"type"`
+	DateFrom      OptDate          `json:"date_from"`
+	DateTo        OptDate          `json:"date_to"`
 	// Substring of payee or note.
 	Query OptString `json:"query"`
 	// Tag name, matched exactly.
@@ -925,6 +927,11 @@ func (s *OperationQuery) GetAccountID() OptInt64 {
 // GetCategoryID returns the value of CategoryID.
 func (s *OperationQuery) GetCategoryID() OptInt64 {
 	return s.CategoryID
+}
+
+// GetUncategorized returns the value of Uncategorized.
+func (s *OperationQuery) GetUncategorized() OptBool {
+	return s.Uncategorized
 }
 
 // GetType returns the value of Type.
@@ -980,6 +987,11 @@ func (s *OperationQuery) SetAccountID(val OptInt64) {
 // SetCategoryID sets the value of CategoryID.
 func (s *OperationQuery) SetCategoryID(val OptInt64) {
 	s.CategoryID = val
+}
+
+// SetUncategorized sets the value of Uncategorized.
+func (s *OperationQuery) SetUncategorized(val OptBool) {
+	s.Uncategorized = val
 }
 
 // SetType sets the value of Type.
@@ -2403,6 +2415,22 @@ func (s *RuleStage) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Ref: #/components/schemas/RulesLearnResult
+type RulesLearnResult struct {
+	// Number of rules created or changed.
+	Learned int `json:"learned"`
+}
+
+// GetLearned returns the value of Learned.
+func (s *RulesLearnResult) GetLearned() int {
+	return s.Learned
+}
+
+// SetLearned sets the value of Learned.
+func (s *RulesLearnResult) SetLearned(val int) {
+	s.Learned = val
 }
 
 // Ref: #/components/schemas/RulesRunResult

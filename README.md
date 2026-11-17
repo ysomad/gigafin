@@ -42,6 +42,7 @@
 - [x] Use templ instead of go templates
 - [x] tbank sync, balance check (if does not count - show alert)
 - [ ] rules event sourcing
+- [x] Rename dashboard to analytics
 - [ ] category icons
 
 ## Extra feats

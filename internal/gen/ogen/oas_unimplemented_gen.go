@@ -113,6 +113,17 @@ func (UnimplementedHandler) GetRuleSettings(ctx context.Context) (r *RuleSetting
 	return r, ht.ErrNotImplemented
 }
 
+// LearnRules implements learnRules operation.
+//
+// Each payee whose category is the same in 3 of its 5 latest expenses and income gets a learned rule
+// "payee is X → set category", or its learned rule is pointed at that category. Runs even when
+// learning is off.
+//
+// POST /rules/learn
+func (UnimplementedHandler) LearnRules(ctx context.Context) (r *RulesLearnResult, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListAccounts implements listAccounts operation.
 //
 // List accounts with balances.

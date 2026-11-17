@@ -292,13 +292,12 @@ func (s *Banks) Disconnect(ctx context.Context, userID int64, bank domain.Bank) 
 // operations of those bank accounts in one run, so transfers between them pair: of an
 // account with operations since the day after its last one, else all, and then sets
 // its opening balance so the balance matches the bank. Neither side of a link may sync
-// with another one already. Times are read in loc, and the operations go to the
-// categories named uncategorized before rules run.
+// with another one already. Times are read in loc, and the operations come without a
+// category for rules to set.
 //
 //nolint:cyclop,funlen,nestif // one transaction checking each link, then the sync
 func (s *Banks) Link(
 	ctx context.Context, userID int64, bank domain.Bank, links []domain.BankLink, loc *time.Location,
-	uncategorized string,
 ) (domain.BankSync, error) {
 	c, err := s.client(bank)
 	if err != nil {
@@ -398,7 +397,7 @@ func (s *Banks) Link(
 	s.log.InfoContext(ctx, "bank accounts linked", slog.Int64("user_id", userID), slog.String("bank", string(bank)),
 		slog.Int("count", len(links)))
 
-	n, sums, err := s.run(ctx, userID, c, loc, uncategorized, &conn, starts, now)
+	n, sums, err := s.run(ctx, userID, c, loc, &conn, starts, now)
 	res, err := s.finish(ctx, userID, &conn, now, n, err)
 	if err != nil || len(res.NeedsLogin) > 0 {
 		return res, err
@@ -425,12 +424,12 @@ func (s *Banks) Link(
 }
 
 // Sync reads the accounts at bank and imports the operations of the linked ones since
-// each was synced last, into the categories named uncategorized before rules run.
+// each was synced last, without a category for rules to set.
 // Unless force is set it does nothing within SyncInterval of the last sync, nor
 // without a connection or when the bank is disabled. Times are read in loc. The sync
 // goes on when ctx is canceled, as the session it rotates must be stored.
 func (s *Banks) Sync(
-	ctx context.Context, userID int64, bank domain.Bank, loc *time.Location, uncategorized string, force bool,
+	ctx context.Context, userID int64, bank domain.Bank, loc *time.Location, force bool,
 ) (domain.BankSync, error) {
 	c, err := s.client(bank)
 	if err != nil {
@@ -470,21 +469,21 @@ func (s *Banks) Sync(
 			starts[t.ExternalID] = t.SyncedUntil.Add(-s.opts.SyncOverlap)
 		}
 	}
-	n, _, err := s.run(ctx, userID, c, loc, uncategorized, &conn, starts, now)
+	n, _, err := s.run(ctx, userID, c, loc, &conn, starts, now)
 	return s.finish(ctx, userID, &conn, now, n, err)
 }
 
 // SyncAll syncs every enabled bank as Sync does, one after another. A failing bank
 // does not stop the others; its error is returned with the name of the bank.
 func (s *Banks) SyncAll(
-	ctx context.Context, userID int64, loc *time.Location, uncategorized string, force bool,
+	ctx context.Context, userID int64, loc *time.Location, force bool,
 ) (domain.BankSync, error) {
 	var (
 		all  domain.BankSync
 		errs []error
 	)
 	for _, bank := range s.Enabled() {
-		res, err := s.Sync(ctx, userID, bank, loc, uncategorized, force)
+		res, err := s.Sync(ctx, userID, bank, loc, force)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", bank.Name(), err))
 		}
@@ -534,11 +533,11 @@ func (s *Banks) finish(
 
 // run refreshes the session of conn, stores the accounts at its bank and imports the
 // operations of the bank accounts in starts, by their ids at the bank, since their
-// starts, all at once: a transfer with an own account, else an expense or income in
-// the categories named uncategorized, which rules then change. It returns the number
-// of operations created and the sums imported by the account they sync into.
+// starts, all at once: a transfer with an own account, else an expense or income
+// without a category, which rules then set. It returns the number of operations
+// created and the sums imported by the account they sync into.
 func (s *Banks) run(
-	ctx context.Context, userID int64, c BankClient, loc *time.Location, uncategorized string,
+	ctx context.Context, userID int64, c BankClient, loc *time.Location,
 	conn *domain.BankConnection, starts map[string]time.Time, now time.Time,
 ) (int, map[int64]bankSum, error) {
 	sess, err := s.open(userID, conn.Secret)
@@ -584,7 +583,7 @@ func (s *Banks) run(
 		if err := s.imports.Discard(ctx, userID, im.ID); err != nil {
 			return 0, nil, err
 		}
-	} else if n, err = s.imports.commit(ctx, userID, im.ID, loc, uncategorized); err != nil {
+	} else if n, err = s.imports.commit(ctx, userID, im.ID, loc, true /* noCategories */); err != nil {
 		// the next sync stages the operations again
 		return 0, nil, errors.Join(err, s.imports.Discard(ctx, userID, im.ID))
 	}

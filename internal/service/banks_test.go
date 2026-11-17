@@ -101,9 +101,6 @@ func (f *fakeBank) add(id, amount string, at time.Time) {
 	}
 }
 
-// _uncategorized is the name of the default category of synced operations.
-const _uncategorized = "Без категории"
-
 type bankFixture struct {
 	store  *repository.Store
 	svc    *service.Services
@@ -145,7 +142,7 @@ func newBankFixture(t *testing.T) bankFixture {
 	step, err = svc.Banks.ConfirmLogin(ctx, f.userID, domain.BankTBank, "1234")
 	require.NoError(t, err)
 	assert.Empty(t, step, "signed in")
-	_, err = svc.Banks.Sync(ctx, f.userID, domain.BankTBank, time.UTC, _uncategorized, true)
+	_, err = svc.Banks.Sync(ctx, f.userID, domain.BankTBank, time.UTC, true)
 	require.NoError(t, err, "the accounts are read")
 
 	f.black, err = svc.Accounts.CreateWithBalance(ctx, f.userID,
@@ -186,12 +183,12 @@ func (f bankFixture) link(t *testing.T, pairs ...any) (domain.BankSync, error) {
 		require.True(t, ok)
 		links = append(links, domain.BankLink{AccountID: accountID, BankAccountID: f.bankAccount(t, id).ID})
 	}
-	return f.svc.Banks.Link(t.Context(), f.userID, domain.BankTBank, links, time.UTC, _uncategorized)
+	return f.svc.Banks.Link(t.Context(), f.userID, domain.BankTBank, links, time.UTC)
 }
 
 func (f bankFixture) sync(t *testing.T, force bool) domain.BankSync {
 	t.Helper()
-	res, err := f.svc.Banks.Sync(t.Context(), f.userID, domain.BankTBank, time.UTC, _uncategorized, force)
+	res, err := f.svc.Banks.Sync(t.Context(), f.userID, domain.BankTBank, time.UTC, force)
 	require.NoError(t, err)
 	return res
 }
@@ -202,14 +199,6 @@ func (f bankFixture) ops(t *testing.T, id int64) []domain.Operation {
 	ops, _, err := f.svc.Operations.List(t.Context(), f.userID, domain.Filter{AccountID: id}, pagination.Params{})
 	require.NoError(t, err)
 	return ops
-}
-
-// category returns the category of id.
-func (f bankFixture) category(t *testing.T, id int64) domain.Category {
-	t.Helper()
-	c, err := f.store.Read().Categories.Get(t.Context(), f.userID, id)
-	require.NoError(t, err)
-	return c
 }
 
 func TestBanksLinkAndSync(t *testing.T) {
@@ -233,8 +222,7 @@ func TestBanksLinkAndSync(t *testing.T) {
 
 	_, err = f.link(t, f.black.ID, "1003")
 	require.ErrorIs(t, err, errors.ErrInvalid, "currencies differ")
-	_, err = f.svc.Banks.Link(ctx, f.userID, domain.BankTBank, []domain.BankLink{{AccountID: f.black.ID}}, time.UTC,
-		_uncategorized)
+	_, err = f.svc.Banks.Link(ctx, f.userID, domain.BankTBank, []domain.BankLink{{AccountID: f.black.ID}}, time.UTC)
 	require.ErrorIs(t, err, errors.ErrInvalid)
 
 	res, err := f.link(t, f.black.ID, "1001")
@@ -244,8 +232,7 @@ func TestBanksLinkAndSync(t *testing.T) {
 	assert.Equal(t, "900", f.balance(t, f.black.ID), "the opening balance is not changed")
 	ops := f.ops(t, f.black.ID)
 	require.Len(t, ops, 2, "the opening balance and the operation")
-	assert.Equal(t, _uncategorized, f.category(t, ops[0].CategoryID).Name, "the saved mapping is ignored")
-	assert.NotEqual(t, groceries.ID, ops[0].CategoryID)
+	assert.Zero(t, ops[0].CategoryID, "the saved mapping is ignored")
 	black := f.bankAccount(t, "1001")
 	assert.Equal(t, f.black.ID, black.AccountID)
 	a, err := f.svc.Accounts.Get(ctx, f.userID, f.black.ID)
@@ -265,7 +252,7 @@ func TestBanksLinkAndSync(t *testing.T) {
 	fetched := len(f.bank.froms)
 	assert.Equal(t, domain.BankSync{}, f.sync(t, false), "synced recently")
 	assert.Len(t, f.bank.froms, fetched)
-	res, err = f.svc.Banks.SyncAll(ctx, f.userID, time.UTC, _uncategorized, false)
+	res, err = f.svc.Banks.SyncAll(ctx, f.userID, time.UTC, false)
 	require.NoError(t, err)
 	assert.Equal(t, domain.BankSync{}, res)
 
@@ -273,7 +260,7 @@ func TestBanksLinkAndSync(t *testing.T) {
 	synced := f.clock.Now()
 	f.clock.add(time.Hour)
 	f.bank.add("1001", "-200", f.clock.Now().Add(-time.Minute))
-	res, err = f.svc.Banks.SyncAll(ctx, f.userID, time.UTC, _uncategorized, false)
+	res, err = f.svc.Banks.SyncAll(ctx, f.userID, time.UTC, false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, res.Operations, "the synced operations are not imported again")
 	assert.Equal(t, synced.Add(-14*24*time.Hour), f.bank.froms[len(f.bank.froms)-1])
@@ -324,7 +311,7 @@ func TestBanksSyncReadsAccounts(t *testing.T) {
 	assert.Len(t, f.bank.froms, fetched, "synced recently")
 }
 
-func TestBanksSyncUncategorizedAndRules(t *testing.T) {
+func TestBanksSyncNoCategoryAndRules(t *testing.T) {
 	t.Parallel()
 
 	f := newBankFixture(t)
@@ -353,16 +340,11 @@ func TestBanksSyncUncategorizedAndRules(t *testing.T) {
 	require.Len(t, ops, 4, "the opening balance and the operations")
 	income, coffee, shop := ops[0], ops[1], ops[2]
 	assert.Equal(t, cafe.ID, coffee.CategoryID, "rules categorize")
-	assert.Equal(t, _uncategorized, f.category(t, shop.CategoryID).Name)
-	assert.Equal(t, domain.KindExpense, f.category(t, shop.CategoryID).Kind)
-	assert.Equal(t, _uncategorized, f.category(t, income.CategoryID).Name)
-	assert.Equal(t, domain.KindIncome, f.category(t, income.CategoryID).Kind)
-
-	// the next sync goes to the same categories
-	f.clock.add(time.Hour)
-	f.bank.add("1001", "-70", f.clock.Now().Add(-time.Minute))
-	assert.Equal(t, 1, f.sync(t, false).Operations)
-	assert.Equal(t, shop.CategoryID, f.ops(t, f.black.ID)[0].CategoryID)
+	assert.Zero(t, shop.CategoryID, "no rule matches")
+	assert.Zero(t, income.CategoryID, "no rule matches")
+	tree, err := f.svc.Categories.Tree(ctx, f.userID)
+	require.NoError(t, err)
+	assert.Len(t, tree, 1, "no category is created")
 }
 
 func TestBanksTransferWithUnlinked(t *testing.T) {
@@ -404,7 +386,7 @@ func TestBanksTransferWithUnlinked(t *testing.T) {
 		assert.Equal(t, 1, res.Operations, "the Black side only")
 		op := f.ops(t, f.black.ID)[0]
 		assert.Equal(t, domain.OpExpense, op.Type)
-		assert.Equal(t, _uncategorized, f.category(t, op.CategoryID).Name)
+		assert.Zero(t, op.CategoryID)
 		assert.Equal(t, "700", f.balance(t, f.black.ID))
 	})
 }
@@ -448,7 +430,7 @@ func TestBanksLinkStart(t *testing.T) {
 	res, err := f.svc.Banks.Link(ctx, f.userID, domain.BankTBank, []domain.BankLink{
 		{AccountID: f.black.ID, BankAccountID: f.bankAccount(t, "1001").ID},
 		{BankAccountID: f.bankAccount(t, "1002").ID},
-	}, time.UTC, _uncategorized)
+	}, time.UTC)
 	require.NoError(t, err)
 	assert.Equal(t, 2, res.Operations, "Black since the day after its last operation, Savings all")
 	ops := f.ops(t, f.black.ID)

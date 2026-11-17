@@ -429,7 +429,7 @@ func (h *Handler) ListRules(ctx context.Context) (*ogen.RuleList, error) {
 	if !ok {
 		return nil, errors.ErrUnauthorized
 	}
-	rules, err := h.svc.Rules.List(ctx, key.UserID)
+	rules, err := h.svc.Rules.List(ctx, key.UserID, domain.RuleFilter{})
 	if err != nil {
 		return nil, err
 	}
@@ -527,6 +527,20 @@ func (h *Handler) RunRules(ctx context.Context, req *ogen.OperationQuery) (*ogen
 		return nil, err
 	}
 	return &ogen.RulesRunResult{Changed: n}, nil
+}
+
+// LearnRules implements ogen.Handler.
+func (h *Handler) LearnRules(ctx context.Context) (*ogen.RulesLearnResult, error) {
+	// every operation requires a key, so a missing one is a wiring bug; fail closed
+	key, ok := ctx.Value(keyCtx{}).(domain.APIKey)
+	if !ok {
+		return nil, errors.ErrUnauthorized
+	}
+	n, err := h.svc.Rules.Learn(ctx, key.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &ogen.RulesLearnResult{Learned: n}, nil
 }
 
 // GetRuleSettings implements ogen.Handler.
@@ -676,12 +690,13 @@ func fromOperationInput(req *ogen.OperationInput) (domain.OperationInput, error)
 // of it.
 func fromOperationQuery(req *ogen.OperationQuery) (domain.Filter, error) {
 	f := domain.Filter{
-		AccountID:  req.AccountID.Or(0),
-		CategoryID: req.CategoryID.Or(0),
-		Type:       domain.OpType(req.Type.Or("")),
-		DateFrom:   req.DateFrom.Or(time.Time{}),
-		DateTo:     req.DateTo.Or(time.Time{}),
-		Query:      req.Query.Or(""),
+		AccountID:     req.AccountID.Or(0),
+		CategoryID:    req.CategoryID.Or(0),
+		Uncategorized: req.Uncategorized.Or(false),
+		Type:          domain.OpType(req.Type.Or("")),
+		DateFrom:      req.DateFrom.Or(time.Time{}),
+		DateTo:        req.DateTo.Or(time.Time{}),
+		Query:         req.Query.Or(""),
 	}
 	if tag, ok := req.Tag.Get(); ok && tag != "" {
 		f.Tags = []string{tag}

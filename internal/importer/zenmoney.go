@@ -40,8 +40,6 @@ var _zenMoneyCols = []string{
 const (
 	_zenMoneyComma         = ';'
 	_zenMoneyCreatedLayout = time.DateTime
-	// _zenMoneyDefaultCategory is the category of rows without one.
-	_zenMoneyDefaultCategory = "Uncategorized"
 )
 
 // _zenMoneyPayeeMCC finds the Merchant Category Code card payments carry in the payee, as in
@@ -225,9 +223,6 @@ func parseZenMoneyAmounts(row domain.Record, get func(name string) string) (doma
 			row.SkipReason = "transfer amounts differ"
 			return row, nil
 		}
-	}
-	if !row.IsTransfer() && row.Category == "" {
-		row.Category = _zenMoneyDefaultCategory
 	}
 	if !money.ValidCurrency(row.Currency) {
 		return domain.Record{}, domain.NewError(errors.ErrInvalid, "currency: unsupported currency %q", row.Currency)

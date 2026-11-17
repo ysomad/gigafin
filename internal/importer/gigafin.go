@@ -41,9 +41,6 @@ var _gigaFinCols = []string{
 
 const _gigaFinComma = ';'
 
-// _gigaFinDefaultCategory is the category of rows without one.
-const _gigaFinDefaultCategory = "Uncategorized"
-
 // _gigaFinNotExport starts errors of files of another format. All errors of
 // parseGigaFin except reading failures are of kind errors.ErrInvalid.
 const _gigaFinNotExport domain.Msg = "not a gigafin CSV file"
@@ -59,7 +56,7 @@ const _gigaFinNotExport domain.Msg = "not a gigafin CSV file"
 //	account     required, account name
 //	amount      required, signed decimal: negative is money out
 //	currency    required, ISO 4217 code
-//	category    optional, "Cat1 / Cat2"; empty is "Uncategorized"; ignored for transfers
+//	category    optional, "Cat1 / Cat2"; empty is no category; ignored for transfers
 //	payee       optional
 //	note        optional
 //	to_account  optional, makes a transfer of a negative amount from account to it
@@ -163,11 +160,8 @@ func parseGigaFinRow(rec []string, idx map[string]int, loc *time.Location) (doma
 		// names are trimmed and checked when the row is committed
 		Tags: strings.FieldsFunc(get(_gigaFinColTags), func(r rune) bool { return r == ',' }),
 	}
-	switch {
-	case row.IsTransfer():
+	if row.IsTransfer() {
 		row.Category = ""
-	case row.Category == "":
-		row.Category = _gigaFinDefaultCategory
 	}
 
 	date, err := time.ParseInLocation(time.DateOnly, get(_gigaFinColDate), loc)
@@ -250,7 +244,7 @@ func parseGigaFinRow(rec []string, idx map[string]int, loc *time.Location) (doma
 //
 // Expenses and income that are parts of one split get its origin as origin_id, so an import
 // splits them again. Re-importing loses what the format cannot hold: adjustments come
-// back as uncategorized expense or income.
+// back as expense or income without a category.
 func WriteGigaFin(w io.Writer, ops []domain.Operation, accounts, categories map[int64]string) error {
 	split := func(op domain.Operation) bool {
 		return op.OriginID != 0 && (op.Type == domain.OpExpense || op.Type == domain.OpIncome)

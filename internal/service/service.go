@@ -24,7 +24,7 @@ type Services struct {
 	Categories *Categories
 	Operations *Operations
 	Plans      *Plans
-	Dashboard  *Dashboard
+	Analytics  *Analytics
 	Imports    *Imports
 	Data       *Data
 	Rates      *Rates
@@ -68,7 +68,7 @@ func New(store *repository.Store, clock timex.Clock, log *slog.Logger, opts Opti
 		Categories: &Categories{store: store, clock: clock, log: log},
 		Operations: &Operations{store: store, clock: clock, log: log, categorizer: rules},
 		Plans:      &Plans{store: store, clock: clock, log: log},
-		Dashboard:  &Dashboard{store: store},
+		Analytics:  &Analytics{store: store},
 		Imports:    imports,
 		Data:       &Data{store: store, auth: auth, log: log},
 		Rates:      &Rates{store: store, clock: clock, fetchers: opts.RateFetchers},

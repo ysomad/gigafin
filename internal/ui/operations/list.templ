@@ -120,6 +120,7 @@ templ filterPopover(d opList) {
 			@kit.Field("col-12", kit.T(ctx, "Category"), "", "", templ.Attributes{"data-category-field": true}) {
 				<select name="category">
 					<option value="">{ kit.T(ctx, "All") }</option>
+					<option value={ kit.NoCategory } selected?={ d.Filter.Uncategorized }>{ kit.T(ctx, "No category") }</option>
 					for _, parent := range d.Categories {
 						<option value={ parent.ID } data-kind={ string(parent.Kind) } selected?={ parent.ID == d.Filter.CategoryID }>{ parent.Name }</option>
 						for _, c := range parent.Children {

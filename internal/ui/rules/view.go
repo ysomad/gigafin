@@ -9,6 +9,20 @@ type rulesData struct {
 	// Stages are the rules of each stage that has any, oldest first, in the order
 	// stages run.
 	Stages []stageRules
+	// Learned is the number of rules just learned from the operations, -1 when not
+	// learning.
+	Learned int
+	Filter  domain.RuleFilter
+	// Filtered reports whether the rules are filtered, FilterCount by how many fields
+	// but the query.
+	Filtered    bool
+	FilterCount int
+	// Category is the category filtered by, 0 for all.
+	Category int64
+	// Shown is the number of rules matching the filter, Total of all rules.
+	Shown, Total int
+	Categories   []domain.Category
+	Accounts     []domain.Account
 }
 
 type stageRules struct {

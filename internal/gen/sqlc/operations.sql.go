@@ -179,37 +179,44 @@ WHERE o.user_id = ?1
   AND (o.category_id = ?6
        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
        OR ?6 IS NULL)
-  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?7)
-       OR ?7 IS NULL)
+  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
+       OR NOT CAST(?7 AS INTEGER))
+  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
+       OR ?8 IS NULL)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
-  AND (abs(o.amount) >= (?8 ->> a.currency) OR ?8 IS NULL)
-  AND (abs(o.amount) <= (?9 ->> a.currency) OR ?9 IS NULL)
+  AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
+  AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
   -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
   -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND instr(?10, ',' || t.name || ',') > 0)
-       OR ?10 IS NULL)
-  AND (o.date < ?11
-       OR (o.date = ?11 AND o.id < ?12)
+                WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0)
        OR ?11 IS NULL)
-ORDER BY o.date DESC, o.id DESC
-LIMIT ?13
+  -- seeks past the cursor in the order below, see pagination.Cursor
+  AND ((o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
+         < (CAST(?12 AS TEXT), CAST(?13 AS TEXT),
+            CAST(?14 AS INTEGER), CAST(?15 AS INTEGER))
+       OR ?12 IS NULL)
+ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
+LIMIT ?16
 `
 
 type ListOperationsParams struct {
-	UserID     int64
-	AccountID  sql.NullInt64
-	Type       sql.NullString
-	DateFrom   sql.NullString
-	DateTo     sql.NullString
-	CategoryID sql.NullInt64
-	Query      sql.NullString
-	AmountMin  sql.NullString
-	AmountMax  sql.NullString
-	Tags       sql.NullString
-	BeforeDate sql.NullString
-	BeforeID   sql.NullInt64
-	Lim        int64
+	UserID        int64
+	AccountID     sql.NullInt64
+	Type          sql.NullString
+	DateFrom      sql.NullString
+	DateTo        sql.NullString
+	CategoryID    sql.NullInt64
+	Uncategorized int64
+	Query         sql.NullString
+	AmountMin     sql.NullString
+	AmountMax     sql.NullString
+	Tags          sql.NullString
+	BeforeDate    sql.NullString
+	BeforeTime    sql.NullString
+	BeforeGroup   sql.NullInt64
+	BeforeID      sql.NullInt64
+	Lim           int64
 }
 
 type ListOperationsRow struct {
@@ -225,11 +232,14 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 		arg.DateFrom,
 		arg.DateTo,
 		arg.CategoryID,
+		arg.Uncategorized,
 		arg.Query,
 		arg.AmountMin,
 		arg.AmountMax,
 		arg.Tags,
 		arg.BeforeDate,
+		arg.BeforeTime,
+		arg.BeforeGroup,
 		arg.BeforeID,
 		arg.Lim,
 	)
@@ -280,7 +290,7 @@ FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
 WHERE o.user_id = ?1 AND o.payee = ?2
   AND o.date >= ?3 AND o.date <= ?4
-ORDER BY o.date DESC, o.id DESC
+ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
 `
 
 type ListOperationsByPayeeParams struct {
@@ -434,30 +444,33 @@ WHERE o.user_id = ?1
   AND (o.category_id = ?6
        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
        OR ?6 IS NULL)
-  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?7)
-       OR ?7 IS NULL)
+  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
+       OR NOT CAST(?7 AS INTEGER))
+  AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
+       OR ?8 IS NULL)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
-  AND (abs(o.amount) >= (?8 ->> a.currency) OR ?8 IS NULL)
-  AND (abs(o.amount) <= (?9 ->> a.currency) OR ?9 IS NULL)
+  AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
+  AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
   -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
   -- matches any of them
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-                WHERE t.user_id = ?1 AND instr(?10, ',' || t.name || ',') > 0)
-       OR ?10 IS NULL)
+                WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0)
+       OR ?11 IS NULL)
 GROUP BY o.type, a.currency
 `
 
 type SumFilteredOperationsParams struct {
-	UserID     int64
-	AccountID  sql.NullInt64
-	Type       sql.NullString
-	DateFrom   sql.NullString
-	DateTo     sql.NullString
-	CategoryID sql.NullInt64
-	Query      sql.NullString
-	AmountMin  sql.NullString
-	AmountMax  sql.NullString
-	Tags       sql.NullString
+	UserID        int64
+	AccountID     sql.NullInt64
+	Type          sql.NullString
+	DateFrom      sql.NullString
+	DateTo        sql.NullString
+	CategoryID    sql.NullInt64
+	Uncategorized int64
+	Query         sql.NullString
+	AmountMin     sql.NullString
+	AmountMax     sql.NullString
+	Tags          sql.NullString
 }
 
 type SumFilteredOperationsRow struct {
@@ -476,6 +489,7 @@ func (q *Queries) SumFilteredOperations(ctx context.Context, arg SumFilteredOper
 		arg.DateFrom,
 		arg.DateTo,
 		arg.CategoryID,
+		arg.Uncategorized,
 		arg.Query,
 		arg.AmountMin,
 		arg.AmountMax,

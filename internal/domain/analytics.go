@@ -8,8 +8,8 @@ import (
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-// Dashboard is an overview of a user's finances for a month.
-type Dashboard struct {
+// Analytics is an overview of a user's finances for a month.
+type Analytics struct {
 	Month  timex.Month
 	Totals []Total
 	// Trends are income vs expense per currency over the year up to Month.

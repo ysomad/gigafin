@@ -61,7 +61,9 @@ func (s *Accounts) CreateWithBalance(
 		if err != nil || !ok {
 			return err
 		}
-		_, err = createOperation(ctx, r, userID, adj, domain.ImportRef{}, now)
+		// an adjustment refers to its account only
+		refs := &opRefs{accounts: map[int64]domain.Account{a.ID: a}}
+		_, err = createOperation(ctx, r, refs, userID, adj, domain.ImportRef{}, now)
 		return err
 	})
 	if err != nil {
@@ -146,7 +148,9 @@ func (s *Accounts) SetBalance(
 		if err != nil || !ok {
 			return err
 		}
-		op, err = createOperation(ctx, r, userID, in, domain.ImportRef{}, s.clock.Now())
+		// an adjustment refers to its account only
+		refs := &opRefs{accounts: map[int64]domain.Account{a.ID: a}}
+		op, err = createOperation(ctx, r, refs, userID, in, domain.ImportRef{}, s.clock.Now())
 		return err
 	})
 	if err != nil {

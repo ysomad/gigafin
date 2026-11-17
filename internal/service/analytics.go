@@ -8,40 +8,40 @@ import (
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-// _trendMonths is how many months a dashboard trend covers, up to its month.
+// _trendMonths is how many months an analytics trend covers, up to its month.
 const _trendMonths = 12
 
-// _topPayees is how many payees per currency a dashboard shows.
+// _topPayees is how many payees per currency analytics shows.
 const _topPayees = 10
 
-// Dashboard reports an overview of a user's finances.
-type Dashboard struct {
+// Analytics reports an overview of a user's finances.
+type Analytics struct {
 	store *repository.Store
 }
 
 // Get returns account totals, expenses of month by category compared with compareMonth, top
 // payees of month, and over the year up to month: income vs expense, expenses by category and net worth.
-func (s *Dashboard) Get(ctx context.Context, userID int64, month, compareMonth timex.Month) (domain.Dashboard, error) {
+func (s *Analytics) Get(ctx context.Context, userID int64, month, compareMonth timex.Month) (domain.Analytics, error) {
 	r := s.store.Read()
 	accounts, err := r.Accounts.List(ctx, userID)
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	cats, err := r.Categories.List(ctx, userID)
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	sums, err := r.Operations.SumByCategory(ctx, userID, month.First(), month.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	compareSums, err := r.Operations.SumByCategory(ctx, userID, compareMonth.First(), compareMonth.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	payees, err := r.Operations.SumByPayee(ctx, userID, month.First(), month.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	from := month
 	for range _trendMonths - 1 {
@@ -49,22 +49,22 @@ func (s *Dashboard) Get(ctx context.Context, userID int64, month, compareMonth t
 	}
 	monthly, err := r.Operations.SumByMonth(ctx, userID, from.First(), month.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	catMonthly, err := r.Operations.SumByCategoryMonth(ctx, userID, from.First(), month.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	changes, err := r.Operations.BalanceChanges(ctx, userID, month.Last())
 	if err != nil {
-		return domain.Dashboard{}, err
+		return domain.Analytics{}, err
 	}
 	var months []timex.Month
 	for m := from; !m.First().After(month.First()); m = m.Next() {
 		months = append(months, m)
 	}
 	tree := domain.NewTree(cats)
-	return domain.Dashboard{
+	return domain.Analytics{
 		Month:        month,
 		Totals:       domain.Totals(accounts),
 		Trends:       domain.NewTrends(monthly, from, month),

@@ -190,6 +190,99 @@ func (r Rule) UsesCategory(id int64) bool {
 	return false
 }
 
+// RuleFilter selects rules. Zero fields match everything.
+type RuleFilter struct {
+	// Query is text in a value of a condition or an action, or in the name of a category
+	// the rule refers to, compared ignoring case.
+	Query  string
+	Stage  RuleStage
+	Origin RuleOrigin
+	// Field is the field of a condition of the rule.
+	Field RuleField
+	// Action is the type of an action of the rule.
+	Action ActionType
+	// CategoryIDs are a category and its children; a rule referring to any matches.
+	CategoryIDs []int64
+	// AccountID is the account of an account condition of the rule.
+	AccountID int64
+}
+
+// Filtered reports whether any field is set.
+func (f RuleFilter) Filtered() bool {
+	return f.Query != "" || f.Count() > 0
+}
+
+// Count returns the number of fields set, but Query.
+func (f RuleFilter) Count() int {
+	var n int
+	for _, set := range []bool{
+		f.Stage != "", f.Origin != "", f.Field != "", f.Action != "", len(f.CategoryIDs) > 0, f.AccountID != 0,
+	} {
+		if set {
+			n++
+		}
+	}
+	return n
+}
+
+// Validate checks that the stage, origin, field and action are known ones.
+func (f RuleFilter) Validate() error {
+	if f.Stage != "" && !slices.Contains(RuleStages(), f.Stage) {
+		return NewError(errors.ErrInvalid, "stage: must be pre, default or post")
+	}
+	if f.Origin != "" && f.Origin != RuleOriginUser && f.Origin != RuleOriginLearned {
+		return NewError(errors.ErrInvalid, "origin: must be user or learned")
+	}
+	if _, ok := CondOps(f.Field); f.Field != "" && !ok {
+		return NewError(errors.ErrInvalid, "field: unknown field %q", f.Field)
+	}
+	if f.Action != "" && !slices.Contains(ActionTypes(), f.Action) {
+		return NewError(errors.ErrInvalid, "type: unknown action %q", f.Action)
+	}
+	return nil
+}
+
+// Match reports whether r passes f. names are the names of categories by id, which
+// Query also looks in.
+func (f RuleFilter) Match(r Rule, names map[int64]string) bool {
+	switch {
+	case f.Stage != "" && r.Stage != f.Stage,
+		f.Origin != "" && r.Origin != f.Origin,
+		f.Field != "" && !slices.ContainsFunc(r.Conditions, func(c Condition) bool { return c.Field == f.Field }),
+		f.Action != "" && !slices.ContainsFunc(r.Actions, func(a Action) bool { return a.Type == f.Action }),
+		len(f.CategoryIDs) > 0 && !slices.ContainsFunc(f.CategoryIDs, r.UsesCategory):
+		return false
+	}
+	if f.AccountID != 0 {
+		account := strconv.FormatInt(f.AccountID, 10)
+		if !slices.ContainsFunc(r.Conditions, func(c Condition) bool {
+			return c.Field == RuleFieldAccount && slices.Contains(c.Values, account)
+		}) {
+			return false
+		}
+	}
+	if f.Query == "" {
+		return true
+	}
+	query := foldText(strings.TrimSpace(f.Query))
+	// has reports whether v, or the name of the category with the id in v, has query
+	has := func(v string, category bool) bool {
+		if strings.Contains(foldText(v), query) {
+			return true
+		}
+		id, err := strconv.ParseInt(v, 10, 64)
+		return category && err == nil && strings.Contains(foldText(names[id]), query)
+	}
+	for _, c := range r.Conditions {
+		for _, v := range c.Values {
+			if has(v, c.Field == RuleFieldCategory) {
+				return true
+			}
+		}
+	}
+	return slices.ContainsFunc(r.Actions, func(a Action) bool { return has(a.Value, a.Type == ActionSetCategory) })
+}
+
 // NewRule validates in against the user's categories by id and returns a rule of
 // origin. Values are trimmed. Errors are of kind errors.ErrInvalid.
 func NewRule(in RuleInput, origin RuleOrigin, cats map[int64]Category) (Rule, error) {
@@ -664,6 +757,41 @@ func LearnCategory(history []Operation, changed Operation, rules []Rule, cats ma
 		out = append(out, r)
 	}
 	return out, len(out) > 0
+}
+
+// LearnCategories learns from ops, the user's operations newest first, as
+// LearnCategory does when the user sets the category of the latest expense or income
+// of each payee, payees compared ignoring case. It returns the rules to store, see
+// LearnCategory, for payees newest first.
+func LearnCategories(ops []Operation, rules []Rule, cats map[int64]Category) []Rule {
+	var (
+		byPayee = make(map[string][]Operation)
+		payees  []string
+	)
+	for _, op := range ops {
+		if op.Payee == "" {
+			continue
+		}
+		k := foldText(op.Payee)
+		if _, ok := byPayee[k]; !ok {
+			payees = append(payees, k)
+		}
+		byPayee[k] = append(byPayee[k], op)
+	}
+	var out []Rule
+	for _, k := range payees {
+		history := byPayee[k]
+		i := slices.IndexFunc(history, func(op Operation) bool {
+			return (op.Type == OpExpense || op.Type == OpIncome) && !op.IsSplit() && op.CategoryID != 0
+		})
+		if i < 0 {
+			continue
+		}
+		if learned, ok := LearnCategory(history, history[i], rules, cats); ok {
+			out = append(out, learned...)
+		}
+	}
+	return out
 }
 
 // payeeCategory returns the category used at least 3 times among the 5 latest

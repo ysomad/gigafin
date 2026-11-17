@@ -235,20 +235,23 @@ func (r *Operations) List(
 		return nil, err
 	}
 	params := sqlc.ListOperationsParams{
-		UserID:     fp.UserID,
-		AccountID:  fp.AccountID,
-		CategoryID: fp.CategoryID,
-		Type:       fp.Type,
-		DateFrom:   fp.DateFrom,
-		DateTo:     fp.DateTo,
-		Query:      fp.Query,
-		Tags:       fp.Tags,
-		AmountMin:  fp.AmountMin,
-		AmountMax:  fp.AmountMax,
-		Lim:        int64(limit),
+		UserID:        fp.UserID,
+		AccountID:     fp.AccountID,
+		CategoryID:    fp.CategoryID,
+		Uncategorized: fp.Uncategorized,
+		Type:          fp.Type,
+		DateFrom:      fp.DateFrom,
+		DateTo:        fp.DateTo,
+		Query:         fp.Query,
+		Tags:          fp.Tags,
+		AmountMin:     fp.AmountMin,
+		AmountMax:     fp.AmountMax,
+		Lim:           int64(limit),
 	}
 	if !cursor.IsZero() {
 		params.BeforeDate = sql.NullString{String: timex.FormatDate(cursor.Date), Valid: true}
+		params.BeforeTime = sql.NullString{String: cursor.Time, Valid: true}
+		params.BeforeGroup = sql.NullInt64{Int64: cursor.Group, Valid: true}
 		params.BeforeID = sql.NullInt64{Int64: cursor.ID, Valid: true}
 	}
 	rows, err := r.q.ListOperations(ctx, params)
@@ -319,17 +322,22 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 		}
 		bounds[i] = sql.NullString{String: string(js), Valid: true}
 	}
+	var uncategorized int64
+	if f.Uncategorized {
+		uncategorized = 1
+	}
 	return sqlc.SumFilteredOperationsParams{
-		UserID:     userID,
-		AccountID:  sql.NullInt64{Int64: f.AccountID, Valid: f.AccountID != 0},
-		CategoryID: sql.NullInt64{Int64: f.CategoryID, Valid: f.CategoryID != 0},
-		Type:       sql.NullString{String: string(f.Type), Valid: f.Type != ""},
-		DateFrom:   sql.NullString{String: timex.FormatDate(f.DateFrom), Valid: !f.DateFrom.IsZero()},
-		DateTo:     sql.NullString{String: timex.FormatDate(f.DateTo), Valid: !f.DateTo.IsZero()},
-		Query:      sql.NullString{String: query, Valid: query != ""},
-		Tags:       sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
-		AmountMin:  bounds[0],
-		AmountMax:  bounds[1],
+		UserID:        userID,
+		AccountID:     sql.NullInt64{Int64: f.AccountID, Valid: f.AccountID != 0},
+		CategoryID:    sql.NullInt64{Int64: f.CategoryID, Valid: f.CategoryID != 0},
+		Uncategorized: uncategorized,
+		Type:          sql.NullString{String: string(f.Type), Valid: f.Type != ""},
+		DateFrom:      sql.NullString{String: timex.FormatDate(f.DateFrom), Valid: !f.DateFrom.IsZero()},
+		DateTo:        sql.NullString{String: timex.FormatDate(f.DateTo), Valid: !f.DateTo.IsZero()},
+		Query:         sql.NullString{String: query, Valid: query != ""},
+		Tags:          sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
+		AmountMin:     bounds[0],
+		AmountMax:     bounds[1],
 	}, nil
 }
 

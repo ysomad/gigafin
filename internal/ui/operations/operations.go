@@ -148,7 +148,7 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 // syncBanks syncs the banks now and goes back to the operations with the outcome.
 func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	ctx := r.Context()
-	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), true /* force */)
 	if err != nil {
 		// a failing bank is not a fault of this server
 		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))

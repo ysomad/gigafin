@@ -205,18 +205,19 @@ func (s *Imports) Unpair(ctx context.Context, userID, importID, rowID int64) err
 
 // Commit creates operations for all new rows of a staged import. Dates and times are
 // converted to loc. Rules run on every row that is not a part of a split and override
-// the mapped category. It returns the number of operations created.
+// the mapped category. When learning is on, rules are then learned from all the
+// operations, see domain.LearnCategories. It returns the number of operations created.
 func (s *Imports) Commit(ctx context.Context, userID, importID int64, loc *time.Location) (int, error) {
-	return s.commit(ctx, userID, importID, loc, "" /* uncategorized */)
+	return s.commit(ctx, userID, importID, loc, false /* noCategories */)
 }
 
-// commit is Commit; with uncategorized set the mapped categories are ignored and every
-// row goes to the root category of its kind of that name, created when missing, before
-// rules run.
+// commit is Commit; with noCategories set the mapped categories are ignored, every
+// expense and income comes without a category before rules run, and nothing is
+// learned, as the categories are the rules' own.
 //
 //nolint:cyclop,funlen // its read and write phases check the same state, so they stay together
 func (s *Imports) commit(
-	ctx context.Context, userID, importID int64, loc *time.Location, uncategorized string,
+	ctx context.Context, userID, importID int64, loc *time.Location, noCategories bool,
 ) (int, error) {
 	// rows are prepared and categorized outside the write transaction, as a categorizer
 	// may be slow; the transaction checks nothing changed meanwhile
@@ -224,26 +225,7 @@ func (s *Imports) commit(
 	if err != nil {
 		return 0, err
 	}
-	if uncategorized != "" {
-		m.Uncategorized = make(map[domain.Kind]domain.Category, 2)
-		err := s.store.InTx(ctx, func(r repository.Repos) error {
-			// only the kinds the rows need, so no empty category is created
-			for _, need := range domain.NewPreview(im, rows, m, s.kindRules).Categories {
-				if _, ok := m.Uncategorized[need.Kind]; ok {
-					continue
-				}
-				c, err := ensureCategory(ctx, r, userID, need.Kind, uncategorized, "", s.clock.Now())
-				if err != nil {
-					return err
-				}
-				m.Uncategorized[need.Kind] = c
-			}
-			return nil
-		})
-		if err != nil {
-			return 0, err
-		}
-	}
+	m.NoCategories = noCategories
 	if err := im.CheckStatus(domain.ImportStaged); err != nil {
 		return 0, err
 	}
@@ -268,7 +250,7 @@ func (s *Imports) commit(
 		return 0, err
 	}
 
-	var created int
+	var created, learned int
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
 		im, err := r.Imports.Get(ctx, userID, importID)
 		if err != nil {
@@ -285,12 +267,16 @@ func (s *Imports) commit(
 			return domain.NewError(errors.ErrConflict, "rows of the import were imported meanwhile, try again")
 		}
 
+		refs, err := loadOpRefs(ctx, r, userID)
+		if err != nil {
+			return err
+		}
 		// split group to the id of its first operation, the origin of all its parts
 		origins := make(map[string]int64)
 		now := s.clock.Now()
 		for _, c := range commits {
 			ref := domain.ImportRef{ImportID: importID, Hash: c.Row.Hash}
-			op, err := createOperation(ctx, r, userID, c.Op, ref, now)
+			op, err := createOperation(ctx, r, &refs, userID, c.Op, ref, now)
 			if err != nil {
 				return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
 			}
@@ -315,13 +301,25 @@ func (s *Imports) commit(
 		}
 		created = len(commits)
 		im.Status = domain.ImportCommitted
-		return r.Imports.Update(ctx, userID, im)
+		if err := r.Imports.Update(ctx, userID, im); err != nil || noCategories {
+			return err
+		}
+		settings, err := r.Settings.Get(ctx, userID)
+		if err != nil || !settings.AutoCategoryRules {
+			return err
+		}
+		learned, err = learnHistory(ctx, r, userID, now)
+		return err
 	})
 	if err != nil {
 		return created, err
 	}
 	s.log.InfoContext(ctx, "import committed", slog.Int64("user_id", userID), slog.Int64("import_id", importID),
 		slog.Int("created", created))
+	if learned > 0 {
+		s.log.DebugContext(ctx, "rules learned", slog.Int64("user_id", userID), slog.Int64("import_id", importID),
+			slog.Int("count", learned))
+	}
 	return created, nil
 }
 

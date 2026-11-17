@@ -13,13 +13,18 @@ import (
 
 func TestCursorRoundTrip(t *testing.T) {
 	t.Parallel()
-	c := pagination.Cursor{Date: time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC), ID: 42}
-	assert.Equal(t, "2026-10-06_42", c.String())
-	got, err := pagination.ParseCursor(c.String())
-	require.NoError(t, err)
-	assert.Equal(t, c, got)
+	date := time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC)
+	for _, c := range []pagination.Cursor{
+		{Date: date, Time: "18:05", Group: 40, ID: 42},
+		{Date: date, Group: 42, ID: 42},
+	} {
+		got, err := pagination.ParseCursor(c.String())
+		require.NoError(t, err)
+		assert.Equal(t, c, got)
+	}
+	assert.Equal(t, "2026-10-06_18:05_40_42", pagination.Cursor{Date: date, Time: "18:05", Group: 40, ID: 42}.String())
 
-	for _, s := range []string{"", "2026-10-06", "bad_42", "2026-10-06_x"} {
+	for _, s := range []string{"", "2026-10-06", "2026-10-06_42", "bad__42_42", "2026-10-06__x_42", "2026-10-06__42_x"} {
 		_, err := pagination.ParseCursor(s)
 		require.ErrorIs(t, err, errors.ErrInvalid, s)
 	}

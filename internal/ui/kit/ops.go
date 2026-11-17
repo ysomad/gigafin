@@ -31,6 +31,9 @@ func GroupByDay(ops []domain.Operation) []DayGroup {
 	return days
 }
 
+// NoCategory is the category filter value of expenses and income without a category.
+const NoCategory int64 = -1
+
 // FilterFromQuery returns the operations filter of the query q of the operations list.
 func (a *App) FilterFromQuery(q url.Values) (domain.Filter, error) {
 	var in struct {
@@ -38,7 +41,7 @@ func (a *App) FilterFromQuery(q url.Values) (domain.Filter, error) {
 		From     string `form:"from"`
 		To       string `form:"to"`
 		Account  int64  `form:"account"`  // 0 means all
-		Category int64  `form:"category"` // 0 means all
+		Category int64  `form:"category"` // 0 means all, NoCategory none
 		Type     string `form:"type"`
 		Min      string `form:"min"`
 		Max      string `form:"max"`
@@ -48,6 +51,9 @@ func (a *App) FilterFromQuery(q url.Values) (domain.Filter, error) {
 		return domain.Filter{}, domain.NewError(errors.ErrInvalid, "invalid filter")
 	}
 	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category}
+	if in.Category == NoCategory {
+		f.CategoryID, f.Uncategorized = 0, true
+	}
 	for tag := range strings.SplitSeq(in.Tags, ",") {
 		if tag = strings.TrimSpace(tag); tag != "" {
 			f.Tags = append(f.Tags, tag)

@@ -412,3 +412,28 @@ func TestImportLogs(t *testing.T) {
 		assert.NotContains(t, buf.String(), private, "no amounts, payees or names in logs")
 	}
 }
+
+func TestImportLearnsRules(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+
+	im, err := e.imp.Upload(ctx, e.userID, domain.ImportSourceTBank, "tbank.csv", file(
+		row("Black", "27.10.2026 10:00:00", "-100,00", "Супермаркеты", "Самокат"),
+		row("Black", "28.10.2026 10:00:00", "-200,00", "Супермаркеты", "Самокат"),
+		row("Black", "29.10.2026 10:00:00", "-300,00", "Супермаркеты", "Самокат"),
+	), time.UTC)
+	require.NoError(t, err)
+	err = e.imp.SaveMapping(ctx, e.userID, im.ID,
+		[]domain.AccountChoice{{Name: "Black", Currency: "RUB", NewName: "Black", NewKind: domain.AccountDebit}},
+		[]domain.CategoryChoice{{Name: "Супермаркеты", Kind: domain.KindExpense, Cat1: "Groceries"}})
+	require.NoError(t, err)
+	_, err = e.imp.Commit(ctx, e.userID, im.ID, time.UTC)
+	require.NoError(t, err)
+
+	rules, err := e.fin.Rules.List(ctx, e.userID, domain.RuleFilter{})
+	require.NoError(t, err)
+	require.Len(t, rules, 1, "the file's categories teach a rule")
+	assert.Equal(t, domain.RuleOriginLearned, rules[0].Origin)
+	assert.Equal(t, []string{"Самокат"}, rules[0].Conditions[0].Values)
+}

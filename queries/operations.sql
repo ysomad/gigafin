@@ -24,7 +24,7 @@ FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
 WHERE o.user_id = sqlc.arg(user_id) AND o.payee = sqlc.arg(payee)
   AND o.date >= sqlc.arg(date_from) AND o.date <= sqlc.arg(date_to)
-ORDER BY o.date DESC, o.id DESC;
+ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC;
 
 -- name: DeleteOperation :execrows
 DELETE FROM operations WHERE id = ? AND user_id = ?;
@@ -41,6 +41,8 @@ WHERE o.user_id = sqlc.arg(user_id)
   AND (o.category_id = sqlc.narg(category_id)
        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = sqlc.narg(category_id))
        OR sqlc.narg(category_id) IS NULL)
+  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
+       OR NOT CAST(sqlc.arg(uncategorized) AS INTEGER))
   AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg(query))
        OR sqlc.narg(query) IS NULL)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List
@@ -51,10 +53,12 @@ WHERE o.user_id = sqlc.arg(user_id)
   AND (o.id IN (SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
                 WHERE t.user_id = sqlc.arg(user_id) AND instr(sqlc.narg(tags), ',' || t.name || ',') > 0)
        OR sqlc.narg(tags) IS NULL)
-  AND (o.date < sqlc.narg(before_date)
-       OR (o.date = sqlc.narg(before_date) AND o.id < sqlc.narg(before_id))
+  -- seeks past the cursor in the order below, see pagination.Cursor
+  AND ((o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
+         < (CAST(sqlc.narg(before_date) AS TEXT), CAST(sqlc.narg(before_time) AS TEXT),
+            CAST(sqlc.narg(before_group) AS INTEGER), CAST(sqlc.narg(before_id) AS INTEGER))
        OR sqlc.narg(before_date) IS NULL)
-ORDER BY o.date DESC, o.id DESC
+ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
 LIMIT sqlc.arg(lim);
 
 -- name: SumFilteredOperations :many
@@ -71,6 +75,8 @@ WHERE o.user_id = sqlc.arg(user_id)
   AND (o.category_id = sqlc.narg(category_id)
        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = sqlc.narg(category_id))
        OR sqlc.narg(category_id) IS NULL)
+  AND ((o.type IN ('expense', 'income') AND o.category_id IS NULL)
+       OR NOT CAST(sqlc.arg(uncategorized) AS INTEGER))
   AND (o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg(query))
        OR sqlc.narg(query) IS NULL)
   -- amount bounds are JSON objects of minor units by currency, see Operations.List

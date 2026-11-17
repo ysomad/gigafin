@@ -140,6 +140,8 @@ func OpTitle(ctx context.Context, op domain.Operation, names map[int64]string) s
 		return T(ctx, "Transfer")
 	case op.Type == domain.OpAdjustment:
 		return T(ctx, "Balance adjustment")
+	case op.CategoryID == 0:
+		return T(ctx, "No category")
 	default:
 		return names[op.CategoryID]
 	}
@@ -157,7 +159,11 @@ func OpSubtitle(
 	case domain.OpAdjustment:
 		parts = append(parts, acc)
 	case domain.OpExpense, domain.OpIncome:
-		if op.Payee != "" {
+		switch {
+		case op.Payee == "":
+		case op.CategoryID == 0:
+			parts = append(parts, T(ctx, "No category"))
+		default:
 			parts = append(parts, names[op.CategoryID])
 		}
 		if op.IsSplit() {

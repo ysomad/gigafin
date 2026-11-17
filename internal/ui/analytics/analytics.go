@@ -1,4 +1,4 @@
-package dashboard
+package analytics
 
 import (
 	"maps"
@@ -11,7 +11,7 @@ import (
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
-// Handler serves the dashboard.
+// Handler serves the analytics.
 type Handler struct {
 	app *kit.App
 }
@@ -21,14 +21,14 @@ func New(app *kit.App) *Handler {
 	return &Handler{app: app}
 }
 
-// Routes returns the routes of the dashboard.
+// Routes returns the routes of the analytics.
 func (h *Handler) Routes() map[string]kit.Handler {
 	return map[string]kit.Handler{
-		"GET /{$}": h.dashboard,
+		"GET /{$}": h.analytics,
 	}
 }
 
-func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.User) error {
+func (h *Handler) analytics(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	month := timex.MonthOf(h.app.Svc.Today(user))
 	if s := r.URL.Query().Get("month"); s != "" {
 		var err error
@@ -43,7 +43,7 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.
 			return domain.NewError(errors.ErrInvalid, "%s: %q must be YYYY-MM", domain.Msg("Compare with"), s)
 		}
 	}
-	dash, err := h.app.Svc.Dashboard.Get(r.Context(), user.ID, month, compareMonth)
+	an, err := h.app.Svc.Analytics.Get(r.Context(), user.ID, month, compareMonth)
 	if err != nil {
 		return err
 	}
@@ -57,8 +57,8 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		return err
 	}
-	d := dashboardData{
-		Dash:   dash,
+	d := analyticsData{
+		An:     an,
 		From:   timex.FormatDate(month.First()),
 		To:     timex.FormatDate(month.Last()),
 		Months: months,
@@ -80,13 +80,13 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.
 		}
 	}
 	// trends and net worth share TrendMonths but not always currencies
-	n := len(dash.TrendMonths)
+	n := len(an.TrendMonths)
 	chartMonths := make([]int64, n)
-	for i, m := range dash.TrendMonths {
+	for i, m := range an.TrendMonths {
 		chartMonths[i] = m.First().Unix()
 	}
-	charts := make(map[string]*trendChart, len(dash.Trends))
-	for _, t := range dash.Trends {
+	charts := make(map[string]*trendChart, len(an.Trends))
+	for _, t := range an.Trends {
 		c := &trendChart{
 			Currency: t.Currency,
 			Months:   chartMonths,
@@ -99,7 +99,7 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.
 		}
 		charts[t.Currency] = c
 	}
-	for _, t := range dash.NetWorth {
+	for _, t := range an.NetWorth {
 		c, ok := charts[t.Currency]
 		if !ok {
 			c = &trendChart{
@@ -123,10 +123,10 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, user domain.
 		d.Charts[i] = *charts[cur]
 	}
 
-	return kit.Render(h.app, w, r, http.StatusOK, dashboardPage, kit.Page{
+	return kit.Render(h.app, w, r, http.StatusOK, analyticsPage, kit.Page{
 		User:      &user,
-		Nav:       "dashboard",
-		Title:     "Dashboard %s",
+		Nav:       "analytics",
+		Title:     "Analytics %s",
 		TitleArgs: []any{month},
 	}, d, kit.Failure{})
 }

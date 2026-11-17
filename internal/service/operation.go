@@ -1,9 +1,12 @@
 package service
 
 import (
+	"cmp"
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -21,39 +24,73 @@ type Operations struct {
 	categorizer Categorizer
 }
 
-// Create validates and stores an operation. Rules fill the payee, note and category
-// when they are empty, so an expense or income may come without a category. A category
-// the user gave may teach a rule, see domain.LearnCategory.
+// Create validates and stores an operation, see CreateMany.
 func (s *Operations) Create(ctx context.Context, userID int64, in domain.OperationInput) (domain.Operation, error) {
-	filled, err := s.Fill(ctx, userID, in)
+	ops, err := s.CreateMany(ctx, userID, []domain.OperationInput{in})
 	if err != nil {
 		return domain.Operation{}, err
 	}
+	return ops[0], nil
+}
+
+// CreateMany validates and stores operations in one transaction, all or none, and
+// returns them in order. Rules fill the payee, note and category when they are empty,
+// so an expense or income may come without a category. A category the user gave may
+// teach a rule, see domain.LearnCategory.
+func (s *Operations) CreateMany(
+	ctx context.Context, userID int64, ins []domain.OperationInput,
+) ([]domain.Operation, error) {
+	if len(ins) == 0 {
+		return nil, nil
+	}
+	ruled, err := s.categorizer.Categorize(ctx, userID, ins)
+	if err != nil {
+		return nil, err
+	}
 	var (
-		op      domain.Operation
+		ops     = make([]domain.Operation, len(ins))
 		learned int
 	)
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
-		now := s.clock.Now()
-		var err error
-		if op, err = createOperation(ctx, r, userID, filled, domain.ImportRef{}, now); err != nil {
+		refs, err := loadOpRefs(ctx, r, userID)
+		if err != nil {
 			return err
 		}
-		if in.CategoryID == 0 {
-			return nil
+		now := s.clock.Now()
+		for i, in := range ins {
+			ops[i], err = createOperation(ctx, r, &refs, userID, domain.FillEmpty(in, ruled[i]), domain.ImportRef{}, now)
+			if err != nil && len(ins) > 1 {
+				return domain.NewError(err, "operation %d", i+1)
+			}
+			if err != nil {
+				return err
+			}
 		}
-		learned, err = learnCategory(ctx, r, userID, op, now)
-		return err
+		for i, op := range ops {
+			if ins[i].CategoryID == 0 {
+				continue
+			}
+			n, err := learnCategory(ctx, r, userID, op, now)
+			if err != nil {
+				return err
+			}
+			learned += n
+		}
+		return nil
 	})
 	if err != nil {
-		return op, err
+		return nil, err
 	}
-	s.log.DebugContext(ctx, "operation created", slog.Int64("user_id", userID), slog.Int64("operation_id", op.ID))
+	if len(ops) == 1 {
+		s.log.DebugContext(ctx, "operation created", slog.Int64("user_id", userID),
+			slog.Int64("operation_id", ops[0].ID))
+	} else {
+		s.log.DebugContext(ctx, "operations created", slog.Int64("user_id", userID), slog.Int("count", len(ops)))
+	}
 	if learned > 0 {
-		s.log.DebugContext(ctx, "rules learned", slog.Int64("user_id", userID), slog.Int64("operation_id", op.ID),
-			slog.Int("count", learned))
+		s.log.DebugContext(ctx, "rules learned", slog.Int64("user_id", userID), slog.Int("count", learned))
 	}
-	return op, nil
+	return ops, nil
 }
 
 // Fill returns in with the empty payee, note and category filled by rules, as Create
@@ -123,7 +160,11 @@ func (s *Operations) Update(
 		if err != nil {
 			return err
 		}
-		if op, err = newOperation(ctx, r, userID, in); err != nil {
+		refs, err := loadOpRefs(ctx, r, userID)
+		if err != nil {
+			return err
+		}
+		if op, err = refs.newOperation(in); err != nil {
 			return err
 		}
 		now := s.clock.Now()
@@ -244,16 +285,17 @@ func (s *Operations) List(
 		return nil, pagination.Cursor{}, err
 	}
 	ops, next := pagination.Cut(ops, limit, func(op domain.Operation) pagination.Cursor {
-		return pagination.Cursor{Date: op.Date, ID: op.ID}
+		return pagination.Cursor{Date: op.Date, Time: op.Time, Group: cmp.Or(op.OriginID, op.ID), ID: op.ID}
 	})
 	return ops, next, nil
 }
 
+// createOperation validates in against refs and stores it.
 func createOperation(
-	ctx context.Context, r repository.Repos, userID int64, in domain.OperationInput, ref domain.ImportRef,
-	now time.Time,
+	ctx context.Context, r repository.Repos, refs *opRefs, userID int64, in domain.OperationInput,
+	ref domain.ImportRef, now time.Time,
 ) (domain.Operation, error) {
-	op, err := newOperation(ctx, r, userID, in)
+	op, err := refs.newOperation(in)
 	if err != nil {
 		return domain.Operation{}, err
 	}
@@ -293,39 +335,63 @@ func splitOperation(
 	return out, nil
 }
 
-// newOperation loads the accounts and category in refers to and validates it.
-func newOperation(
-	ctx context.Context, r repository.Repos, userID int64, in domain.OperationInput,
-) (domain.Operation, error) {
-	acc, err := r.Accounts.Get(ctx, userID, in.AccountID)
+// opRefs are the user's accounts, categories and tag names operations refer to,
+// loaded once to validate many operations.
+type opRefs struct {
+	accounts map[int64]domain.Account
+	cats     map[int64]domain.Category
+	tags     []string
+}
+
+// loadOpRefs loads the user's accounts, categories and tag names.
+func loadOpRefs(ctx context.Context, r repository.Repos, userID int64) (opRefs, error) {
+	accounts, err := r.Accounts.List(ctx, userID)
+	if err != nil {
+		return opRefs{}, err
+	}
+	cats, err := r.Categories.List(ctx, userID)
+	if err != nil {
+		return opRefs{}, err
+	}
+	refs := opRefs{
+		accounts: make(map[int64]domain.Account, len(accounts)),
+		cats:     make(map[int64]domain.Category, len(cats)),
+	}
+	for _, a := range accounts {
+		refs.accounts[a.ID] = a
+	}
+	for _, c := range cats {
+		refs.cats[c.ID] = c
+	}
+	if refs.tags, err = r.Operations.Tags(ctx, userID); err != nil {
+		return opRefs{}, err
+	}
+	return refs, nil
+}
+
+// newOperation validates in against the accounts and category it refers to. Its new
+// tags become known, so the operations after it take their spelling.
+func (refs *opRefs) newOperation(in domain.OperationInput) (domain.Operation, error) {
+	acc, ok := refs.accounts[in.AccountID]
+	if !ok {
+		return domain.Operation{}, fmt.Errorf("account: %w", errors.ErrNotFound)
+	}
+	var to *domain.Account
+	if a, ok := refs.accounts[in.ToAccountID]; ok && in.Type == domain.OpTransfer && in.ToAccountID != in.AccountID {
+		to = &a
+	}
+	var cat *domain.Category
+	if c, ok := refs.cats[in.CategoryID]; ok {
+		cat = &c
+	}
+	op, err := domain.NewOperation(in, acc, to, cat, refs.tags)
 	if err != nil {
 		return domain.Operation{}, err
 	}
-	var to *domain.Account
-	if in.Type == domain.OpTransfer && in.ToAccountID != 0 && in.ToAccountID != in.AccountID {
-		a, err := r.Accounts.Get(ctx, userID, in.ToAccountID)
-		switch {
-		case err == nil:
-			to = &a
-		case !errors.Is(err, errors.ErrNotFound):
-			return domain.Operation{}, err
+	for _, t := range op.Tags {
+		if !slices.ContainsFunc(refs.tags, func(k string) bool { return strings.EqualFold(k, t) }) {
+			refs.tags = append(refs.tags, t)
 		}
 	}
-	var cat *domain.Category
-	if in.CategoryID != 0 {
-		c, err := r.Categories.Get(ctx, userID, in.CategoryID)
-		switch {
-		case err == nil:
-			cat = &c
-		case !errors.Is(err, errors.ErrNotFound):
-			return domain.Operation{}, err
-		}
-	}
-	var known []string
-	if len(in.Tags) > 0 {
-		if known, err = r.Operations.Tags(ctx, userID); err != nil {
-			return domain.Operation{}, err
-		}
-	}
-	return domain.NewOperation(in, acc, to, cat, known)
+	return op, nil
 }

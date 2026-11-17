@@ -118,7 +118,7 @@ func (h *Handler) bankConfirm(w http.ResponseWriter, r *http.Request, user domai
 		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
 	}
 	// signed in: the accounts are read, the linked ones catch up
-	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
 	d := pageData{Notice: kit.T(ctx, "%s connected.", kit.T(ctx, bank.Name()))}
 	if res.Operations > 0 {
 		d.Notice = kit.SyncNotice(ctx, res)
@@ -141,7 +141,7 @@ func (h *Handler) bankSync(w http.ResponseWriter, r *http.Request, user domain.U
 		return err
 	}
 	ctx := r.Context()
-	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
 	return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, err)
 }
 
@@ -165,7 +165,7 @@ func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.U
 	links, err := bankPicks(r, bank, bankAccounts)
 	if err == nil && len(links) > 0 {
 		var res domain.BankSync
-		res, err = h.app.Svc.Banks.Link(ctx, user.ID, bank, links, user.Location(), kit.T(ctx, "Uncategorized"))
+		res, err = h.app.Svc.Banks.Link(ctx, user.ID, bank, links, user.Location())
 		if err == nil {
 			return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, nil)
 		}
@@ -236,7 +236,7 @@ func (h *Handler) bankDisconnect(w http.ResponseWriter, r *http.Request, user do
 // to show them.
 func (h *Handler) banksAutoSync(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	ctx := r.Context()
-	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), false /* force */)
+	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), false /* force */)
 	if err != nil {
 		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
 	}

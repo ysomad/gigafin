@@ -75,6 +75,14 @@ type Handler interface {
 	//
 	// GET /rules/settings
 	GetRuleSettings(ctx context.Context) (*RuleSettings, error)
+	// LearnRules implements learnRules operation.
+	//
+	// Each payee whose category is the same in 3 of its 5 latest expenses and income gets a learned rule
+	// "payee is X → set category", or its learned rule is pointed at that category. Runs even when
+	// learning is off.
+	//
+	// POST /rules/learn
+	LearnRules(ctx context.Context) (*RulesLearnResult, error)
 	// ListAccounts implements listAccounts operation.
 	//
 	// List accounts with balances.

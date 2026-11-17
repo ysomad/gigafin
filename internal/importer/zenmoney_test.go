@@ -53,7 +53,7 @@ func TestZenMoneyParse(t *testing.T) {
 
 	r = res.Rows[1]
 	assert.Equal(t, "356", r.Amount.String())
-	assert.Equal(t, "Uncategorized", r.Category)
+	assert.Empty(t, r.Category, "no category")
 	assert.Equal(t, "refund", r.Note)
 
 	r = res.Rows[2]

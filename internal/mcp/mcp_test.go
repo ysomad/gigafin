@@ -100,7 +100,7 @@ func TestMCP(t *testing.T) {
 
 	tools, err := read.ListTools(ctx, nil)
 	require.NoError(t, err)
-	assert.Len(t, tools.Tools, 22)
+	assert.Len(t, tools.Tools, 23)
 	for _, tool := range tools.Tools {
 		schema, err := json.Marshal(tool.InputSchema)
 		require.NoError(t, err)

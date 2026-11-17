@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"time"
@@ -68,9 +69,28 @@ func (s *Rules) Categorize(
 	return out, nil
 }
 
-// List returns the user's rules, oldest first.
-func (s *Rules) List(ctx context.Context, userID int64) ([]domain.Rule, error) {
-	return s.store.Read().Rules.List(ctx, userID)
+// List returns the user's rules matching f, oldest first.
+func (s *Rules) List(ctx context.Context, userID int64, f domain.RuleFilter) ([]domain.Rule, error) {
+	if err := f.Validate(); err != nil {
+		return nil, err
+	}
+	r := s.store.Read()
+	rules, err := r.Rules.List(ctx, userID)
+	if err != nil || !f.Filtered() {
+		return rules, err
+	}
+	cats, err := r.Categories.List(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	names := domain.CategoryNames(domain.NewTree(cats))
+	var out []domain.Rule
+	for _, rule := range rules {
+		if f.Match(rule, names) {
+			out = append(out, rule)
+		}
+	}
+	return out, nil
 }
 
 // Get returns one rule.
@@ -227,6 +247,22 @@ func (s *Rules) Apply(ctx context.Context, userID, id int64) (int, error) {
 	return n, nil
 }
 
+// Learn learns rules from all the user's operations, see domain.LearnCategories, even
+// when learning is off, and returns how many rules it stored.
+func (s *Rules) Learn(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.store.InTx(ctx, func(r repository.Repos) error {
+		var err error
+		n, err = learnHistory(ctx, r, userID, s.clock.Now())
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	s.log.InfoContext(ctx, "rules learned", slog.Int64("user_id", userID), slog.Int("count", n))
+	return n, nil
+}
+
 // learnCategory learns a rule from the user setting the category of op by hand, see
 // domain.LearnCategory, when learning is on. It returns how many rules it stored.
 func learnCategory(
@@ -275,6 +311,39 @@ func learnCategory(
 	return len(learned), nil
 }
 
+// learnHistory learns rules from all the user's operations, see
+// domain.LearnCategories, and returns how many rules it stored.
+func learnHistory(ctx context.Context, r repository.Repos, userID int64, now time.Time) (int, error) {
+	ops, err := allOperations(ctx, r, userID, domain.Filter{})
+	if err != nil {
+		return 0, err
+	}
+	rules, err := r.Rules.List(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	cats, err := r.Categories.List(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	byID := make(map[int64]domain.Category, len(cats))
+	for _, c := range cats {
+		byID[c.ID] = c
+	}
+	learned := domain.LearnCategories(ops, rules, byID)
+	for _, rule := range learned {
+		if rule.ID == 0 {
+			_, err = r.Rules.Create(ctx, userID, rule, now)
+		} else {
+			_, err = r.Rules.Update(ctx, userID, rule, now)
+		}
+		if err != nil {
+			return 0, err
+		}
+	}
+	return len(learned), nil
+}
+
 // allOperations returns all the user's operations matching f, newest first, reading
 // them page by page.
 func allOperations(ctx context.Context, r repository.Repos, userID int64, f domain.Filter) ([]domain.Operation, error) {
@@ -293,7 +362,7 @@ func allOperations(ctx context.Context, r repository.Repos, userID int64, f doma
 			return all, nil
 		}
 		last := ops[len(ops)-1]
-		cursor = pagination.Cursor{Date: last.Date, ID: last.ID}
+		cursor = pagination.Cursor{Date: last.Date, Time: last.Time, Group: cmp.Or(last.OriginID, last.ID), ID: last.ID}
 	}
 }
 
@@ -308,8 +377,12 @@ func replaceOperations(
 	}
 	n := 0
 	err := store.InTx(ctx, func(r repository.Repos) error {
+		refs, err := loadOpRefs(ctx, r, userID)
+		if err != nil {
+			return err
+		}
 		for _, old := range ops {
-			op, err := newOperation(ctx, r, userID, ins[old.ID])
+			op, err := refs.newOperation(ins[old.ID])
 			if err != nil {
 				return domain.NewError(err, "operation %d", old.ID)
 			}

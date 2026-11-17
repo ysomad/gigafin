@@ -185,6 +185,64 @@ func TestSplitOperation(t *testing.T) {
 	assert.True(t, ops[0].IsSplit())
 }
 
+func TestListOrder(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	ctx := t.Context()
+
+	create := func(tm string) domain.Operation {
+		op, err := f.svc.Operations.Create(ctx, f.userID, domain.OperationInput{
+			Type:       domain.OpExpense,
+			AccountID:  f.card.ID,
+			CategoryID: f.groceries.ID,
+			Amount:     dec("10"),
+			Date:       day(t, "2026-11-16"),
+			Time:       tm,
+		})
+		require.NoError(t, err)
+		return op
+	}
+	evening := create("18:00")
+	afternoon := create("16:09")
+	untimed := create("")
+	night := create("20:00")
+	// the new part gets an id above every operation of the day
+	parts, err := f.svc.Operations.Split(ctx, f.userID, evening.ID, []domain.SplitPart{
+		{CategoryID: f.groceries.ID, Amount: dec("6")},
+		{CategoryID: f.cafe.ID, Amount: dec("4")},
+	})
+	require.NoError(t, err)
+	want := []int64{night.ID, parts[1].ID, parts[0].ID, afternoon.ID, untimed.ID}
+
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{})
+	require.NoError(t, err)
+	ids := make([]int64, len(ops))
+	for i, op := range ops {
+		ids[i] = op.ID
+	}
+	assert.Equal(t, want, ids, "newest time first, parts of a split together, no time last")
+
+	// pages of one item seek through the same order
+	var (
+		paged []int64
+		p     = pagination.Params{Limit: 1}
+	)
+	for {
+		ops, next, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, p)
+		require.NoError(t, err)
+		for _, op := range ops {
+			paged = append(paged, op.ID)
+		}
+		if next.IsZero() {
+			break
+		}
+		p.After, err = pagination.ParseCursor(next.String())
+		require.NoError(t, err)
+	}
+	assert.Equal(t, want, paged)
+}
+
 func TestOperationValidation(t *testing.T) {
 	t.Parallel()
 
@@ -196,9 +254,6 @@ func TestOperationValidation(t *testing.T) {
 	}{
 		{name: "no amount", give: domain.OperationInput{
 			Type: domain.OpExpense, AccountID: f.card.ID, Date: day(t, "2026-10-01"), CategoryID: f.groceries.ID,
-		}},
-		{name: "no category", give: domain.OperationInput{
-			Type: domain.OpExpense, AccountID: f.card.ID, Date: day(t, "2026-10-01"), Amount: dec("10"),
 		}},
 		{name: "income category on expense", give: domain.OperationInput{
 			Type: domain.OpExpense, AccountID: f.card.ID, Date: day(t, "2026-10-01"),
@@ -496,7 +551,7 @@ func TestPlanCarry(t *testing.T) {
 	assert.Equal(t, map[int64]string{food.ID: "10000"}, amounts("2027-01"))
 }
 
-func TestDashboard(t *testing.T) {
+func TestAnalytics(t *testing.T) {
 	t.Parallel()
 
 	f := newFixture(t)
@@ -523,7 +578,7 @@ func TestDashboard(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	d, err := f.svc.Dashboard.Get(ctx, f.userID, month(t, "2026-10"), month(t, "2026-09"))
+	d, err := f.svc.Analytics.Get(ctx, f.userID, month(t, "2026-10"), month(t, "2026-09"))
 	require.NoError(t, err)
 
 	require.Len(t, d.Totals, 2)
@@ -673,7 +728,7 @@ func TestListByAmount(t *testing.T) {
 	require.ErrorIs(t, err, errors.ErrInvalid)
 }
 
-func TestDashboardReports(t *testing.T) {
+func TestAnalyticsReports(t *testing.T) {
 	t.Parallel()
 
 	f := newFixture(t)
@@ -706,7 +761,7 @@ func TestDashboardReports(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	d, err := f.svc.Dashboard.Get(ctx, f.userID, month(t, "2026-10"), month(t, "2026-09"))
+	d, err := f.svc.Analytics.Get(ctx, f.userID, month(t, "2026-10"), month(t, "2026-09"))
 	require.NoError(t, err)
 
 	require.Len(t, d.Expenses, 1)

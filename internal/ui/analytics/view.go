@@ -1,12 +1,12 @@
-package dashboard
+package analytics
 
 import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-type dashboardData struct {
-	Dash domain.Dashboard
+type analyticsData struct {
+	An domain.Analytics
 	// Prev, Next, ComparePrev and CompareNext are adjacent months within Months,
 	// empty when there is none.
 	Prev        string
@@ -21,7 +21,7 @@ type dashboardData struct {
 	Months []timex.Month
 }
 
-// trendChart is a trend and net worth of a currency as chart series, read by dashboard.js.
+// trendChart is a trend and net worth of a currency as chart series, read by analytics.js.
 type trendChart struct {
 	Currency string    `json:"-"`
 	Months   []int64   `json:"months"` // unix seconds of the first day

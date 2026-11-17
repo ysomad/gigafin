@@ -2,6 +2,7 @@ package rules
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -29,6 +30,7 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"GET /rules/condition":    h.ruleCondition,
 		"GET /rules/action":       h.ruleAction,
 		"POST /rules/preview":     h.previewRule,
+		"POST /rules/learn":       h.learnRules,
 		"GET /rules/{id}":         h.rule,
 		"POST /rules/{id}":        h.updateRule,
 		"POST /rules/{id}/apply":  h.applyRule,
@@ -41,18 +43,45 @@ func (h *Handler) Routes() map[string]kit.Handler {
 const _ruleValueSep = "|"
 
 func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	rules, err := h.app.Svc.Rules.List(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
 	tree, err := h.app.Svc.Categories.Tree(r.Context(), user.ID)
 	if err != nil {
 		return err
+	}
+	f, category, err := h.ruleFilterFromQuery(r.URL.Query(), tree)
+	if err != nil {
+		return err
+	}
+	rules, err := h.app.Svc.Rules.List(r.Context(), user.ID, f)
+	if err != nil {
+		return err
+	}
+	total := len(rules)
+	if f.Filtered() {
+		all, err := h.app.Svc.Rules.List(r.Context(), user.ID, domain.RuleFilter{})
+		if err != nil {
+			return err
+		}
+		total = len(all)
 	}
 	accounts, err := h.app.Svc.Accounts.List(r.Context(), user.ID)
 	if err != nil {
 		return err
 	}
+	d := rulesData{
+		Learned: -1, Filter: f, Filtered: f.Filtered(), FilterCount: f.Count(), Category: category,
+		Shown: len(rules), Total: total, Categories: tree, Accounts: accounts,
+	}
+	if n, err := strconv.Atoi(r.URL.Query().Get("learned")); err == nil && n >= 0 {
+		d.Learned = n
+	}
+	d.Stages = ruleStages(rules, tree, accounts)
+	return kit.Render(h.app, w, r, http.StatusOK, listPage, kit.Page{User: &user, Nav: "settings", Title: "Rules"}, d,
+		kit.Failure{})
+}
+
+// ruleStages returns rules grouped by stage, in the order stages run, without empty
+// stages, with the ids of the categories of tree and accounts in values replaced by names.
+func ruleStages(rules []domain.Rule, tree []domain.Category, accounts []domain.Account) []stageRules {
 	catNames, accByID := domain.CategoryNames(tree), domain.AccountsByID(accounts)
 	// name returns the name of the category or account with the id in v, v otherwise
 	name := func(field domain.RuleField, v string) string {
@@ -68,7 +97,7 @@ func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User
 		}
 		return v
 	}
-	var d rulesData
+	var stages []stageRules
 	for _, stage := range domain.RuleStages() {
 		s := stageRules{Stage: stage}
 		for _, rule := range rules {
@@ -99,11 +128,43 @@ func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User
 			s.Rules = append(s.Rules, v)
 		}
 		if len(s.Rules) > 0 {
-			d.Stages = append(d.Stages, s)
+			stages = append(stages, s)
 		}
 	}
-	return kit.Render(h.app, w, r, http.StatusOK, listPage, kit.Page{User: &user, Nav: "settings", Title: "Rules"}, d,
-		kit.Failure{})
+	return stages
+}
+
+// ruleFilterFromQuery returns the rules filter of the query q of the rules list, with
+// the categories of tree, and the category filtered by. A category filters by its
+// children too.
+func (h *Handler) ruleFilterFromQuery(q url.Values, tree []domain.Category) (domain.RuleFilter, int64, error) {
+	var in struct {
+		Query    string `form:"q"`
+		Stage    string `form:"stage"`
+		Origin   string `form:"origin"`
+		Field    string `form:"field"`
+		Action   string `form:"action"`
+		Category int64  `form:"category"` // 0 means all
+		Account  int64  `form:"account"`  // 0 means all
+	}
+	if err := h.app.Decoder.Decode(&in, q); err != nil {
+		return domain.RuleFilter{}, 0, domain.NewError(errors.ErrInvalid, "invalid filter")
+	}
+	f := domain.RuleFilter{
+		Query: strings.TrimSpace(in.Query), Stage: domain.RuleStage(in.Stage), Origin: domain.RuleOrigin(in.Origin),
+		Field: domain.RuleField(in.Field), Action: domain.ActionType(in.Action), AccountID: in.Account,
+	}
+	if in.Category != 0 {
+		f.CategoryIDs = []int64{in.Category}
+	}
+	for _, parent := range tree {
+		if parent.ID == in.Category {
+			for _, c := range parent.Children {
+				f.CategoryIDs = append(f.CategoryIDs, c.ID)
+			}
+		}
+	}
+	return f, in.Category, nil
 }
 
 // newCondRow returns a condition row of field, the first field when it is unknown, and
@@ -341,6 +402,17 @@ func (h *Handler) deleteRule(w http.ResponseWriter, r *http.Request, user domain
 		return err
 	}
 	kit.Redirect(w, r, "/rules")
+	return nil
+}
+
+// learnRules learns rules from all the user's operations and returns to the rules
+// with the number learned.
+func (h *Handler) learnRules(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	n, err := h.app.Svc.Rules.Learn(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	kit.Redirect(w, r, "/rules?learned="+strconv.Itoa(n))
 	return nil
 }
 

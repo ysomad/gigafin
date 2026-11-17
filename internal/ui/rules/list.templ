@@ -9,51 +9,94 @@ import (
 
 templ listPage(v kit.Page, d rulesData) {
 	@kit.Layout(v, false, nil) {
-		<div class="hstack mb-4">
-			<a class="button" href="/rules/new">+ { kit.T(ctx, "New rule") }</a>
-		</div>
-		<p class="text-light">{ kit.T(ctx, "Rules run when importing or creating operations.") }</p>
-		for _, s := range d.Stages {
-			<h2>{ ruleStageLabel(ctx, s.Stage) }</h2>
-			<ul class="vstack">
-				for _, r := range s.Rules {
+		<div class="hstack justify-between mb-4">
+			<ot-dropdown>
+				<menu class="buttons">
+					<li><a class="button" href="/rules/new">+ { kit.T(ctx, "New rule") }</a></li>
 					<li>
-						<a href={ fmt.Sprintf("/rules/%d", r.ID) }>
-							{ kit.T(ctx, "If") }
-							for i, c := range r.Conds {
-								{{
-									join := ""
-									if i > 0 && c.Any {
-										join = kit.T(ctx, "or") + " "
-									} else if i > 0 {
-										join = kit.T(ctx, "and") + " "
-									}
-								}}
-								{ join + ruleFieldLabel(ctx, c.Field) } { ruleOpLabel(ctx, c.Op) } <strong>{ c.Values }</strong>
-							}
-							→
-							for i, a := range r.Actions {
-								{{
-									sep := ""
-									if i < len(r.Actions)-1 {
-										sep = ", "
-									}
-								}}
-								if a.Value != "" {
-									{ ruleActionLabel(ctx, a.Type) } <strong>{ a.Value }</strong>{ sep }
-								} else {
-									{ ruleActionLabel(ctx, a.Type) + sep }
-								}
-							}
-						</a>
-						if r.Origin == domain.RuleOriginLearned {
-							@learnedBadge()
-						}
+						<button type="button" popovertarget="rule-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
 					</li>
-				}
-			</ul>
+				</menu>
+				<menu popover id="rule-actions">
+					<form method="post" action="/rules/learn">
+						<button type="submit" role="menuitem" class="ghost" title={ kit.T(ctx, "Payees whose 3 of 5 latest operations share a category get a rule setting it.") }>{ kit.T(ctx, "Learn from history") }</button>
+					</form>
+				</menu>
+			</ot-dropdown>
+			<form method="get" action="/rules">
+				<div class="hstack">
+					<fieldset class="group">
+						<input type="search" name="q" value={ d.Filter.Query } placeholder={ kit.T(ctx, "value or category") } aria-label={ kit.T(ctx, "Search") }/>
+						<button type="submit">{ kit.T(ctx, "Search") }</button>
+					</fieldset>
+					<ot-dropdown>
+						<button type="button" class="outline" popovertarget="filter-popover">
+							{ kit.T(ctx, "Filter") }
+							if d.FilterCount > 0 {
+								<span class="badge">{ d.FilterCount }</span>
+							}
+						</button>
+						@filterPopover(d)
+					</ot-dropdown>
+					if d.Filtered {
+						<a class="button ghost" href="/rules">{ kit.T(ctx, "Reset") }</a>
+					}
+				</div>
+			</form>
+		</div>
+		if d.Learned >= 0 {
+			<p role="status" class="badge mb-4" data-variant="success">{ kit.T(ctx, "Learned %d rules.", d.Learned) }</p>
 		}
-		if len(d.Stages) == 0 {
+		if d.Filtered {
+			<p class="text-light mb-4">{ kit.T(ctx, "Showing %d of %d rules.", d.Shown, d.Total) }</p>
+		} else {
+			<p class="text-light mb-4">{ kit.T(ctx, "Rules run when importing or creating operations.") }</p>
+		}
+		for _, s := range d.Stages {
+			if len(d.Stages) > 1 || s.Stage != domain.RuleStageDefault {
+				<h2>{ ruleStageLabel(ctx, s.Stage) }</h2>
+			}
+			<div class="table mb-4">
+				<table>
+					<thead><tr><th>{ kit.T(ctx, "If") }</th><th>{ kit.T(ctx, "Then") }</th><th></th></tr></thead>
+					<tbody>
+						for _, r := range s.Rules {
+							<tr>
+								<td>
+									<a href={ fmt.Sprintf("/rules/%d", r.ID) }>
+										for i, c := range r.Conds {
+											<div>
+												if i > 0 && c.Any {
+													<span class="text-light">{ kit.T(ctx, "or") } </span>
+												} else if i > 0 {
+													<span class="text-light">{ kit.T(ctx, "and") } </span>
+												}
+												<span class="text-light">{ ruleFieldLabel(ctx, c.Field) } { ruleOpLabel(ctx, c.Op) }</span> { c.Values }
+											</div>
+										}
+									</a>
+								</td>
+								<td>
+									for _, a := range r.Actions {
+										<div>
+											<span class="text-light">{ ruleActionLabel(ctx, a.Type) }</span> { a.Value }
+										</div>
+									}
+								</td>
+								<td class="align-right">
+									if r.Origin == domain.RuleOriginLearned {
+										@learnedBadge()
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		if len(d.Stages) == 0 && d.Filtered {
+			<p class="text-light">{ kit.T(ctx, "No rules match.") }</p>
+		} else if len(d.Stages) == 0 {
 			<p class="text-light">{ kit.T(ctx, "No rules yet.") }</p>
 		}
 	}
@@ -64,3 +107,59 @@ templ learnedBadge() {
 	<span class="badge" data-variant="secondary">{ kit.T(ctx, "learned") }</span>
 }
 
+// filterPopover is the dialog of the filters of the rules of d, but the query.
+templ filterPopover(d rulesData) {
+	<article class="card p-4 form-compact" popover id="filter-popover">
+		<div class="row">
+			@kit.Field("col-6", kit.T(ctx, "Runs"), "", "", nil) {
+				<select name="stage">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, s := range domain.RuleStages() {
+						<option value={ string(s) } selected?={ s == d.Filter.Stage }>{ ruleStageLabel(ctx, s) }</option>
+					}
+				</select>
+			}
+			@kit.Field("col-6", kit.T(ctx, "Origin"), "", "", nil) {
+				<select name="origin">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					<option value={ string(domain.RuleOriginUser) } selected?={ d.Filter.Origin == domain.RuleOriginUser }>{ kit.T(ctx, "mine") }</option>
+					<option value={ string(domain.RuleOriginLearned) } selected?={ d.Filter.Origin == domain.RuleOriginLearned }>{ kit.T(ctx, "learned") }</option>
+				</select>
+			}
+			@kit.Field("col-6", kit.T(ctx, "Field"), "", "", nil) {
+				<select name="field">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, f := range domain.RuleFields() {
+						<option value={ string(f.Field) } selected?={ f.Field == d.Filter.Field }>{ ruleFieldLabel(ctx, f.Field) }</option>
+					}
+				</select>
+			}
+			@kit.Field("col-6", kit.T(ctx, "Action"), "", "", nil) {
+				<select name="action">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, typ := range domain.ActionTypes() {
+						<option value={ string(typ) } selected?={ typ == d.Filter.Action }>{ ruleActionLabel(ctx, typ) }</option>
+					}
+				</select>
+			}
+			@kit.Field("col-12", kit.T(ctx, "Category"), "", "", nil) {
+				<select name="category">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					@kit.CategoryOptions(d.Categories, d.Category)
+				</select>
+			}
+			@kit.Field("col-12", kit.T(ctx, "Account"), "", "", nil) {
+				<select name="account">
+					<option value="">{ kit.T(ctx, "All") }</option>
+					for _, a := range d.Accounts {
+						<option value={ a.ID } selected?={ a.ID == d.Filter.AccountID }>{ a.Name }</option>
+					}
+				</select>
+			}
+		</div>
+		<footer class="hstack justify-end mt-4">
+			<button type="button" class="outline" popovertarget="filter-popover" popovertargetaction="hide">{ kit.T(ctx, "Close") }</button>
+			<button type="submit">{ kit.T(ctx, "Apply") }</button>
+		</footer>
+	</article>
+}

@@ -17,6 +17,7 @@ const (
 	GetOperationOperation    OperationName = "GetOperation"
 	GetRuleOperation         OperationName = "GetRule"
 	GetRuleSettingsOperation OperationName = "GetRuleSettings"
+	LearnRulesOperation      OperationName = "LearnRules"
 	ListAccountsOperation    OperationName = "ListAccounts"
 	ListCategoriesOperation  OperationName = "ListCategories"
 	ListOperationsOperation  OperationName = "ListOperations"

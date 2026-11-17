@@ -54,7 +54,8 @@ type Operation struct {
 	Type        OpType
 	AccountID   int64
 	ToAccountID int64
-	// CategoryID is the category of an expense or income, 0 for transfers and adjustments.
+	// CategoryID is the category of an expense or income, 0 for one without a category
+	// and for transfers and adjustments.
 	CategoryID int64
 	// OriginID is the id of the operation a split started from, shared by all parts of
 	// the split including that operation; 0 when the operation was never split.
@@ -118,7 +119,8 @@ type OperationInput struct {
 	Type        OpType
 	AccountID   int64
 	ToAccountID int64
-	// CategoryID is required for expense and income and must be 0 otherwise.
+	// CategoryID is the category of an expense or income, 0 for none; it must be 0 for
+	// transfers and adjustments.
 	CategoryID int64
 	Amount     money.Amount
 	Date       time.Time
@@ -265,17 +267,17 @@ func (o *Operation) setTransfer(in OperationInput, to *Account) error {
 }
 
 func (o *Operation) setCategory(in OperationInput, cat *Category) error {
+	if !in.Amount.IsPositive() {
+		return NewError(errors.ErrInvalid, "amount: must be positive")
+	}
 	if in.CategoryID == 0 {
-		return NewError(errors.ErrInvalid, "category: required")
+		return nil
 	}
 	if cat == nil || cat.ID != in.CategoryID {
 		return NewError(errors.ErrInvalid, "category: category not found")
 	}
 	if cat.Kind != o.Kind() {
 		return NewError(errors.ErrInvalid, "category: category %q is not an %s category", cat.Name, Msg(o.Kind()))
-	}
-	if !in.Amount.IsPositive() {
-		return NewError(errors.ErrInvalid, "amount: must be positive")
 	}
 	o.CategoryID = cat.ID
 	return nil
@@ -373,7 +375,9 @@ func parseDateTime(date time.Time, tm string) (time.Time, string, error) {
 type Filter struct {
 	AccountID  int64
 	CategoryID int64
-	Type       OpType
+	// Uncategorized selects expenses and income without a category.
+	Uncategorized bool
+	Type          OpType
 	// DateFrom and DateTo are inclusive calendar days, zero when unset.
 	DateFrom time.Time
 	DateTo   time.Time
@@ -388,7 +392,7 @@ type Filter struct {
 
 // Filtered reports whether any field is set.
 func (f Filter) Filtered() bool {
-	return f.AccountID != 0 || f.CategoryID != 0 || f.Type != "" || !f.DateFrom.IsZero() ||
+	return f.AccountID != 0 || f.CategoryID != 0 || f.Uncategorized || f.Type != "" || !f.DateFrom.IsZero() ||
 		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || len(f.Tags) > 0
 }
 
@@ -396,7 +400,7 @@ func (f Filter) Filtered() bool {
 func (f Filter) Count() int {
 	var n int
 	for _, set := range []bool{
-		f.AccountID != 0, f.CategoryID != 0, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
+		f.AccountID != 0, f.CategoryID != 0 || f.Uncategorized, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
 		f.AmountMin.Valid, f.AmountMax.Valid, len(f.Tags) > 0,
 	} {
 		if set {
@@ -416,6 +420,9 @@ func (f Filter) Validate() error {
 	}
 	if f.AmountMin.Valid && f.AmountMax.Valid && f.AmountMin.Amount.Cmp(f.AmountMax.Amount) > 0 {
 		return NewError(errors.ErrInvalid, "amount min: must not be above max")
+	}
+	if f.Uncategorized && f.CategoryID != 0 {
+		return NewError(errors.ErrInvalid, "category: choose a category or no category")
 	}
 	return nil
 }

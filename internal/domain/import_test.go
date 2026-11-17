@@ -113,15 +113,26 @@ func TestCommitRows(t *testing.T) {
 	_, err = domain.CommitRows(rows, nil, m, time.UTC)
 	require.ErrorIs(t, err, errors.ErrConflict)
 
-	// uncategorized replaces the mapped categories, even the mapped ones
-	m.Uncategorized = map[domain.Kind]domain.Category{domain.KindExpense: {ID: 99, Kind: domain.KindExpense}}
+	// a row without a bank category needs no mapping and gets no category
+	rows[2].Row.Category = ""
+	p := domain.NewPreview(domain.Import{}, rows, m, nil)
+	assert.True(t, p.Ready())
+	require.Len(t, p.Categories, 1, "only the category of the other row")
+	assert.Equal(t, "Food", p.Categories[0].Name)
+	commits, err = domain.CommitRows(rows, nil, m, time.UTC)
+	require.NoError(t, err)
+	assert.Zero(t, commits[1].Op.CategoryID)
+
+	// no categories leaves out even the mapped ones
+	m.NoCategories = true
+	rows[2].Row.Category = "Unmapped"
 	assert.True(t, domain.NewPreview(domain.Import{}, rows, m, nil).Ready())
 	rows[2].Row.Category = "Food"
 	commits, err = domain.CommitRows(rows, nil, m, time.UTC)
 	require.NoError(t, err)
 	require.Len(t, commits, 3)
-	assert.Equal(t, int64(99), commits[1].Op.CategoryID)
-	assert.Equal(t, int64(99), commits[2].Op.CategoryID)
+	assert.Zero(t, commits[1].Op.CategoryID)
+	assert.Zero(t, commits[2].Op.CategoryID)
 }
 
 func TestPreviewCheckReady(t *testing.T) {

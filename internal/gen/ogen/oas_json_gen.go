@@ -2004,6 +2004,12 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Uncategorized.Set {
+			e.FieldStart("uncategorized")
+			s.Uncategorized.Encode(e)
+		}
+	}
+	{
 		if s.Type.Set {
 			e.FieldStart("type")
 			s.Type.Encode(e)
@@ -2059,18 +2065,19 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOperationQuery = [11]string{
+var jsonFieldsNameOfOperationQuery = [12]string{
 	0:  "account_id",
 	1:  "category_id",
-	2:  "type",
-	3:  "date_from",
-	4:  "date_to",
-	5:  "query",
-	6:  "tag",
-	7:  "amount_min",
-	8:  "amount_max",
-	9:  "cursor",
-	10: "page_size",
+	2:  "uncategorized",
+	3:  "type",
+	4:  "date_from",
+	5:  "date_to",
+	6:  "query",
+	7:  "tag",
+	8:  "amount_min",
+	9:  "amount_max",
+	10: "cursor",
+	11: "page_size",
 }
 
 // Decode decodes OperationQuery from json.
@@ -2101,6 +2108,16 @@ func (s *OperationQuery) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"category_id\"")
+			}
+		case "uncategorized":
+			if err := func() error {
+				s.Uncategorized.Reset()
+				if err := s.Uncategorized.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"uncategorized\"")
 			}
 		case "type":
 			if err := func() error {
@@ -4102,6 +4119,102 @@ func (s RuleStage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RuleStage) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *RulesLearnResult) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RulesLearnResult) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("learned")
+		e.Int(s.Learned)
+	}
+}
+
+var jsonFieldsNameOfRulesLearnResult = [1]string{
+	0: "learned",
+}
+
+// Decode decodes RulesLearnResult from json.
+func (s *RulesLearnResult) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RulesLearnResult to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "learned":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Int()
+				s.Learned = int(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"learned\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RulesLearnResult")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRulesLearnResult) {
+					name = jsonFieldsNameOfRulesLearnResult[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RulesLearnResult) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RulesLearnResult) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
