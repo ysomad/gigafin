@@ -1,8 +1,14 @@
 package settings
 
 import (
+	"fmt"
+	"strings"
+
+	"rsc.io/qr"
+
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/i18n"
+	"github.com/ysomad/gigafin/internal/totp"
 )
 
 // pageData is the data of the settings page, or of the cards of it an htmx post
@@ -12,6 +18,11 @@ type pageData struct {
 	Keys      []domain.APIKey
 	NewToken  string
 	CanBackup bool
+	// TwoFactor is the state of two-factor authentication. TOTPSetup is the secret of it
+	// being set up, RecoveryCodes are new codes, shown once.
+	TwoFactor     domain.TwoFactor
+	TOTPSetup     *totpSetup
+	RecoveryCodes []string
 	// Notice is a success message of an htmx post, shown as a toast.
 	Notice string
 	// General, Rate and APIKey are the values of a failed post of their form, to fill
@@ -94,4 +105,40 @@ type ratesSync struct {
 	Updated int
 	// Err is a failure of some sources; the rest are synced
 	Err error
+}
+
+// totpSetup is a TOTP secret being set up, with the QR code of its otpauth URI drawn as
+// an SVG path of unit squares on a QRSize grid.
+type totpSetup struct {
+	Secret string
+	// Key is Secret in groups of 4 to type by hand; apps ignore the spaces.
+	Key    string
+	QRPath string
+	QRSize int
+}
+
+// newTOTPSetup returns the setup of secret for the user of login.
+func newTOTPSetup(login, secret string) (*totpSetup, error) {
+	// quiet is the blank border scanners need around a QR code, in modules
+	const quiet = 4
+	code, err := qr.Encode(totp.URI("gigafin", login, secret), qr.M)
+	if err != nil {
+		return nil, fmt.Errorf("encode qr code: %w", err)
+	}
+	var path strings.Builder
+	for y := range code.Size {
+		for x := range code.Size {
+			if code.Black(x, y) {
+				fmt.Fprintf(&path, "M%d %dh1v1h-1z", x+quiet, y+quiet)
+			}
+		}
+	}
+	var key strings.Builder
+	for i, r := range secret {
+		if i > 0 && i%4 == 0 {
+			key.WriteByte(' ')
+		}
+		key.WriteRune(r)
+	}
+	return &totpSetup{Secret: secret, Key: key.String(), QRPath: path.String(), QRSize: code.Size + 2*quiet}, nil
 }

@@ -16,10 +16,18 @@ type Users struct {
 	q *sqlc.Queries
 }
 
-// Credentials is a user with the password hash, which never leaves the auth service.
+// Credentials is a user with the password hash and TOTP secret, which never leave the
+// auth service.
 type Credentials struct {
 	User         domain.User
 	PasswordHash string
+	// TOTPSecret is the encrypted TOTP secret, empty when two-factor authentication is
+	// off. TOTPPendingSecret is the encrypted secret being set up, empty when none is.
+	TOTPSecret        []byte
+	TOTPPendingSecret []byte
+	// TOTPLastStep is the step of the last TOTP code used, 0 when none was.
+	TOTPLastStep  int64
+	TOTPEnabledAt time.Time
 }
 
 // Create stores a new user.
@@ -57,9 +65,7 @@ func (r *Users) Credentials(ctx context.Context, id int64) (Credentials, error) 
 	if err != nil {
 		return Credentials{}, notFound(err, "user")
 	}
-	return Credentials{
-		User: domain.NewUser(u.ID, u.Login, u.Timezone, domain.Role(u.Role)), PasswordHash: u.PasswordHash,
-	}, nil
+	return credentialsFromRow(u), nil
 }
 
 // CredentialsByLogin returns a user by login with the password hash.
@@ -68,9 +74,21 @@ func (r *Users) CredentialsByLogin(ctx context.Context, login string) (Credentia
 	if err != nil {
 		return Credentials{}, notFound(err, "user")
 	}
-	return Credentials{
-		User: domain.NewUser(u.ID, u.Login, u.Timezone, domain.Role(u.Role)), PasswordHash: u.PasswordHash,
-	}, nil
+	return credentialsFromRow(u), nil
+}
+
+func credentialsFromRow(u sqlc.User) Credentials {
+	c := Credentials{
+		User:              domain.NewUser(u.ID, u.Login, u.Timezone, domain.Role(u.Role)),
+		PasswordHash:      u.PasswordHash,
+		TOTPSecret:        u.TOTPSecret,
+		TOTPPendingSecret: u.TOTPPendingSecret,
+		TOTPLastStep:      u.TOTPLastStep.Int64,
+	}
+	if u.TOTPEnabledAt.Valid {
+		c.TOTPEnabledAt = time.Unix(u.TOTPEnabledAt.Int64, 0)
+	}
+	return c
 }
 
 // SetPassword stores a new password hash.
@@ -95,6 +113,182 @@ func (r *Users) SetTimezone(ctx context.Context, id int64, tz string, now time.T
 		Timezone: tz, UpdatedAt: sql.NullInt64{Int64: now.Unix(), Valid: true}, ID: id,
 	})
 	return affected(n, err, "update time zone")
+}
+
+// SetPendingTOTP stores the encrypted secret being set up, replacing one set up before.
+// It fails with errors.ErrNotFound when two-factor authentication is on already.
+func (r *Users) SetPendingTOTP(ctx context.Context, id int64, secret []byte, now time.Time) error {
+	n, err := r.q.SetUserPendingTOTP(ctx, sqlc.SetUserPendingTOTPParams{
+		TOTPPendingSecret: secret, UpdatedAt: nullUnix(now), ID: id,
+	})
+	return affected(n, err, "set pending totp")
+}
+
+// ClearPendingTOTP drops the secret being set up.
+func (r *Users) ClearPendingTOTP(ctx context.Context, id int64, now time.Time) error {
+	err := r.q.ClearUserPendingTOTP(ctx, sqlc.ClearUserPendingTOTPParams{UpdatedAt: nullUnix(now), ID: id})
+	if err != nil {
+		return fmt.Errorf("clear pending totp: %w", err)
+	}
+	return nil
+}
+
+// EnableTOTP turns two-factor authentication on with the pending secret, which must
+// still be pending, recording step as used. It fails with errors.ErrNotFound when it is
+// on already or another secret is pending.
+func (r *Users) EnableTOTP(ctx context.Context, id int64, pending []byte, step int64, now time.Time) error {
+	n, err := r.q.EnableUserTOTP(ctx, sqlc.EnableUserTOTPParams{
+		Step:    sql.NullInt64{Int64: step, Valid: true},
+		Now:     nullUnix(now),
+		ID:      id,
+		Pending: pending,
+	})
+	return affected(n, err, "enable totp")
+}
+
+// DisableTOTP turns two-factor authentication off.
+func (r *Users) DisableTOTP(ctx context.Context, id int64, now time.Time) error {
+	n, err := r.q.DisableUserTOTP(ctx, sqlc.DisableUserTOTPParams{UpdatedAt: nullUnix(now), ID: id})
+	return affected(n, err, "disable totp")
+}
+
+// UseTOTPStep records step as the last used TOTP step and reports whether it is after
+// the stored one, so of two requests with the same code only one succeeds.
+func (r *Users) UseTOTPStep(ctx context.Context, id, step int64) (bool, error) {
+	n, err := r.q.UseUserTOTPStep(ctx, sqlc.UseUserTOTPStepParams{Step: sql.NullInt64{Int64: step, Valid: true}, ID: id})
+	if err != nil {
+		return false, fmt.Errorf("use totp step: %w", err)
+	}
+	return n == 1, nil
+}
+
+// RecoveryCodes stores the hashes of unused recovery codes by prefix.
+type RecoveryCodes struct {
+	q *sqlc.Queries
+}
+
+// RecoveryCode is the stored hash of a recovery code.
+type RecoveryCode struct {
+	ID   int64
+	Hash string
+}
+
+// Replace replaces the user's codes with codes, of which the prefix and hash are stored.
+func (r *RecoveryCodes) Replace(ctx context.Context, userID int64, codes []credential.Token, now time.Time) error {
+	if err := r.q.DeleteUserRecoveryCodes(ctx, userID); err != nil {
+		return fmt.Errorf("delete recovery codes: %w", err)
+	}
+	for _, c := range codes {
+		err := r.q.CreateRecoveryCode(ctx, sqlc.CreateRecoveryCodeParams{
+			UserID: userID, Prefix: c.Prefix, CodeHash: c.Hash, CreatedAt: now.Unix(),
+		})
+		if err != nil {
+			return fmt.Errorf("create recovery code: %w", err)
+		}
+	}
+	return nil
+}
+
+// Count returns how many unused codes the user has.
+func (r *RecoveryCodes) Count(ctx context.Context, userID int64) (int, error) {
+	n, err := r.q.CountRecoveryCodes(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("count recovery codes: %w", err)
+	}
+	return int(n), nil
+}
+
+// ListByPrefix returns the user's codes with prefix, usually one.
+func (r *RecoveryCodes) ListByPrefix(ctx context.Context, userID int64, prefix string) ([]RecoveryCode, error) {
+	rows, err := r.q.ListRecoveryCodesByPrefix(ctx, sqlc.ListRecoveryCodesByPrefixParams{UserID: userID, Prefix: prefix})
+	if err != nil {
+		return nil, fmt.Errorf("list recovery codes: %w", err)
+	}
+	codes := make([]RecoveryCode, len(rows))
+	for i, c := range rows {
+		codes[i] = RecoveryCode{ID: c.ID, Hash: c.CodeHash}
+	}
+	return codes, nil
+}
+
+// Delete deletes a code and reports whether it was there, so it is used once.
+func (r *RecoveryCodes) Delete(ctx context.Context, id int64) (bool, error) {
+	n, err := r.q.DeleteRecoveryCode(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("delete recovery code: %w", err)
+	}
+	return n == 1, nil
+}
+
+// DeleteForUser deletes all codes of a user.
+func (r *RecoveryCodes) DeleteForUser(ctx context.Context, userID int64) error {
+	if err := r.q.DeleteUserRecoveryCodes(ctx, userID); err != nil {
+		return fmt.Errorf("delete recovery codes: %w", err)
+	}
+	return nil
+}
+
+// LoginChallenges stores sign-ins waiting for a second-factor code by token hash.
+type LoginChallenges struct {
+	q *sqlc.Queries
+}
+
+// Create stores a challenge.
+func (r *LoginChallenges) Create(
+	ctx context.Context, tokenHash string, userID int64, userAgent string, expires, now time.Time,
+) error {
+	err := r.q.CreateLoginChallenge(ctx, sqlc.CreateLoginChallengeParams{
+		UserID:    userID,
+		TokenHash: tokenHash,
+		UserAgent: userAgent,
+		ExpiresAt: expires.Unix(),
+		CreatedAt: now.Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("create login challenge: %w", err)
+	}
+	return nil
+}
+
+// TakeAttempt counts an attempt of the challenge with tokenHash and returns it, or fails
+// with errors.ErrNotFound when it has none of maxAttempts left or expired at now. The
+// attempt is counted before the code is checked, so parallel requests cannot try more.
+func (r *LoginChallenges) TakeAttempt(
+	ctx context.Context, tokenHash string, maxAttempts int, now time.Time,
+) (domain.LoginChallenge, error) {
+	c, err := r.q.TakeLoginChallengeAttempt(ctx, sqlc.TakeLoginChallengeAttemptParams{
+		TokenHash: tokenHash, MaxAttempts: int64(maxAttempts), Now: now.Unix(),
+	})
+	if err != nil {
+		return domain.LoginChallenge{}, notFound(err, "login challenge")
+	}
+	return domain.LoginChallenge{ID: c.ID, UserID: c.UserID, UserAgent: c.UserAgent, Attempts: int(c.Attempts)}, nil
+}
+
+// Delete deletes a challenge and reports whether it was there, so it is passed once.
+func (r *LoginChallenges) Delete(ctx context.Context, id int64) (bool, error) {
+	n, err := r.q.DeleteLoginChallenge(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("delete login challenge: %w", err)
+	}
+	return n == 1, nil
+}
+
+// DeleteForUser deletes all challenges of a user.
+func (r *LoginChallenges) DeleteForUser(ctx context.Context, userID int64) error {
+	if err := r.q.DeleteUserLoginChallenges(ctx, userID); err != nil {
+		return fmt.Errorf("delete login challenges: %w", err)
+	}
+	return nil
+}
+
+// DeleteExpired deletes challenges expired at now and returns how many.
+func (r *LoginChallenges) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
+	n, err := r.q.DeleteExpiredLoginChallenges(ctx, now.Unix())
+	if err != nil {
+		return 0, fmt.Errorf("delete expired login challenges: %w", err)
+	}
+	return n, nil
 }
 
 // Sessions stores browser sessions by token hash.

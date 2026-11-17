@@ -9,6 +9,7 @@ import (
 
 	"github.com/ysomad/gigafin/internal/credential"
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/password"
 )
 
 func TestNew(t *testing.T) {
@@ -40,6 +41,28 @@ func TestNew(t *testing.T) {
 		assert.True(t, credential.Matches(tok.Token, tok.Hash))
 		_, ok := credential.Parse(tok.Token)
 		assert.False(t, ok)
+	})
+
+	t.Run("recovery", func(t *testing.T) {
+		t.Parallel()
+
+		tok, err := credential.New(credential.KindRecovery)
+		require.NoError(t, err)
+		assert.Equal(t, credential.KindRecovery, tok.Kind)
+		assert.Regexp(t, `^[a-z2-7]{4}-[a-z2-7]{4}-[a-z2-7]{4}$`, tok.Token)
+		typed := " " + strings.ToUpper(strings.ReplaceAll(tok.Token, "-", " ")) + " "
+		prefix, code, ok := credential.ParseRecoveryCode(typed)
+		require.True(t, ok)
+		assert.Equal(t, tok.Prefix, prefix)
+		assert.Equal(t, tok.Token[:4], prefix)
+		match, err := password.Compare(tok.Hash, code)
+		require.NoError(t, err)
+		assert.True(t, match)
+
+		for _, s := range []string{"", "123456", "abcd-efgh-ijk", "abcd-efgh-ijkl1", "abcd-efgh-ijk1"} {
+			_, _, ok = credential.ParseRecoveryCode(s)
+			assert.False(t, ok, s)
+		}
 	})
 
 	t.Run("unknown kind", func(t *testing.T) {

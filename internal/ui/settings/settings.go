@@ -41,6 +41,11 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"POST /settings/rates/set":               h.setRate,
 		"POST /settings/rates/reset":             h.resetRate,
 		"POST /settings/password":                h.changePassword,
+		"POST /settings/2fa/setup":               h.setupTwoFactor,
+		"POST /settings/2fa/cancel":              h.cancelTwoFactorSetup,
+		"POST /settings/2fa/enable":              h.enableTwoFactor,
+		"POST /settings/2fa/disable":             h.disableTwoFactor,
+		"POST /settings/2fa/recovery-codes":      h.regenerateRecoveryCodes,
 		"POST /settings/api-keys":                h.createAPIKey,
 		"POST /settings/delete-data":             h.deleteAllData,
 		"GET /settings/export":                   h.exportData,
@@ -67,7 +72,8 @@ const (
 	_cardAccess
 	_cardDelete
 	_cardBanks
-	_cardAll = _cardGeneral | _cardPassword | _cardRates | _cardAccess | _cardDelete | _cardBanks
+	_cardTwoFactor
+	_cardAll = _cardGeneral | _cardPassword | _cardRates | _cardAccess | _cardDelete | _cardBanks | _cardTwoFactor
 )
 
 // loadSettings sets the data of cards in d. The settings are read here, not taken from
@@ -81,6 +87,16 @@ func (h *Handler) loadSettings(r *http.Request, user domain.User, d *pageData, c
 		}
 		if d.Keys, err = h.app.Svc.Auth.ListAPIKeys(ctx, user.ID); err != nil {
 			return err
+		}
+	}
+	if cards&_cardTwoFactor != 0 {
+		if d.TwoFactor, err = h.app.Svc.Auth.TwoFactor(ctx, user.ID); err != nil {
+			return err
+		}
+		if d.TwoFactor.PendingSecret != "" {
+			if d.TOTPSetup, err = newTOTPSetup(user.Login, d.TwoFactor.PendingSecret); err != nil {
+				return err
+			}
 		}
 	}
 	if cards&(_cardGeneral|_cardRates) != 0 {
@@ -130,8 +146,8 @@ func (h *Handler) renderSettings(
 
 // settingsReply answers a settings form post that failed with fail.Err, or succeeded
 // when it is nil. htmx gets cards, swapped in out of band, and the toasts. A plain
-// browser gets the page on failure or with a result shown once, a new API key token or
-// a rate sync, else is sent back to it.
+// browser gets the page on failure or with a result shown once, a new API key token,
+// recovery codes or a rate sync, else is sent back to it.
 func (h *Handler) settingsReply(
 	w http.ResponseWriter, r *http.Request, user domain.User, cards settingsCard, d pageData, fail kit.Failure,
 ) error {
@@ -144,7 +160,7 @@ func (h *Handler) settingsReply(
 	}
 	if !kit.IsHTMX(r) {
 		// a token is never put in a URL, so it is rendered instead of redirecting
-		if fail.Err != nil || d.NewToken != "" || d.RatesSync.Done {
+		if fail.Err != nil || d.NewToken != "" || d.RatesSync.Done || len(d.RecoveryCodes) > 0 {
 			return h.renderSettings(w, r, user, status, d, fail)
 		}
 		kit.Redirect(w, r, "/settings")
@@ -160,6 +176,9 @@ func (h *Handler) settingsReply(
 	}
 	if cards&_cardPassword != 0 {
 		cs = append(cs, passwordCard(v, true))
+	}
+	if cards&_cardTwoFactor != 0 {
+		cs = append(cs, twoFactorCard(v, d, true))
 	}
 	if cards&_cardRates != 0 {
 		cs = append(cs, ratesCard(v, d, true))
@@ -322,6 +341,90 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request, user do
 	// the request still carries the old session cookie, so the sessions are listed
 	// without the current one marked
 	return h.settingsReply(w, r, user, _cardPassword|_cardAccess, pageData{Notice: notice}, kit.Failure{})
+}
+
+func (h *Handler) setupTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	if _, err := h.app.Svc.Auth.SetupTwoFactor(r.Context(), user.ID); err != nil {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa"})
+	}
+	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
+}
+
+func (h *Handler) cancelTwoFactorSetup(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	if err := h.app.Svc.Auth.CancelTwoFactorSetup(r.Context(), user.ID); err != nil {
+		return err
+	}
+	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
+}
+
+func (h *Handler) enableTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	if err := r.ParseForm(); err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
+	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
+	errs := kit.FieldsError{}
+	if strings.TrimSpace(code) == "" {
+		errs["2fa.code"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if pass == "" {
+		errs["2fa.password"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if len(errs) > 0 {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa"})
+	}
+	codes, token, err := h.app.Svc.Auth.EnableTwoFactor(r.Context(), user.ID, pass, code, r.UserAgent())
+	if err != nil {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa"})
+	}
+	// sessions started with the password alone end, this browser gets a new one
+	http.SetCookie(w, h.app.Cookie(kit.SessionCookie, token, int(h.app.SessionTTL.Seconds())))
+	p := kit.PrefsFrom(r.Context())
+	notice := h.app.Dicts.T(p.Lang, "Two-factor authentication is on. Other sessions are signed out.")
+	return h.settingsReply(w, r, user, _cardTwoFactor|_cardAccess, pageData{RecoveryCodes: codes, Notice: notice},
+		kit.Failure{})
+}
+
+func (h *Handler) disableTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	if err := r.ParseForm(); err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
+	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
+	errs := kit.FieldsError{}
+	if strings.TrimSpace(code) == "" {
+		errs["2fa-manage.code"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if pass == "" {
+		errs["2fa-manage.password"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if len(errs) > 0 {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa-manage"})
+	}
+	if err := h.app.Svc.Auth.DisableTwoFactor(r.Context(), user.ID, pass, code); err != nil {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa-manage"})
+	}
+	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
+}
+
+func (h *Handler) regenerateRecoveryCodes(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	if err := r.ParseForm(); err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
+	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
+	errs := kit.FieldsError{}
+	if strings.TrimSpace(code) == "" {
+		errs["2fa-manage.code"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if pass == "" {
+		errs["2fa-manage.password"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if len(errs) > 0 {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa-manage"})
+	}
+	codes, err := h.app.Svc.Auth.RegenerateRecoveryCodes(r.Context(), user.ID, pass, code)
+	if err != nil {
+		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa-manage"})
+	}
+	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{RecoveryCodes: codes}, kit.Failure{})
 }
 
 func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request, user domain.User) error {

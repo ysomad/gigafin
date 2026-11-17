@@ -22,6 +22,7 @@ type Config struct {
 	Session Session `envPrefix:"SESSION_"`
 	Import  Import  `envPrefix:"IMPORT_"`
 	Banks   Banks   `envPrefix:"BANKS_"`
+	TOTP    TOTP    `envPrefix:"TOTP_"`
 }
 
 // Logger configures the JSON logs.
@@ -78,6 +79,13 @@ type Banks struct {
 	// SyncOverlap is how far before the end of the last synced period a sync starts,
 	// to catch operations the bank added late.
 	SyncOverlap time.Duration
+}
+
+// TOTP configures two-factor authentication with authenticator apps.
+type TOTP struct {
+	// SecretKey encrypts TOTP secrets in the database: 32 bytes in standard base64, such
+	// as the output of openssl rand -base64 32. Empty disables setting it up.
+	SecretKey string
 }
 
 // Load returns Default with values set in the environment replacing it.

@@ -10,6 +10,31 @@ import (
 	"database/sql"
 )
 
+const clearUserPendingTOTP = `-- name: ClearUserPendingTOTP :exec
+UPDATE users SET totp_pending_secret = NULL, updated_at = ? WHERE id = ?
+`
+
+type ClearUserPendingTOTPParams struct {
+	UpdatedAt sql.NullInt64
+	ID        int64
+}
+
+func (q *Queries) ClearUserPendingTOTP(ctx context.Context, arg ClearUserPendingTOTPParams) error {
+	_, err := q.db.ExecContext(ctx, clearUserPendingTOTP, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const countRecoveryCodes = `-- name: CountRecoveryCodes :one
+SELECT count(*) FROM recovery_codes WHERE user_id = ?
+`
+
+func (q *Queries) CountRecoveryCodes(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRecoveryCodes, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAPIKey = `-- name: CreateAPIKey :one
 INSERT INTO api_keys (user_id, name, prefix, key_hash, scope, expires_at, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -52,6 +77,53 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 	return i, err
 }
 
+const createLoginChallenge = `-- name: CreateLoginChallenge :exec
+INSERT INTO login_challenges (user_id, token_hash, user_agent, attempts, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type CreateLoginChallengeParams struct {
+	UserID    int64
+	TokenHash string
+	UserAgent string
+	Attempts  int64
+	ExpiresAt int64
+	CreatedAt int64
+}
+
+func (q *Queries) CreateLoginChallenge(ctx context.Context, arg CreateLoginChallengeParams) error {
+	_, err := q.db.ExecContext(ctx, createLoginChallenge,
+		arg.UserID,
+		arg.TokenHash,
+		arg.UserAgent,
+		arg.Attempts,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const createRecoveryCode = `-- name: CreateRecoveryCode :exec
+INSERT INTO recovery_codes (user_id, prefix, code_hash, created_at) VALUES (?, ?, ?, ?)
+`
+
+type CreateRecoveryCodeParams struct {
+	UserID    int64
+	Prefix    string
+	CodeHash  string
+	CreatedAt int64
+}
+
+func (q *Queries) CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error {
+	_, err := q.db.ExecContext(ctx, createRecoveryCode,
+		arg.UserID,
+		arg.Prefix,
+		arg.CodeHash,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO sessions (user_id, token_hash, user_agent, expires_at, last_used_at, created_at)
 VALUES (?, ?, ?, ?, ?, ?)
@@ -81,7 +153,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (login, password_hash, timezone, role, created_at)
 VALUES (?, ?, ?, ?, ?)
-RETURNING id, login, password_hash, timezone, role, created_at, updated_at
+RETURNING id, login, password_hash, timezone, role, totp_secret, totp_pending_secret, totp_last_step, totp_enabled_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -107,10 +179,26 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.Timezone,
 		&i.Role,
+		&i.TOTPSecret,
+		&i.TOTPPendingSecret,
+		&i.TOTPLastStep,
+		&i.TOTPEnabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteExpiredLoginChallenges = `-- name: DeleteExpiredLoginChallenges :execrows
+DELETE FROM login_challenges WHERE expires_at <= ?
+`
+
+func (q *Queries) DeleteExpiredLoginChallenges(ctx context.Context, expiresAt int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteExpiredLoginChallenges, expiresAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :execrows
@@ -125,12 +213,54 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt int64) (i
 	return result.RowsAffected()
 }
 
+const deleteLoginChallenge = `-- name: DeleteLoginChallenge :execrows
+DELETE FROM login_challenges WHERE id = ?
+`
+
+func (q *Queries) DeleteLoginChallenge(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteLoginChallenge, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteRecoveryCode = `-- name: DeleteRecoveryCode :execrows
+DELETE FROM recovery_codes WHERE id = ?
+`
+
+func (q *Queries) DeleteRecoveryCode(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteRecoveryCode, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteSession = `-- name: DeleteSession :exec
 DELETE FROM sessions WHERE token_hash = ?
 `
 
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash string) error {
 	_, err := q.db.ExecContext(ctx, deleteSession, tokenHash)
+	return err
+}
+
+const deleteUserLoginChallenges = `-- name: DeleteUserLoginChallenges :exec
+DELETE FROM login_challenges WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserLoginChallenges(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserLoginChallenges, userID)
+	return err
+}
+
+const deleteUserRecoveryCodes = `-- name: DeleteUserRecoveryCodes :exec
+DELETE FROM recovery_codes WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserRecoveryCodes(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserRecoveryCodes, userID)
 	return err
 }
 
@@ -160,6 +290,52 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
 	return err
 }
 
+const disableUserTOTP = `-- name: DisableUserTOTP :execrows
+UPDATE users
+SET totp_secret = NULL, totp_pending_secret = NULL, totp_last_step = NULL, totp_enabled_at = NULL, updated_at = ?
+WHERE id = ?
+`
+
+type DisableUserTOTPParams struct {
+	UpdatedAt sql.NullInt64
+	ID        int64
+}
+
+func (q *Queries) DisableUserTOTP(ctx context.Context, arg DisableUserTOTPParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableUserTOTP, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const enableUserTOTP = `-- name: EnableUserTOTP :execrows
+UPDATE users
+SET totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = ?1,
+    totp_enabled_at = ?2, updated_at = ?2
+WHERE id = ?3 AND totp_secret IS NULL AND totp_pending_secret = ?4
+`
+
+type EnableUserTOTPParams struct {
+	Step    sql.NullInt64
+	Now     sql.NullInt64
+	ID      int64
+	Pending []byte
+}
+
+func (q *Queries) EnableUserTOTP(ctx context.Context, arg EnableUserTOTPParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, enableUserTOTP,
+		arg.Step,
+		arg.Now,
+		arg.ID,
+		arg.Pending,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getAPIKeyByPrefix = `-- name: GetAPIKeyByPrefix :one
 SELECT id, user_id, name, prefix, key_hash, scope, expires_at, last_used_at, revoked_at, created_at FROM api_keys WHERE prefix = ?
 `
@@ -184,7 +360,7 @@ func (q *Queries) GetAPIKeyByPrefix(ctx context.Context, prefix string) (ApiKey,
 
 const getSession = `-- name: GetSession :one
 SELECT
-    users.id, users.login, users.password_hash, users.timezone, users.role, users.created_at, users.updated_at, sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
+    users.id, users.login, users.password_hash, users.timezone, users.role, users.totp_secret, users.totp_pending_secret, users.totp_last_step, users.totp_enabled_at, users.created_at, users.updated_at, sessions.id, sessions.user_agent, sessions.expires_at, sessions.last_used_at,
     sessions.created_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id
@@ -209,6 +385,10 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionR
 		&i.User.PasswordHash,
 		&i.User.Timezone,
 		&i.User.Role,
+		&i.User.TOTPSecret,
+		&i.User.TOTPPendingSecret,
+		&i.User.TOTPLastStep,
+		&i.User.TOTPEnabledAt,
 		&i.User.CreatedAt,
 		&i.User.UpdatedAt,
 		&i.ID,
@@ -221,7 +401,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionR
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, login, password_hash, timezone, role, created_at, updated_at FROM users WHERE id = ?
+SELECT id, login, password_hash, timezone, role, totp_secret, totp_pending_secret, totp_last_step, totp_enabled_at, created_at, updated_at FROM users WHERE id = ?
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
@@ -233,6 +413,10 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.PasswordHash,
 		&i.Timezone,
 		&i.Role,
+		&i.TOTPSecret,
+		&i.TOTPPendingSecret,
+		&i.TOTPLastStep,
+		&i.TOTPEnabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -240,7 +424,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByLogin = `-- name: GetUserByLogin :one
-SELECT id, login, password_hash, timezone, role, created_at, updated_at FROM users WHERE login = ?
+SELECT id, login, password_hash, timezone, role, totp_secret, totp_pending_secret, totp_last_step, totp_enabled_at, created_at, updated_at FROM users WHERE login = ?
 `
 
 func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error) {
@@ -252,6 +436,10 @@ func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error
 		&i.PasswordHash,
 		&i.Timezone,
 		&i.Role,
+		&i.TOTPSecret,
+		&i.TOTPPendingSecret,
+		&i.TOTPLastStep,
+		&i.TOTPEnabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -283,6 +471,43 @@ func (q *Queries) ListAPIKeys(ctx context.Context, userID int64) ([]ApiKey, erro
 			&i.RevokedAt,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecoveryCodesByPrefix = `-- name: ListRecoveryCodesByPrefix :many
+SELECT id, code_hash FROM recovery_codes WHERE user_id = ? AND prefix = ?
+`
+
+type ListRecoveryCodesByPrefixParams struct {
+	UserID int64
+	Prefix string
+}
+
+type ListRecoveryCodesByPrefixRow struct {
+	ID       int64
+	CodeHash string
+}
+
+func (q *Queries) ListRecoveryCodesByPrefix(ctx context.Context, arg ListRecoveryCodesByPrefixParams) ([]ListRecoveryCodesByPrefixRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRecoveryCodesByPrefix, arg.UserID, arg.Prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecoveryCodesByPrefixRow
+	for rows.Next() {
+		var i ListRecoveryCodesByPrefixRow
+		if err := rows.Scan(&i.ID, &i.CodeHash); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -332,7 +557,7 @@ func (q *Queries) ListSessions(ctx context.Context, userID int64) ([]Session, er
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, login, password_hash, timezone, role, created_at, updated_at FROM users ORDER BY id
+SELECT id, login, password_hash, timezone, role, totp_secret, totp_pending_secret, totp_last_step, totp_enabled_at, created_at, updated_at FROM users ORDER BY id
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -350,6 +575,10 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.PasswordHash,
 			&i.Timezone,
 			&i.Role,
+			&i.TOTPSecret,
+			&i.TOTPPendingSecret,
+			&i.TOTPLastStep,
+			&i.TOTPEnabledAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -382,6 +611,51 @@ func (q *Queries) RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (int
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const setUserPendingTOTP = `-- name: SetUserPendingTOTP :execrows
+UPDATE users SET totp_pending_secret = ?, updated_at = ? WHERE id = ? AND totp_secret IS NULL
+`
+
+type SetUserPendingTOTPParams struct {
+	TOTPPendingSecret []byte
+	UpdatedAt         sql.NullInt64
+	ID                int64
+}
+
+func (q *Queries) SetUserPendingTOTP(ctx context.Context, arg SetUserPendingTOTPParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setUserPendingTOTP, arg.TOTPPendingSecret, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const takeLoginChallengeAttempt = `-- name: TakeLoginChallengeAttempt :one
+UPDATE login_challenges SET attempts = attempts + 1
+WHERE token_hash = ?1 AND attempts < ?2 AND expires_at > ?3
+RETURNING id, user_id, token_hash, user_agent, attempts, expires_at, created_at
+`
+
+type TakeLoginChallengeAttemptParams struct {
+	TokenHash   string
+	MaxAttempts int64
+	Now         int64
+}
+
+func (q *Queries) TakeLoginChallengeAttempt(ctx context.Context, arg TakeLoginChallengeAttemptParams) (LoginChallenge, error) {
+	row := q.db.QueryRowContext(ctx, takeLoginChallengeAttempt, arg.TokenHash, arg.MaxAttempts, arg.Now)
+	var i LoginChallenge
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.UserAgent,
+		&i.Attempts,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const touchAPIKey = `-- name: TouchAPIKey :exec
@@ -461,6 +735,24 @@ type UpdateUserTimezoneParams struct {
 
 func (q *Queries) UpdateUserTimezone(ctx context.Context, arg UpdateUserTimezoneParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateUserTimezone, arg.Timezone, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const useUserTOTPStep = `-- name: UseUserTOTPStep :execrows
+UPDATE users SET totp_last_step = ?1
+WHERE id = ?2 AND totp_secret IS NOT NULL AND (totp_last_step IS NULL OR totp_last_step < ?1)
+`
+
+type UseUserTOTPStepParams struct {
+	Step sql.NullInt64
+	ID   int64
+}
+
+func (q *Queries) UseUserTOTPStep(ctx context.Context, arg UseUserTOTPStepParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, useUserTOTPStep, arg.Step, arg.ID)
 	if err != nil {
 		return 0, err
 	}

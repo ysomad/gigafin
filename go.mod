@@ -29,6 +29,7 @@ require (
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.15.0
 	modernc.org/sqlite v1.61.1
+	rsc.io/qr v0.2.0
 )
 
 require (

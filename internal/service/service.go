@@ -7,6 +7,9 @@
 package service
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -41,6 +44,9 @@ type Options struct {
 	// RateFetchers fetch exchange rates of each source users may pick.
 	RateFetchers map[domain.RateSource]RateFetcher
 	Banks        BankOptions
+	// TOTPKey encrypts TOTP secrets stored in the database, 32 bytes; without it two-factor
+	// authentication cannot be set up.
+	TOTPKey []byte
 }
 
 // New returns services over store using clock for timestamps and today's date, logging
@@ -56,6 +62,15 @@ func New(store *repository.Store, clock timex.Clock, log *slog.Logger, opts Opti
 	rules := &Rules{store: store, clock: clock, log: log}
 	imports.categorizer = rules
 	auth := &Auth{store: store, clock: clock, log: log, session: opts.Session}
+	if len(opts.TOTPKey) > 0 {
+		block, err := aes.NewCipher(opts.TOTPKey)
+		if err != nil {
+			return nil, fmt.Errorf("totp secret key: %w", err)
+		}
+		if auth.aead, err = cipher.NewGCM(block); err != nil {
+			return nil, fmt.Errorf("totp secret key: %w", err)
+		}
+	}
 	accounts := &Accounts{store: store, clock: clock, log: log}
 	banks, err := newBanks(store, clock, log, imports, accounts, opts.Banks)
 	if err != nil {

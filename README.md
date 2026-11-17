@@ -21,7 +21,7 @@ make tools
 make user-add login=me role=admin
 make run            # migrates gigafin.db, serves on 127.0.0.1:8080
 ```
-Config via env (`DB_PATH`, `HTTP_ADDR`, `BANKS_SECRET_KEY`, …), see `internal/config`.
+Config via env (`DB_PATH`, `HTTP_ADDR`, `BANKS_SECRET_KEY`, `TOTP_SECRET_KEY`, …), see `internal/config`.
 
 ## Development
 `make generate` · `make test` · `make lint` · `make dev` (live reload). See [CLAUDE.md](CLAUDE.md) and [CODE_STYLE.md](CODE_STYLE.md).

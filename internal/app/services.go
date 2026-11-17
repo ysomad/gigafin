@@ -24,6 +24,13 @@ func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*ser
 	if err != nil {
 		return nil, nil, fmt.Errorf("config: %w", err)
 	}
+	var totpKey []byte
+	if cfg.TOTP.SecretKey != "" {
+		totpKey, err = base64.StdEncoding.DecodeString(cfg.TOTP.SecretKey)
+		if err != nil || len(totpKey) != 32 {
+			return nil, nil, errors.Error("config: TOTP_SECRET_KEY: must be 32 bytes in base64")
+		}
+	}
 	store, err := repository.Open(ctx, cfg.DBPath)
 	if err != nil {
 		return nil, nil, err
@@ -41,7 +48,8 @@ func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*ser
 			// one request a second stays under the rate limit of the CBR site
 			domain.RateSourceCBR: exchangerate.NewCBR(newHTTPClient(time.Minute), exchangerate.CBRURL, time.Second),
 		},
-		Banks: banks,
+		Banks:   banks,
+		TOTPKey: totpKey,
 	})
 	if err != nil {
 		_ = store.Close()

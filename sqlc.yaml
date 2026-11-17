@@ -10,6 +10,10 @@ sql:
         out: internal/gen/sqlc
         rename:
           mcc: MCC
+          totp_secret: TOTPSecret
+          totp_pending_secret: TOTPPendingSecret
+          totp_last_step: TOTPLastStep
+          totp_enabled_at: TOTPEnabledAt
         overrides:
           - column: plans.is_repeating
             go_type: bool

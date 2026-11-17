@@ -66,6 +66,29 @@ func userRole(ctx context.Context, cfg config.Config, log *slog.Logger, args []s
 	return nil
 }
 
+// userTwoFactorOff turns two-factor authentication off for a user who lost both the
+// authenticator app and the recovery codes.
+func userTwoFactorOff(ctx context.Context, cfg config.Config, log *slog.Logger, args []string) error {
+	fs := flag.NewFlagSet("user 2fa-off", flag.ContinueOnError)
+	login := fs.String("login", "", "login of the user")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *login == "" {
+		return errors.Error("-login is required")
+	}
+	svc, closeStore, err := newServices(ctx, cfg, log)
+	if err != nil {
+		return err
+	}
+	defer closeStore()
+	if err := svc.Auth.DisableTwoFactorByLogin(ctx, *login); err != nil {
+		return err
+	}
+	fmt.Printf("two-factor authentication of %q turned off\n", *login)
+	return nil
+}
+
 func userPasswd(ctx context.Context, cfg config.Config, log *slog.Logger, args []string) error {
 	fs := flag.NewFlagSet("user passwd", flag.ContinueOnError)
 	return userCommand(ctx, cfg, log, fs, args, "New password: ", func(a *service.Auth, login, pass string) error {

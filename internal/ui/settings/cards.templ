@@ -3,6 +3,7 @@ package settings
 import (
 	"cmp"
 	"fmt"
+	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/timex"
@@ -94,6 +95,138 @@ templ passwordCard(v kit.Page, oob bool) {
 			}
 			@kit.SubmitColumn("col-3", "", kit.T(ctx, "Change password"))
 		</form>
+	</article>
+}
+
+// twoFactorCard turns two-factor authentication on and off: while a secret is set up it
+// walks through scanning its QR code and confirming a code, after codes are made it
+// shows the recovery codes, once. Without a key on the server it tells how to set one.
+// oob marks it for htmx to swap in out of band.
+templ twoFactorCard(v kit.Page, d pageData, oob bool) {
+	<article
+		id="settings-2fa"
+		class="card mb-4 form-compact"
+		if oob {
+			hx-swap-oob="true"
+		}
+	>
+		<div class="hstack">
+			<h3>{ kit.T(ctx, "Two-factor authentication") }</h3>
+			switch  {
+				case d.TwoFactor.Enabled:
+					<span class="badge" data-variant="success">{ kit.T(ctx, "On") }</span>
+					<span class="badge outline">{ kit.T(ctx, "since %s", kit.Datetime(ctx, d.TwoFactor.EnabledAt, v.User)) }</span>
+					// a few left is the time to make new ones, before they run out
+					<span
+						if d.TwoFactor.RecoveryCodes <= 2 {
+							class="badge"
+							data-variant="warning"
+						} else {
+							class="badge outline"
+						}
+					>{ kit.T(ctx, "recovery codes left: %d", d.TwoFactor.RecoveryCodes) }</span>
+				case d.TOTPSetup != nil:
+					<span class="badge" data-variant="warning">{ kit.T(ctx, "Setting up") }</span>
+				default:
+					<span class="badge" data-variant="secondary">{ kit.T(ctx, "Off") }</span>
+			}
+		</div>
+		if len(d.RecoveryCodes) > 0 {
+			<div class="vstack mb-4">
+				<div class="hstack">
+					<p class="text-light">{ kit.T(ctx, "Save these recovery codes. Each works once. They won't be shown again.") }</p>
+					<button type="button" class="icon outline" data-copy={ strings.Join(d.RecoveryCodes, "\n") } aria-label={ kit.T(ctx, "Copy all codes") }>
+						<svg data-icon="copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+						<svg data-icon="check" hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+					</button>
+				</div>
+				<ul class="unstyled hstack gap-2">
+					for _, c := range d.RecoveryCodes {
+						<li><code>{ c }</code></li>
+					}
+				</ul>
+			</div>
+		}
+		switch  {
+			case d.TwoFactor.Enabled:
+				// both actions need a code and the password, so they share the inputs
+				<form id="form-2fa-manage" method="post" action="/settings/2fa/recovery-codes" class="row" hx-post="/settings/2fa/recovery-codes" hx-swap="none">
+					@kit.FormError(v.Errors.Form("2fa-manage"), "col-12")
+					{{ e := v.Errors.Get("2fa-manage.password") }}
+					@kit.Field("col-3", kit.T(ctx, "Current password"), e, "2fa-manage-password-error", nil) {
+						<input type="password" name="password" autocomplete="current-password" { kit.Invalid(e, "2fa-manage-password-error")... }/>
+					}
+					{{ e = v.Errors.Get("2fa-manage.code") }}
+					@kit.Field("col-3", kit.T(ctx, "Code or recovery code"), e, "2fa-manage-code-error", nil) {
+						<input name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" { kit.Invalid(e, "2fa-manage-code-error")... }/>
+					}
+					<div class="col-6 vstack gap-1">
+						<label aria-hidden="true">&nbsp;</label>
+						<div class="hstack">
+							<button type="submit">{ kit.T(ctx, "New recovery codes") }</button>
+							<button type="submit" data-variant="danger" formaction="/settings/2fa/disable" hx-post="/settings/2fa/disable">{ kit.T(ctx, "Turn off") }</button>
+						</div>
+					</div>
+				</form>
+			case d.TOTPSetup != nil:
+				<div class="row">
+					<div class="col-3 vstack justify-center items-center">
+						<svg
+							width="200"
+							height="200"
+							viewBox={ fmt.Sprintf("0 0 %d %d", d.TOTPSetup.QRSize, d.TOTPSetup.QRSize) }
+							shape-rendering="crispEdges"
+							role="img"
+							aria-label={ kit.T(ctx, "QR code") }
+						>
+							<rect width="100%" height="100%" fill="#fff"></rect>
+							<path d={ d.TOTPSetup.QRPath } fill="#000"></path>
+						</svg>
+					</div>
+					<div class="col-9 vstack">
+						<div>
+							<p><strong>1.</strong> { kit.T(ctx, "Scan the QR code with an authenticator app.") }</p>
+							<p class="text-light">{ kit.T(ctx, "Can't scan it? Enter this key in the app instead.") }</p>
+							<fieldset class="group">
+								<input readonly value={ d.TOTPSetup.Key } aria-label={ kit.T(ctx, "Key") } autocomplete="off" spellcheck="false"/>
+								<button type="button" class="icon outline" data-copy={ d.TOTPSetup.Secret } aria-label={ kit.T(ctx, "Copy key") }>
+									<svg data-icon="copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+									<svg data-icon="check" hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+								</button>
+							</fieldset>
+						</div>
+						<div>
+							<p><strong>2.</strong> { kit.T(ctx, "Enter your current password and the 6-digit code the app shows.") }</p>
+							// cancel posts the form elsewhere, so it sits by Turn on
+							<form id="form-2fa" method="post" action="/settings/2fa/enable" class="row" hx-post="/settings/2fa/enable" hx-swap="none">
+								@kit.FormError(v.Errors.Form("2fa"), "col-12")
+								{{ e := v.Errors.Get("2fa.password") }}
+								@kit.Field("col-4", kit.T(ctx, "Current password"), e, "2fa-password-error", nil) {
+									<input type="password" name="password" autocomplete="current-password" { kit.Invalid(e, "2fa-password-error")... }/>
+								}
+								{{ e = v.Errors.Get("2fa.code") }}
+								@kit.Field("col-4", kit.T(ctx, "Code"), e, "2fa-code-error", nil) {
+									<input name="code" inputmode="numeric" autocomplete="one-time-code" { kit.Invalid(e, "2fa-code-error")... }/>
+								}
+								<div class="col-4 vstack gap-1">
+									<label aria-hidden="true">&nbsp;</label>
+									<div class="hstack">
+										<button type="submit">{ kit.T(ctx, "Turn on") }</button>
+										<button type="submit" class="outline" data-variant="secondary" formaction="/settings/2fa/cancel" hx-post="/settings/2fa/cancel">{ kit.T(ctx, "Cancel") }</button>
+									</div>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div>
+			case !d.TwoFactor.Available:
+				<p class="text-light">{ kit.T(ctx, "Set TOTP_SECRET_KEY (openssl rand -base64 32) and restart gigafin.") }</p>
+			default:
+				<form method="post" action="/settings/2fa/setup" hx-post="/settings/2fa/setup" hx-swap="none">
+					@kit.FormError(v.Errors.Form("2fa"), "")
+					<button type="submit">{ kit.T(ctx, "Set up") }</button>
+				</form>
+		}
 	</article>
 }
 

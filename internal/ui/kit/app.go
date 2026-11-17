@@ -68,7 +68,13 @@ func (a *App) cookieName(name string) string {
 
 // SessionToken returns the session token of the request, empty when it has none.
 func (a *App) SessionToken(r *http.Request) string {
-	c, err := r.Cookie(a.cookieName(SessionCookie))
+	return a.CookieValue(r, SessionCookie)
+}
+
+// CookieValue returns the value of cookie name, set with Cookie, empty when the request
+// has none.
+func (a *App) CookieValue(r *http.Request, name string) string {
+	c, err := r.Cookie(a.cookieName(name))
 	if err != nil {
 		return ""
 	}

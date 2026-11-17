@@ -27,3 +27,27 @@ templ loginPage(v kit.Page, d loginData) {
 		</div>
 	}
 }
+
+// twoFactorPage asks a user with two-factor authentication on for a code after the
+// password.
+templ twoFactorPage(v kit.Page, _ struct{}) {
+	@kit.Layout(v, false, nil) {
+		<div class="row">
+			<article class="card col-6 offset-3">
+				<h1>{ kit.T(ctx, "Two-factor authentication") }</h1>
+				<p class="text-light">{ kit.T(ctx, "Enter the code from your authenticator app or one of your recovery codes.") }</p>
+				<form id="form-2fa" method="post" action="/login/2fa">
+					@kit.FormError(v.Errors.Form("2fa"), "")
+					{{ e := v.Errors.Get("code") }}
+					@kit.Field("", kit.T(ctx, "Code"), e, "code-error", nil) {
+						<input name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" autofocus { kit.Invalid(e, "code-error")... }/>
+					}
+					<div class="hstack">
+						<button type="submit">{ kit.T(ctx, "Sign in") }</button>
+						@kit.LinkButton("/login", "secondary", kit.T(ctx, "Back"))
+					</div>
+				</form>
+			</article>
+		</div>
+	}
+}

@@ -21,6 +21,60 @@ UPDATE users SET role = ?, updated_at = ? WHERE login = ?;
 -- name: UpdateUserTimezone :execrows
 UPDATE users SET timezone = ?, updated_at = ? WHERE id = ?;
 
+-- name: SetUserPendingTOTP :execrows
+UPDATE users SET totp_pending_secret = ?, updated_at = ? WHERE id = ? AND totp_secret IS NULL;
+
+-- name: ClearUserPendingTOTP :exec
+UPDATE users SET totp_pending_secret = NULL, updated_at = ? WHERE id = ?;
+
+-- name: EnableUserTOTP :execrows
+UPDATE users
+SET totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = sqlc.arg(step),
+    totp_enabled_at = sqlc.arg(now), updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND totp_secret IS NULL AND totp_pending_secret = sqlc.arg(pending);
+
+-- name: DisableUserTOTP :execrows
+UPDATE users
+SET totp_secret = NULL, totp_pending_secret = NULL, totp_last_step = NULL, totp_enabled_at = NULL, updated_at = ?
+WHERE id = ?;
+
+-- name: UseUserTOTPStep :execrows
+UPDATE users SET totp_last_step = sqlc.arg(step)
+WHERE id = sqlc.arg(id) AND totp_secret IS NOT NULL AND (totp_last_step IS NULL OR totp_last_step < sqlc.arg(step));
+
+-- name: CreateRecoveryCode :exec
+INSERT INTO recovery_codes (user_id, prefix, code_hash, created_at) VALUES (?, ?, ?, ?);
+
+-- name: CountRecoveryCodes :one
+SELECT count(*) FROM recovery_codes WHERE user_id = ?;
+
+-- name: ListRecoveryCodesByPrefix :many
+SELECT id, code_hash FROM recovery_codes WHERE user_id = ? AND prefix = ?;
+
+-- name: DeleteRecoveryCode :execrows
+DELETE FROM recovery_codes WHERE id = ?;
+
+-- name: DeleteUserRecoveryCodes :exec
+DELETE FROM recovery_codes WHERE user_id = ?;
+
+-- name: CreateLoginChallenge :exec
+INSERT INTO login_challenges (user_id, token_hash, user_agent, attempts, expires_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: TakeLoginChallengeAttempt :one
+UPDATE login_challenges SET attempts = attempts + 1
+WHERE token_hash = sqlc.arg(token_hash) AND attempts < sqlc.arg(max_attempts) AND expires_at > sqlc.arg(now)
+RETURNING *;
+
+-- name: DeleteLoginChallenge :execrows
+DELETE FROM login_challenges WHERE id = ?;
+
+-- name: DeleteUserLoginChallenges :exec
+DELETE FROM login_challenges WHERE user_id = ?;
+
+-- name: DeleteExpiredLoginChallenges :execrows
+DELETE FROM login_challenges WHERE expires_at <= ?;
+
 -- name: CreateSession :exec
 INSERT INTO sessions (user_id, token_hash, user_agent, expires_at, last_used_at, created_at)
 VALUES (?, ?, ?, ?, ?, ?);

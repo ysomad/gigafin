@@ -24,6 +24,7 @@ templ page(v kit.Page, d pageData) {
 		@ratesCard(v, d, false)
 		@accessCard(v, d, false)
 		@passwordCard(v, false)
+		@twoFactorCard(v, d, false)
 		<article class="card mb-4 form-compact">
 			<h3>{ kit.T(ctx, "Export") }</h3>
 			<p class="text-light">{ kit.T(ctx, "Without dates, data of all time is exported.") }</p>

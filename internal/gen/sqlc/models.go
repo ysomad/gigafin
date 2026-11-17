@@ -127,6 +127,16 @@ type ImportRow struct {
 	ExternalID  sql.NullString
 }
 
+type LoginChallenge struct {
+	ID        int64
+	UserID    int64
+	TokenHash string
+	UserAgent string
+	Attempts  int64
+	ExpiresAt int64
+	CreatedAt int64
+}
+
 type Operation struct {
 	ID          int64
 	UserID      int64
@@ -173,6 +183,14 @@ type PlanCarry struct {
 	CreatedAt int64
 }
 
+type RecoveryCode struct {
+	ID        int64
+	UserID    int64
+	Prefix    string
+	CodeHash  string
+	CreatedAt int64
+}
+
 type Rule struct {
 	ID         int64
 	UserID     int64
@@ -203,13 +221,17 @@ type Tag struct {
 }
 
 type User struct {
-	ID           int64
-	Login        string
-	PasswordHash string
-	Timezone     string
-	Role         string
-	CreatedAt    int64
-	UpdatedAt    sql.NullInt64
+	ID                int64
+	Login             string
+	PasswordHash      string
+	Timezone          string
+	Role              string
+	TOTPSecret        []byte
+	TOTPPendingSecret []byte
+	TOTPLastStep      sql.NullInt64
+	TOTPEnabledAt     sql.NullInt64
+	CreatedAt         int64
+	UpdatedAt         sql.NullInt64
 }
 
 type UserSetting struct {

@@ -44,6 +44,7 @@
 - [x] tbank sync, balance check (if does not count - show alert)
 - [x] rules event sourcing
 - [x] Rename dashboard to analytics
+- [x] 2fa
 - [ ] better categories ui/ux (icons, selectors)
 - [ ] operations tags filter
 - [ ] sber sync
@@ -52,7 +53,6 @@
 - [ ] bybit sync?
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)
 - [ ] shared household plan (between multiple users)
-- [ ] 2fa
 - [ ] No Cross-currency transfers. An operation has one amount, so a RUB→USD transfer can't record both sides. It needs a to_amount.
 - [ ] No exchange rates or base currency. Totals stay split by currency, so there is no single net worth or "total spent this month."
 - [ ] Recurring and scheduled operations. No bills, subscriptions or planned future operations, and no "upcoming" view.

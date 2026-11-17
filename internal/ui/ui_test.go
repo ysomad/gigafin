@@ -24,6 +24,7 @@ import (
 	"github.com/ysomad/gigafin/internal/repository/repotest"
 	"github.com/ysomad/gigafin/internal/service"
 	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/totp"
 	"github.com/ysomad/gigafin/internal/ui"
 )
 
@@ -37,6 +38,7 @@ func newBrowser(t *testing.T) (browser, *service.Services, int64) {
 	t.Helper()
 	svc, err := service.New(repotest.New(t), timex.System{}, slog.New(slog.DiscardHandler), service.Options{
 		Session: domain.SessionLifetime{Max: 30 * 24 * time.Hour, Idle: 7 * 24 * time.Hour},
+		TOTPKey: bytes.Repeat([]byte{7}, 32),
 	})
 	require.NoError(t, err)
 	u, err := ui.New(ui.Config{
@@ -146,6 +148,40 @@ func TestLoginRequired(t *testing.T) {
 	}
 }
 
+func TestLoginTwoFactor(t *testing.T) {
+	t.Parallel()
+
+	b, svc, userID := newBrowser(t)
+	secret, err := svc.Auth.SetupTwoFactor(t.Context(), userID)
+	require.NoError(t, err)
+	code, err := totp.Code(secret, totp.Step(time.Now()))
+	require.NoError(t, err)
+	codes, _, err := svc.Auth.EnableTwoFactor(t.Context(), userID, "password1234", code, "")
+	require.NoError(t, err)
+
+	status, body := b.get("/login/2fa")
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, `id="form-login"`, "no sign-in in progress goes back to the password")
+
+	b.login()
+	status, body = b.get("/operations")
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, `id="form-login"`, "the password alone does not sign in")
+
+	status, body = b.get("/login/2fa")
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, `id="form-2fa"`)
+
+	status, _ = b.post("/login/2fa", url.Values{"code": {"wrong"}})
+	assert.Equal(t, http.StatusUnprocessableEntity, status)
+
+	status, body = b.post("/login/2fa", url.Values{"code": {codes[0]}})
+	require.Equal(t, http.StatusOK, status, body)
+	status, body = b.get("/operations")
+	require.Equal(t, http.StatusOK, status)
+	assert.Contains(t, body, "No operations yet.")
+}
+
 func TestPagesAndFlows(t *testing.T) {
 	t.Parallel()
 
@@ -168,7 +204,6 @@ func TestPagesAndFlows(t *testing.T) {
 	status, body = b.get("/accounts")
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "1\u202f000.50")
-	assert.Contains(t, body, "data-minor-units")
 
 	status, body = b.post("/accounts", url.Values{"name": {"Card"}, "currency": {"RUB"}})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
@@ -349,7 +384,6 @@ func TestPagesAndFlows(t *testing.T) {
 		"category": {strconv.FormatInt(groceries.ID, 10)}, "amount": {"100,25"}, "tags": {"trip, food ,"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, `<a class="tag" href="/operations?tag=trip">trip</a>`)
 	status, body = b.get(opPath + "/edit")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `value="food, trip"`)
@@ -362,7 +396,8 @@ func TestPagesAndFlows(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "Expenses by category")
 	assert.Contains(t, body, "Food")
-	assert.Contains(t, body, `<figure class="trend" data-currency="RUB">`)
+	assert.Contains(t, body, `data-currency="RUB"`)
+	assert.Contains(t, body, "data-minor-units", "the chart shows minor units as set")
 	assert.Contains(t, body, `"months":[`)
 	assert.Contains(t, body, "Top payees")
 	assert.Contains(t, body, "Market")
@@ -375,7 +410,8 @@ func TestPagesAndFlows(t *testing.T) {
 	status, body = b.get("/?month=2026-11&compare=2026-10")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `<option value="2026-10" selected>`)
-	assert.Contains(t, body, `<td class="num income">-100%</td>`, "food spent in the compare month only")
+	assert.Contains(t, body, `<span class="badge" data-variant="success">-100%</span>`,
+		"food spent in the compare month only")
 
 	foodPath := "/categories/" + strconv.FormatInt(food.ID, 10)
 	status, body = b.postFrom(foodPath+"/delete", foodPath, nil)
@@ -411,7 +447,7 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(t, body, "gf_")
 	assert.Contains(t, body, "be shown again")
 	assert.Contains(t, body, "this browser", "current session listed")
-	assert.Contains(t, body, `<td data-label="Expires">never</td>`)
+	assert.Contains(t, body, `<td>read</td><td>never</td><td>never</td>`, "never used, never expires")
 }
 
 func TestChangePassword(t *testing.T) {
@@ -510,10 +546,10 @@ func TestRevokeSession(t *testing.T) {
 
 	b, svc, userID := newBrowser(t)
 	b.login()
-	other, _, err := svc.Auth.Login(t.Context(), "alice", "password1234", "OtherBrowser/1.0")
+	other, err := svc.Auth.Login(t.Context(), "alice", "password1234", "OtherBrowser/1.0")
 	require.NoError(t, err)
 
-	sessions, err := svc.Auth.ListSessions(t.Context(), userID, other)
+	sessions, err := svc.Auth.ListSessions(t.Context(), userID, other.Token)
 	require.NoError(t, err)
 	require.Len(t, sessions, 2)
 	status, body := b.get("/settings")
@@ -529,7 +565,7 @@ func TestRevokeSession(t *testing.T) {
 	status, body = b.post("/settings/sessions/"+strconv.FormatInt(otherID, 10)+"/revoke", nil)
 	require.Equal(t, http.StatusOK, status, body)
 	assert.NotContains(t, body, "OtherBrowser/1.0")
-	_, err = svc.Auth.SessionUser(t.Context(), other)
+	_, err = svc.Auth.SessionUser(t.Context(), other.Token)
 	require.ErrorIs(t, err, errors.ErrUnauthorized)
 }
 

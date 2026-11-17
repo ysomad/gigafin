@@ -40,6 +40,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("BANKS_SECRET_KEY", "a2V5")
 	t.Setenv("BANKS_SYNC_INTERVAL", "5m")
 	t.Setenv("BANKS_SYNC_OVERLAP", "72h")
+	t.Setenv("TOTP_SECRET_KEY", "dG90cA==")
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	assert.Equal(t, config.Config{
@@ -59,6 +60,7 @@ func TestLoadFromEnv(t *testing.T) {
 			SyncInterval: 5 * time.Minute,
 			SyncOverlap:  72 * time.Hour,
 		},
+		TOTP: config.TOTP{SecretKey: "dG90cA=="},
 	}, cfg)
 }
 

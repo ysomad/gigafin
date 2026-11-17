@@ -45,12 +45,15 @@ func Run(args []string) error {
 		return userPasswd(ctx, cfg, log, args[2:])
 	case len(args) >= 2 && args[0] == "user" && args[1] == "role":
 		return userRole(ctx, cfg, log, args[2:])
+	case len(args) >= 2 && args[0] == "user" && args[1] == "2fa-off":
+		return userTwoFactorOff(ctx, cfg, log, args[2:])
 	default:
 		const usage errors.Error = `usage:
   gigafin serve
   gigafin user add    -login LOGIN [-role user|admin] [-tz ZONE]
   gigafin user passwd -login LOGIN
   gigafin user role   -login LOGIN -role user|admin
+  gigafin user 2fa-off -login LOGIN
 settings come from the environment: DB_PATH, LOGGER_LEVEL, HTTP_ADDR, HTTP_SECURE_COOKIES, ...`
 		return usage
 	}

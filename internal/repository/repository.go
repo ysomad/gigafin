@@ -21,6 +21,8 @@ type Repos struct {
 	Settings   *Settings
 	Sessions   *Sessions
 	APIKeys    *APIKeys
+	Recovery   *RecoveryCodes
+	Challenges *LoginChallenges
 	Accounts   *Accounts
 	Categories *Categories
 	Operations *Operations
@@ -102,6 +104,8 @@ func newRepos(q *sqlc.Queries) Repos {
 		Settings:   &Settings{q: q},
 		Sessions:   &Sessions{q: q},
 		APIKeys:    &APIKeys{q: q},
+		Recovery:   &RecoveryCodes{q: q},
+		Challenges: &LoginChallenges{q: q},
 		Accounts:   &Accounts{q: q},
 		Categories: &Categories{q: q},
 		Operations: &Operations{q: q},

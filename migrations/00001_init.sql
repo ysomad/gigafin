@@ -5,6 +5,11 @@ CREATE TABLE users (
     password_hash TEXT    NOT NULL,
     timezone      TEXT    NOT NULL,
     role          TEXT    NOT NULL,
+    -- TOTP two-factor authentication, NULL when off; secrets are encrypted
+    totp_secret         BLOB,
+    totp_pending_secret BLOB,
+    totp_last_step      INTEGER,
+    totp_enabled_at     INTEGER,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER
 ) STRICT;
@@ -32,6 +37,29 @@ CREATE TABLE sessions (
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
 CREATE INDEX sessions_token_hash_idx ON sessions (token_hash);
+
+CREATE TABLE recovery_codes (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    prefix     TEXT    NOT NULL,
+    code_hash  TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX recovery_codes_user_id_idx ON recovery_codes (user_id, prefix);
+
+CREATE TABLE login_challenges (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT    NOT NULL,
+    user_agent TEXT    NOT NULL,
+    attempts   INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX login_challenges_user_id_idx ON login_challenges (user_id);
+CREATE INDEX login_challenges_token_hash_idx ON login_challenges (token_hash);
 
 CREATE TABLE api_keys (
     id           INTEGER PRIMARY KEY,
@@ -317,6 +345,8 @@ DROP TABLE imports;
 DROP TABLE categories;
 DROP TABLE accounts;
 DROP TABLE api_keys;
+DROP TABLE login_challenges;
+DROP TABLE recovery_codes;
 DROP TABLE sessions;
 DROP TABLE user_settings;
 DROP TABLE users;

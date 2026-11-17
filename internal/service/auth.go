@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/cipher"
+	"crypto/rand"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/credential"
@@ -11,19 +15,28 @@ import (
 	"github.com/ysomad/gigafin/internal/password"
 	"github.com/ysomad/gigafin/internal/repository"
 	"github.com/ysomad/gigafin/internal/timex"
+	"github.com/ysomad/gigafin/internal/totp"
 )
 
 var (
-	errInvalidCredentials = domain.NewError(errors.ErrUnauthorized, "invalid login or password")
-	errWrongPassword      = domain.NewError(errors.ErrUnauthorized, "wrong password")
+	errInvalidCredentials   = domain.NewError(errors.ErrUnauthorized, "invalid login or password")
+	errWrongPassword        = domain.NewError(errors.ErrUnauthorized, "wrong password")
+	errWrongCode            = domain.NewError(errors.ErrUnauthorized, "wrong code")
+	errTwoFactorOn          = domain.NewError(errors.ErrConflict, "two-factor authentication is on already")
+	errTwoFactorOff         = domain.NewError(errors.ErrConflict, "two-factor authentication is off")
+	errNoSetup              = domain.NewError(errors.ErrConflict, "the setup is gone, start it again")
+	errTwoFactorUnavailable = domain.NewError(errors.ErrConflict, "two-factor authentication is not configured")
 )
 
-// Auth manages users, browser sessions and API keys.
+// Auth manages users, browser sessions, two-factor authentication and API keys.
 type Auth struct {
 	store   *repository.Store
 	clock   timex.Clock
 	log     *slog.Logger
 	session domain.SessionLifetime
+	// aead encrypts TOTP secrets, nil without a key, which disables setting up
+	// two-factor authentication
+	aead cipher.AEAD
 }
 
 // CreateUser creates a user with role.
@@ -111,6 +124,10 @@ func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error
 		if err := r.Users.SetPassword(ctx, userID, hash, s.clock.Now()); err != nil {
 			return err
 		}
+		// a sign-in that passed the old password must not finish
+		if err := r.Challenges.DeleteForUser(ctx, userID); err != nil {
+			return err
+		}
 		return r.Sessions.DeleteForUser(ctx, userID)
 	})
 	if err != nil {
@@ -169,6 +186,9 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 		if err := r.Users.SetPassword(ctx, userID, hash, now); err != nil {
 			return err
 		}
+		if err := r.Challenges.DeleteForUser(ctx, userID); err != nil {
+			return err
+		}
 		if err := r.Sessions.DeleteForUser(ctx, userID); err != nil {
 			return err
 		}
@@ -197,50 +217,432 @@ func (s *Auth) SetTimezone(ctx context.Context, userID int64, timezone string) e
 	return nil
 }
 
+// SignIn is a passed password check of Login.
+type SignIn struct {
+	User domain.User
+	// Token is the session token to put in a cookie, or with TwoFactor the token of a
+	// challenge to pass with a code to LoginTwoFactor within domain.LoginChallengeTTL.
+	Token string
+	// TwoFactor is set when the user has two-factor authentication on.
+	TwoFactor bool
+}
+
 // Login checks credentials and starts a session for the browser identified by
-// userAgent. It returns the session token to put in a cookie.
-func (s *Auth) Login(ctx context.Context, login, pass, userAgent string) (string, domain.User, error) {
+// userAgent, or a challenge when the user has two-factor authentication on.
+func (s *Auth) Login(ctx context.Context, login, pass, userAgent string) (SignIn, error) {
 	login, err := domain.ParseLogin(login)
 	if err != nil {
-		return "", domain.User{}, err
+		return SignIn{}, err
 	}
 
 	cred, err := s.store.Read().Users.CredentialsByLogin(ctx, login)
 	if errors.Is(err, errors.ErrNotFound) {
 		// hash anyway so response time does not reveal which logins exist
 		if _, err := password.Hash(pass); err != nil {
-			return "", domain.User{}, err
+			return SignIn{}, err
 		}
-		return "", domain.User{}, errInvalidCredentials
+		return SignIn{}, errInvalidCredentials
 	}
 
 	if err != nil {
-		return "", domain.User{}, err
+		return SignIn{}, err
 	}
 
 	ok, err := password.Compare(cred.PasswordHash, pass)
 	if err != nil {
-		return "", domain.User{}, err
+		return SignIn{}, err
 	}
 	if !ok {
-		return "", domain.User{}, errInvalidCredentials
+		return SignIn{}, errInvalidCredentials
 	}
 
 	tok, err := credential.New(credential.KindSession)
 	if err != nil {
-		return "", domain.User{}, err
+		return SignIn{}, err
 	}
 
 	now := s.clock.Now()
 	userAgent = domain.ParseUserAgent(userAgent)
 
+	if len(cred.TOTPSecret) > 0 {
+		expires := now.Add(domain.LoginChallengeTTL)
+		err = s.store.Write().Challenges.Create(ctx, tok.Hash, cred.User.ID, userAgent, expires, now)
+		if err != nil {
+			return SignIn{}, err
+		}
+		s.log.InfoContext(ctx, "password accepted, code required", slog.Int64("user_id", cred.User.ID))
+		return SignIn{User: cred.User, Token: tok.Token, TwoFactor: true}, nil
+	}
+
 	err = s.store.Write().Sessions.Create(ctx, tok.Hash, cred.User.ID, userAgent, s.session.Expiry(now, now), now)
 	if err != nil {
-		return "", domain.User{}, err
+		return SignIn{}, err
 	}
 
 	s.log.InfoContext(ctx, "user signed in", slog.Int64("user_id", cred.User.ID), slog.String("user_agent", userAgent))
-	return tok.Token, cred.User, nil
+	return SignIn{User: cred.User, Token: tok.Token}, nil
+}
+
+// LoginTwoFactor passes the challenge of Login with a code of the authenticator app or
+// a recovery code and starts a session for the browser the challenge was made for. It
+// returns the session token to put in a cookie. A wrong code fails with
+// errors.ErrUnauthorized; after domain.LoginChallengeAttempts codes, or once the
+// challenge expired, it fails with domain.ErrLoginExpired and the sign-in starts over.
+func (s *Auth) LoginTwoFactor(ctx context.Context, challenge, code string) (string, error) {
+	now := s.clock.Now()
+
+	ch, err := s.store.Write().Challenges.TakeAttempt(ctx, credential.Hash(challenge), domain.LoginChallengeAttempts, now)
+	if errors.Is(err, errors.ErrNotFound) {
+		return "", domain.ErrLoginExpired
+	}
+	if err != nil {
+		return "", err
+	}
+
+	cred, err := s.store.Read().Users.Credentials(ctx, ch.UserID)
+	if err != nil {
+		return "", err
+	}
+
+	ok, err := s.useSecondFactor(ctx, cred, code, now)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		// for fail2ban and alerts
+		s.log.WarnContext(ctx, "second factor rejected",
+			slog.Int64("user_id", ch.UserID), slog.Int("attempt", ch.Attempts))
+		return "", errWrongCode
+	}
+
+	tok, err := credential.New(credential.KindSession)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.store.InTx(ctx, func(r repository.Repos) error {
+		// two requests with the same challenge start one session
+		deleted, err := r.Challenges.Delete(ctx, ch.ID)
+		if err != nil {
+			return err
+		}
+		if !deleted {
+			return domain.ErrLoginExpired
+		}
+		return r.Sessions.Create(ctx, tok.Hash, ch.UserID, ch.UserAgent, s.session.Expiry(now, now), now)
+	})
+	if err != nil {
+		return "", err
+	}
+
+	s.log.InfoContext(ctx, "user signed in", slog.Int64("user_id", ch.UserID),
+		slog.String("user_agent", ch.UserAgent), slog.Bool("two_factor", true))
+	return tok.Token, nil
+}
+
+// useSecondFactor reports whether code is a TOTP code of cred not used before or one of
+// its recovery codes, and uses it up. Without a key only recovery codes work.
+func (s *Auth) useSecondFactor(
+	ctx context.Context, cred repository.Credentials, code string, now time.Time,
+) (bool, error) {
+	if len(cred.TOTPSecret) == 0 {
+		return false, errTwoFactorOff
+	}
+	if s.aead != nil {
+		secret, err := s.openTOTP(cred.User.ID, cred.TOTPSecret)
+		if err != nil {
+			return false, err
+		}
+		if step, ok := totp.Verify(secret, code, now, cred.TOTPLastStep); ok {
+			return s.store.Write().Users.UseTOTPStep(ctx, cred.User.ID, step)
+		}
+	}
+	prefix, code, ok := credential.ParseRecoveryCode(code)
+	if !ok {
+		return false, nil
+	}
+	codes, err := s.store.Read().Recovery.ListByPrefix(ctx, cred.User.ID, prefix)
+	if err != nil {
+		return false, err
+	}
+	for _, c := range codes {
+		match, err := password.Compare(c.Hash, code)
+		if err != nil {
+			return false, err
+		}
+		if !match {
+			continue
+		}
+		// of two requests with the same code only one deletes it
+		ok, err := s.store.Write().Recovery.Delete(ctx, c.ID)
+		if ok {
+			s.log.InfoContext(ctx, "recovery code used", slog.Int64("user_id", cred.User.ID))
+		}
+		return ok, err
+	}
+	return false, nil
+}
+
+// TwoFactor returns the state of the user's two-factor authentication.
+func (s *Auth) TwoFactor(ctx context.Context, userID int64) (domain.TwoFactor, error) {
+	c, err := s.store.Read().Users.Credentials(ctx, userID)
+	if err != nil {
+		return domain.TwoFactor{}, err
+	}
+	state := domain.TwoFactor{Available: s.aead != nil}
+	if len(c.TOTPSecret) == 0 {
+		if len(c.TOTPPendingSecret) > 0 && s.aead != nil {
+			if state.PendingSecret, err = s.openTOTP(userID, c.TOTPPendingSecret); err != nil {
+				return domain.TwoFactor{}, err
+			}
+		}
+		return state, nil
+	}
+	n, err := s.store.Read().Recovery.Count(ctx, userID)
+	if err != nil {
+		return domain.TwoFactor{}, err
+	}
+	state.Enabled, state.EnabledAt, state.RecoveryCodes = true, c.TOTPEnabledAt, n
+	return state, nil
+}
+
+// SetupTwoFactor starts setting up two-factor authentication: it stores a new secret,
+// replacing one set up before, and returns it to show in the authenticator app. It is
+// kept on the server, so EnableTwoFactor turns on the secret the user was shown.
+func (s *Auth) SetupTwoFactor(ctx context.Context, userID int64) (string, error) {
+	if s.aead == nil {
+		return "", errTwoFactorUnavailable
+	}
+	secret, err := totp.NewSecret()
+	if err != nil {
+		return "", err
+	}
+	sealed, err := s.sealTOTP(userID, secret)
+	if err != nil {
+		return "", err
+	}
+	err = s.store.Write().Users.SetPendingTOTP(ctx, userID, sealed, s.clock.Now())
+	if errors.Is(err, errors.ErrNotFound) {
+		return "", errTwoFactorOn
+	}
+	if err != nil {
+		return "", err
+	}
+	return secret, nil
+}
+
+// CancelTwoFactorSetup drops the secret of SetupTwoFactor.
+func (s *Auth) CancelTwoFactorSetup(ctx context.Context, userID int64) error {
+	return s.store.Write().Users.ClearPendingTOTP(ctx, userID, s.clock.Now())
+}
+
+// EnableTwoFactor checks the user's current password and a code of the secret of
+// SetupTwoFactor, which proves the authenticator app has it, then turns two-factor
+// authentication on. Sessions started with the password alone end and the browser
+// identified by userAgent gets a new one. It returns domain.RecoveryCodeCount recovery
+// codes, shown once, and the session token to put in a cookie.
+func (s *Auth) EnableTwoFactor(
+	ctx context.Context, userID int64, pass, code, userAgent string,
+) (codes []string, token string, err error) {
+	if err := s.CheckPassword(ctx, userID, pass); err != nil {
+		return nil, "", err
+	}
+	if s.aead == nil {
+		return nil, "", errTwoFactorUnavailable
+	}
+
+	c, err := s.store.Read().Users.Credentials(ctx, userID)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(c.TOTPSecret) > 0 {
+		return nil, "", errTwoFactorOn
+	}
+	if len(c.TOTPPendingSecret) == 0 {
+		return nil, "", errNoSetup
+	}
+	secret, err := s.openTOTP(userID, c.TOTPPendingSecret)
+	if err != nil {
+		return nil, "", err
+	}
+
+	now := s.clock.Now()
+
+	step, ok := totp.Verify(secret, code, now, 0)
+	if !ok {
+		return nil, "", errWrongCode
+	}
+
+	recovery, err := newRecoveryCodes()
+	if err != nil {
+		return nil, "", err
+	}
+	tok, err := credential.New(credential.KindSession)
+	if err != nil {
+		return nil, "", err
+	}
+	userAgent = domain.ParseUserAgent(userAgent)
+
+	err = s.store.InTx(ctx, func(r repository.Repos) error {
+		// a setup started meanwhile replaced the secret the code is of
+		if err := r.Users.EnableTOTP(ctx, userID, c.TOTPPendingSecret, step, now); errors.Is(err, errors.ErrNotFound) {
+			return errNoSetup
+		} else if err != nil {
+			return err
+		}
+		if err := r.Recovery.Replace(ctx, userID, recovery, now); err != nil {
+			return err
+		}
+		if err := r.Sessions.DeleteForUser(ctx, userID); err != nil {
+			return err
+		}
+		return r.Sessions.Create(ctx, tok.Hash, userID, userAgent, s.session.Expiry(now, now), now)
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	s.log.InfoContext(ctx, "two-factor authentication enabled, other sessions ended", slog.Int64("user_id", userID))
+	return recoveryTokens(recovery), tok.Token, nil
+}
+
+// DisableTwoFactor checks the user's current password and a code of the authenticator
+// app or a recovery code, then turns two-factor authentication off.
+func (s *Auth) DisableTwoFactor(ctx context.Context, userID int64, pass, code string) error {
+	if err := s.CheckPassword(ctx, userID, pass); err != nil {
+		return err
+	}
+
+	c, err := s.store.Read().Users.Credentials(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	ok, err := s.useSecondFactor(ctx, c, code, s.clock.Now())
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errWrongCode
+	}
+
+	return s.disableTwoFactor(ctx, userID)
+}
+
+// DisableTwoFactorByLogin turns two-factor authentication of a user off without a code,
+// for a user who lost both the authenticator app and the recovery codes.
+func (s *Auth) DisableTwoFactorByLogin(ctx context.Context, login string) error {
+	login, err := domain.ParseLogin(login)
+	if err != nil {
+		return err
+	}
+
+	c, err := s.store.Read().Users.CredentialsByLogin(ctx, login)
+	if err != nil {
+		return err
+	}
+	if len(c.TOTPSecret) == 0 {
+		return errTwoFactorOff
+	}
+
+	return s.disableTwoFactor(ctx, c.User.ID)
+}
+
+func (s *Auth) disableTwoFactor(ctx context.Context, userID int64) error {
+	err := s.store.InTx(ctx, func(r repository.Repos) error {
+		if err := r.Users.DisableTOTP(ctx, userID, s.clock.Now()); err != nil {
+			return err
+		}
+		if err := r.Recovery.DeleteForUser(ctx, userID); err != nil {
+			return err
+		}
+		return r.Challenges.DeleteForUser(ctx, userID)
+	})
+	if err != nil {
+		return err
+	}
+
+	s.log.InfoContext(ctx, "two-factor authentication disabled", slog.Int64("user_id", userID))
+	return nil
+}
+
+// RegenerateRecoveryCodes checks the user's current password and a code of the
+// authenticator app or a recovery code, then replaces their recovery codes with
+// domain.RecoveryCodeCount new ones, shown once.
+func (s *Auth) RegenerateRecoveryCodes(ctx context.Context, userID int64, pass, code string) ([]string, error) {
+	if err := s.CheckPassword(ctx, userID, pass); err != nil {
+		return nil, err
+	}
+
+	c, err := s.store.Read().Users.Credentials(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := s.useSecondFactor(ctx, c, code, s.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errWrongCode
+	}
+
+	recovery, err := newRecoveryCodes()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.store.InTx(ctx, func(r repository.Repos) error {
+		return r.Recovery.Replace(ctx, userID, recovery, s.clock.Now())
+	}); err != nil {
+		return nil, err
+	}
+
+	s.log.InfoContext(ctx, "recovery codes regenerated", slog.Int64("user_id", userID))
+	return recoveryTokens(recovery), nil
+}
+
+// newRecoveryCodes returns domain.RecoveryCodeCount recovery codes.
+func newRecoveryCodes() ([]credential.Token, error) {
+	codes := make([]credential.Token, domain.RecoveryCodeCount)
+	for i := range codes {
+		var err error
+		if codes[i], err = credential.New(credential.KindRecovery); err != nil {
+			return nil, err
+		}
+	}
+	return codes, nil
+}
+
+// recoveryTokens returns the codes to show of tokens.
+func recoveryTokens(tokens []credential.Token) []string {
+	codes := make([]string, len(tokens))
+	for i, t := range tokens {
+		codes[i] = t.Token
+	}
+	return codes
+}
+
+// sealTOTP encrypts a TOTP secret of the user; the user id binds it to the row.
+func (s *Auth) sealTOTP(userID int64, secret string) ([]byte, error) {
+	nonce := make([]byte, s.aead.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("totp secret nonce: %w", err)
+	}
+	return s.aead.Seal(nonce, nonce, []byte(secret), []byte("totp:"+strconv.FormatInt(userID, 10))), nil
+}
+
+// openTOTP decrypts a secret sealed by sealTOTP.
+func (s *Auth) openTOTP(userID int64, sealed []byte) (string, error) {
+	n := s.aead.NonceSize()
+	if len(sealed) < n {
+		return "", errors.Error("totp secret: too short")
+	}
+	b, err := s.aead.Open(nil, sealed[:n], sealed[n:], []byte("totp:"+strconv.FormatInt(userID, 10)))
+	if err != nil {
+		return "", fmt.Errorf("open totp secret: %w", err)
+	}
+	return string(b), nil
 }
 
 // SessionUser returns the user of a live session or errors.ErrUnauthorized, and
@@ -318,9 +720,16 @@ func (s *Auth) RevokeSession(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-// DeleteExpiredSessions removes expired sessions and returns how many.
+// DeleteExpiredSessions removes expired sessions and sign-in challenges and returns how
+// many.
 func (s *Auth) DeleteExpiredSessions(ctx context.Context) (int64, error) {
-	return s.store.Write().Sessions.DeleteExpired(ctx, s.clock.Now())
+	now := s.clock.Now()
+	n, err := s.store.Write().Sessions.DeleteExpired(ctx, now)
+	if err != nil {
+		return n, err
+	}
+	c, err := s.store.Write().Challenges.DeleteExpired(ctx, now)
+	return n + c, err
 }
 
 // CreateAPIKey checks the user's current password, since a key outlives the session,

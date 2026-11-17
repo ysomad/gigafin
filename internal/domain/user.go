@@ -75,6 +75,45 @@ func (s Session) Touch(now time.Time, l SessionLifetime) (time.Time, bool) {
 	return exp, exp.Sub(s.ExpiresAt) >= refresh
 }
 
+// Limits of two-factor authentication.
+const (
+	// RecoveryCodeCount is how many recovery codes a user gets, each usable once in
+	// place of a code of the authenticator app.
+	RecoveryCodeCount = 10
+	// LoginChallengeTTL is how long a sign-in that passed the password waits for the
+	// second-factor code.
+	LoginChallengeTTL = 5 * time.Minute
+	// LoginChallengeAttempts is how many wrong codes end a sign-in.
+	LoginChallengeAttempts = 5
+)
+
+// TwoFactor is the state of a user's two-factor authentication.
+type TwoFactor struct {
+	// Available is set when the server has a key to encrypt TOTP secrets; without it
+	// two-factor authentication cannot be set up.
+	Available bool
+	Enabled   bool
+	EnabledAt time.Time
+	// RecoveryCodes is how many unused recovery codes are left.
+	RecoveryCodes int
+	// PendingSecret is a TOTP secret being set up, in base32, empty when none is.
+	PendingSecret string
+}
+
+// LoginChallenge is a sign-in of a user with two-factor authentication on that passed
+// the password and waits for a code.
+type LoginChallenge struct {
+	ID        int64
+	UserID    int64
+	UserAgent string
+	// Attempts is how many codes were tried, the one being checked included.
+	Attempts int
+}
+
+// ErrLoginExpired is a second sign-in step whose challenge is gone: expired, out of
+// attempts or passed already; the user must sign in again.
+const ErrLoginExpired errors.Error = "sign-in expired"
+
 // Role grants a user a set of permissions.
 type Role string
 
