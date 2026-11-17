@@ -7,7 +7,7 @@ TOOL = go tool
 GOOSE = $(TOOL) goose -dir migrations sqlite3 $(DB)
 
 .PHONY: tools generate build run dev test lint vuln locales migrate-up migrate-down migrate-status migrate-create \
-	user-add user-passwd user-role tbank-probe clean
+	user-add user-passwd user-role clean
 
 tools:
 	go mod download
@@ -63,9 +63,6 @@ user-passwd: build
 user-role: build
 	@test -n "$(login)" -a -n "$(role)" || (echo "usage: make user-role login=<login> role=<user|admin>" && exit 1)
 	$(DOTENV) DB_PATH=$(DB) ./bin/gigafin user role -login $(login) -role $(role)
-
-tbank-probe: build
-	./bin/gigafin tbank probe -out $(or $(out),tbank-probe)$(if $(phone), -phone '$(phone)')$(if $(days), -days $(days))$(if $(csv), -csv '$(csv)')
 
 clean:
 	rm -rf bin

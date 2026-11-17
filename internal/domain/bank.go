@@ -29,6 +29,35 @@ func (b Bank) ImportSource() ImportSource {
 	return ImportSource(b)
 }
 
+// ErrBankLoginRequired is a session the bank no longer accepts; the user must sign in
+// again.
+const ErrBankLoginRequired errors.Error = "bank session expired"
+
+// Inputs a bank may ask for while signing in, as BankLogin.Step. A bank may ask for
+// others, which are asked for as text.
+const (
+	BankStepOTP      = "otp"
+	BankStepPassword = "password"
+)
+
+// BankLogin is a sign-in to a bank in progress.
+type BankLogin interface {
+	// Step is the input the bank asks for next.
+	Step() string
+}
+
+// BankData is what a bank has for a period: its accounts as of now and the operations
+// of the period to import.
+type BankData struct {
+	// Accounts are the accounts gigafin can sync with, without ID and AccountID. Their
+	// Balance is less holds not yet debited, as those are not imported until they are.
+	Accounts []BankAccount
+	// Records are the operations to import by the ExternalID of their account, as the
+	// rows of a CSV export of the bank, so both dedupe against each other. Operations
+	// that never import, such as failed ones or holds, are left out.
+	Records map[string][]Record
+}
+
 // BankStatus is the state of a connection to a bank.
 type BankStatus string
 
@@ -66,7 +95,6 @@ type BankAccount struct {
 	Balance money.Amount
 	// CreditLimit is the limit of a credit card, zero for other accounts.
 	CreditLimit money.Amount
-	BalanceAt   time.Time
 	// AccountID is the linked account, zero when the bank account is not synced.
 	AccountID int64
 	// SyncedUntil is the end of the last synced period, zero before the first sync.
@@ -82,24 +110,19 @@ func (t BankAccount) Mismatch(a Account) bool {
 	return t.AccountID != 0 && t.AccountID == a.ID && !t.Balance.Equal(a.Balance)
 }
 
-// BankSync is the outcome of a sync.
+// BankSync is the outcome of syncing one bank or several.
 type BankSync struct {
-	// NeedsLogin is set when the user must sign in to the bank again.
-	NeedsLogin bool
-	// Skipped is set when the last sync was too recent or there is no connection.
-	Skipped bool
+	// NeedsLogin are the banks the user must sign in to again.
+	NeedsLogin []Bank
 	// Operations is the number of operations created.
 	Operations int
-	// Fetched is the sum of the operations imported by the account they sync into.
-	Fetched map[int64]money.Amount
 }
 
-// BankLink links the account AccountID to sync with the bank account BankAccountID,
-// importing its operations since From.
+// BankLink links the account AccountID, a new one when zero, to sync with the bank
+// account BankAccountID.
 type BankLink struct {
 	AccountID     int64
 	BankAccountID int64
-	From          time.Time
 }
 
 // NormalizePhone returns a phone number in the international form +79991234567. A

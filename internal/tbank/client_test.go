@@ -3,6 +3,7 @@ package tbank_test
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -12,9 +13,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/tbank"
 )
+
+// session is the session the client stores.
+type session struct {
+	DeviceID     string    `json:"device_id"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	SessionID    string    `json:"session_id"`
+	ExpiresAt    time.Time `json:"expires_at"`
+}
+
+func encode(t *testing.T, s session) []byte {
+	t.Helper()
+	b, err := json.Marshal(s)
+	require.NoError(t, err)
+	return b
+}
+
+func decode(t *testing.T, b []byte) session {
+	t.Helper()
+	var s session
+	require.NoError(t, json.Unmarshal(b, &s))
+	return s
+}
 
 func newClient(t *testing.T, h http.HandlerFunc) *tbank.Client {
 	t.Helper()
@@ -81,19 +106,20 @@ func TestLogin(t *testing.T) {
 		}
 	})
 
-	l, err := c.StartLogin(t.Context(), "DEVICE", "+79990000000")
+	l, err := c.StartLogin(t.Context(), encode(t, session{DeviceID: "DEVICE"}), "+79990000000")
 	require.NoError(t, err)
-	assert.Equal(t, tbank.StepOTP, l.Step)
+	assert.Equal(t, domain.BankStepOTP, l.Step())
 
 	_, done, err := c.Confirm(t.Context(), l, "1234")
 	require.NoError(t, err)
 	assert.False(t, done)
-	assert.Equal(t, tbank.StepPassword, l.Step)
+	assert.Equal(t, domain.BankStepPassword, l.Step())
 
-	s, done, err := c.Confirm(t.Context(), l, "secret")
+	b, done, err := c.Confirm(t.Context(), l, "secret")
 	require.NoError(t, err)
 	assert.True(t, done)
-	assert.Equal(t, "DEVICE", s.DeviceID)
+	s := decode(t, b)
+	assert.Equal(t, "DEVICE", s.DeviceID, "the device of the last session")
 	assert.Equal(t, "AT", s.AccessToken)
 	assert.Equal(t, "RT", s.RefreshToken)
 	assert.Equal(t, "SID", s.SessionID)
@@ -111,7 +137,7 @@ func TestLoginStepError(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		write(t, w, `{"error": "invalid_request", "error_description": "phone +79990000000"}`)
 	})
-	_, err := c.StartLogin(t.Context(), "", "+79990000000")
+	_, err := c.StartLogin(t.Context(), nil, "+79990000000")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid_request")
 	assert.NotContains(t, err.Error(), "+7999", "answers are not put in errors")
@@ -133,26 +159,27 @@ func TestRefresh(t *testing.T) {
 		}
 		write(t, w, answer)
 	})
-	old := tbank.Session{DeviceID: "DEVICE", AccessToken: "AT", RefreshToken: "RT", SessionID: "SID"}
+	old := session{DeviceID: "DEVICE", AccessToken: "AT", RefreshToken: "RT", SessionID: "SID"}
 
-	s, err := c.Refresh(t.Context(), old)
+	b, err := c.Refresh(t.Context(), encode(t, old))
 	require.NoError(t, err)
-	assert.Equal(t, tbank.Session{
+	s := decode(t, b)
+	assert.Equal(t, session{
 		DeviceID: "DEVICE", AccessToken: "AT2", RefreshToken: "RT2", SessionID: "SID2",
 		ExpiresAt: s.ExpiresAt,
 	}, s, "the refresh token rotates")
 
 	answer = `{"access_token": "AT3", "expires_in": 7199, "mobile": {"sessionid": "SID3"}}`
-	s, err = c.Refresh(t.Context(), old)
+	b, err = c.Refresh(t.Context(), encode(t, old))
 	require.NoError(t, err)
-	assert.Equal(t, "RT", s.RefreshToken, "kept when the bank does not rotate it")
+	assert.Equal(t, "RT", decode(t, b).RefreshToken, "kept when the bank does not rotate it")
 
 	old.RefreshToken = "dead"
-	_, err = c.Refresh(t.Context(), old)
-	assert.ErrorIs(t, err, tbank.ErrSessionExpired)
+	_, err = c.Refresh(t.Context(), encode(t, old))
+	assert.ErrorIs(t, err, domain.ErrBankLoginRequired)
 }
 
-func TestOperations(t *testing.T) {
+func TestFetchErrors(t *testing.T) {
 	t.Parallel()
 
 	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
@@ -160,38 +187,36 @@ func TestOperations(t *testing.T) {
 	status, answer := http.StatusOK, ""
 	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		assert.Equal(t, "/v1/operations", r.URL.Path)
 		assert.Equal(t, "Bearer AT", r.Header.Get("Authorization"))
 		assert.Equal(t, "SID", q.Get("sessionid"))
 		assert.Equal(t, "DEVICE", q.Get("deviceId"))
+		if r.URL.Path == "/v1/accounts_light" {
+			write(t, w, `{"resultCode": "OK", "payload": []}`)
+			return
+		}
+		assert.Equal(t, "/v1/operations", r.URL.Path)
 		assert.Equal(t, "1790812800000", q.Get("start"))
 		assert.Equal(t, "1793491200000", q.Get("end"))
 		w.WriteHeader(status)
 		write(t, w, answer)
 	})
-	s := tbank.Session{DeviceID: "DEVICE", AccessToken: "AT", SessionID: "SID"}
+	s := encode(t, session{DeviceID: "DEVICE", AccessToken: "AT", SessionID: "SID"})
 
-	answer = `{"resultCode": "OK", "payload": [{"id": "1", "account": "1001", "type": "Debit", "status": "OK",
-		"operationTime": {"milliseconds": 1793836800123}, "accountAmount": {"value": 10.5},
-		"operationId": {"source": "PrimeAuth"}}]}`
-	ops, err := c.Operations(t.Context(), s, from, to)
+	answer = `{"resultCode": "OK", "payload": []}`
+	_, err := c.Fetch(t.Context(), s, from, to, time.UTC)
 	require.NoError(t, err)
-	require.Len(t, ops, 1)
-	assert.Equal(t, "-10.5", ops[0].Amount().String())
-	assert.True(t, ops[0].Pending(), "an authorization without a debiting time")
-	assert.Equal(t, int64(1793836800123), ops[0].Time().UnixMilli())
 
 	answer = `{"resultCode": "INSUFFICIENT_PRIVILEGES"}`
-	_, err = c.Operations(t.Context(), s, from, to)
-	require.ErrorIs(t, err, tbank.ErrSessionExpired)
+	_, err = c.Fetch(t.Context(), s, from, to, time.UTC)
+	require.ErrorIs(t, err, domain.ErrBankLoginRequired)
 
 	status, answer = http.StatusUnauthorized, ""
-	_, err = c.Operations(t.Context(), s, from, to)
-	require.ErrorIs(t, err, tbank.ErrSessionExpired)
+	_, err = c.Fetch(t.Context(), s, from, to, time.UTC)
+	require.ErrorIs(t, err, domain.ErrBankLoginRequired)
 
 	status, answer = http.StatusOK, `{"resultCode": "INTERNAL_ERROR"}`
-	_, err = c.Operations(t.Context(), s, from, to)
+	_, err = c.Fetch(t.Context(), s, from, to, time.UTC)
 	require.Error(t, err)
-	assert.False(t, errors.Is(err, tbank.ErrSessionExpired))
+	assert.False(t, errors.Is(err, domain.ErrBankLoginRequired))
 	assert.NotContains(t, err.Error(), "SID", "the session is not put in errors")
 }

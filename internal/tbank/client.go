@@ -1,10 +1,11 @@
-// Package tbank is a client of the private T-Bank mobile API, the one the iOS app
-// uses: sign-in by phone, SMS code and password, and reading accounts and operations.
-// The API is undocumented, so the client sends what the app sends and reads only the
+// Package tbank syncs T-Bank through its private mobile API, the one the iOS app uses:
+// sign-in by phone, SMS code and password, and reading accounts and operations. The
+// API is undocumented, so the client sends what the app sends and reads only the
 // fields gigafin needs. Errors never carry tokens or response bodies.
 package tbank
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -21,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/money"
 )
@@ -46,16 +48,10 @@ const (
 		`"picture":{"essential":true},"api_sso_id":{"essential":true}}}`
 )
 
-// ErrSessionExpired is a session the bank no longer accepts; the user must sign in
-// again.
-const ErrSessionExpired errors.Error = "t-bank session expired"
-
-// Steps of a sign-in that need input from the user.
-const (
-	StepOTP       = "otp"
-	StepPassword  = "password"
-	_stepComplete = "complete"
-)
+// _stepComplete is the step the bank asks for once every factor is accepted; it
+// needs no input. The steps that do are named as domain.BankStepOTP and
+// domain.BankStepPassword.
+const _stepComplete = "complete"
 
 // Client calls the API.
 type Client struct {
@@ -72,9 +68,9 @@ func New(hc *http.Client, idURL, apiURL string, log *slog.Logger) *Client {
 	return &Client{http: hc, idURL: idURL, apiURL: apiURL, log: log}
 }
 
-// Session is a signed-in device. RefreshToken rotates on every refresh, so the
-// session returned by Refresh must replace the old one.
-type Session struct {
+// session is a signed-in device, stored by gigafin as JSON. RefreshToken rotates on
+// every refresh, so the session returned by Refresh must replace the old one.
+type session struct {
 	DeviceID     string    `json:"device_id"`
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
@@ -82,20 +78,23 @@ type Session struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
-// Login is a sign-in in progress. Step is the input the bank asks for next, StepOTP
-// or StepPassword.
-type Login struct {
-	DeviceID string
-	Step     string
-
+// login is a sign-in in progress.
+type login struct {
+	deviceID string
+	step     string
 	cid      string
 	token    string
 	verifier string
 	jar      http.CookieJar
 }
 
-// Account is a bank account. Amount fields are zero when the bank omits them.
-type Account struct {
+// Step returns the input the bank asks for next.
+func (l *login) Step() string {
+	return l.step
+}
+
+// account is a bank account. Amount fields are zero when the bank omits them.
+type account struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	AccountType string `json:"accountType"`
@@ -108,36 +107,35 @@ type Account struct {
 	DebtAmount  amount `json:"debtAmount"`
 }
 
-// Kinds of accounts gigafin reads.
+// Kinds of accounts other than current ones.
 const (
-	AccountCurrent  = "Current"
-	AccountSaving   = "Saving"
-	AccountCredit   = "Credit"
-	AccountCashLoan = "CashLoan"
+	_accountSaving   = "Saving"
+	_accountCredit   = "Credit"
+	_accountCashLoan = "CashLoan"
 )
 
-// Tracked reports whether the account can sync with a gigafin account: it is not
+// tracked reports whether the account can sync with a gigafin account: it is not
 // hidden and has a currency, unlike an installment plan.
-func (a Account) Tracked() bool {
+func (a account) tracked() bool {
 	return !a.Hidden && strings.TrimSpace(a.Name) != "" && money.ValidCurrency(strings.ToUpper(a.Currency.Name))
 }
 
-// Balance returns the signed balance of the account as gigafin counts it: what is on
+// balance returns the signed balance of the account as gigafin counts it: what is on
 // a current or savings account, own money minus the limit on a credit card, and the
 // negative debt of a loan.
-func (a Account) Balance() money.Amount {
+func (a account) balance() money.Amount {
 	switch a.AccountType {
-	case AccountCredit:
+	case _accountCredit:
 		return a.MoneyAmount.Value.Sub(a.CreditLimit.Value)
-	case AccountCashLoan:
+	case _accountCashLoan:
 		return a.DebtAmount.Value
 	default:
 		return a.MoneyAmount.Value
 	}
 }
 
-// Operation is a bank operation of any account.
-type Operation struct {
+// operation is a bank operation of any account.
+type operation struct {
 	ID          string `json:"id"`
 	Account     string `json:"account"`
 	Type        string `json:"type"`
@@ -161,30 +159,30 @@ type Operation struct {
 
 // Operation fields gigafin checks.
 const (
-	OpStatusOK = "OK"
-	OpDebit    = "Debit"
-	// OpSourceAuth is an authorization; without DebitingTime it is a hold that may
+	_opStatusOK = "OK"
+	_opDebit    = "Debit"
+	// _opSourceAuth is an authorization; without DebitingTime it is a hold that may
 	// still change or be canceled.
-	OpSourceAuth = "PrimeAuth"
+	_opSourceAuth = "PrimeAuth"
 )
 
-// Amount returns the amount of the operation in the account currency, negative for
+// value returns the amount of the operation in the account currency, negative for
 // money out.
-func (o Operation) Amount() money.Amount {
-	if o.Type == OpDebit {
+func (o operation) value() money.Amount {
+	if o.Type == _opDebit {
 		return o.AccountAmount.Value.Neg()
 	}
 	return o.AccountAmount.Value
 }
 
-// Time returns when the operation happened.
-func (o Operation) Time() time.Time {
+// at returns when the operation happened.
+func (o operation) at() time.Time {
 	return time.UnixMilli(o.OperationTime.Milliseconds)
 }
 
-// Pending reports whether the operation is a hold not yet debited.
-func (o Operation) Pending() bool {
-	return o.OperationID.Source == OpSourceAuth && o.DebitingTime == nil
+// pending reports whether the operation is a hold not yet debited.
+func (o operation) pending() bool {
+	return o.OperationID.Source == _opSourceAuth && o.DebitingTime == nil
 }
 
 type amount struct {
@@ -198,17 +196,24 @@ type millis struct {
 	Milliseconds int64 `json:"milliseconds"`
 }
 
-// StartLogin starts a sign-in of deviceID, an empty one is generated, by phone in the
-// international form. The bank sends an SMS code.
-func (c *Client) StartLogin(ctx context.Context, deviceID, phone string) (*Login, error) {
-	if deviceID == "" {
-		deviceID = strings.ToUpper(randomHex(16))
+// StartLogin starts a sign-in by phone in the international form, on the device of
+// prev, the session of the last sign-in, so the bank does not see a new one; a device
+// is made up without it. The bank sends an SMS code.
+//
+//nolint:ireturn // the sign-in is kept by the caller as domain.BankLogin
+func (c *Client) StartLogin(ctx context.Context, prev []byte, phone string) (domain.BankLogin, error) {
+	var old session
+	if prev != nil {
+		if err := json.Unmarshal(prev, &old); err != nil {
+			return nil, fmt.Errorf("tbank: session: %w", err)
+		}
 	}
+	deviceID := cmp.Or(old.DeviceID, strings.ToUpper(randomHex(16)))
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, fmt.Errorf("tbank: cookie jar: %w", err)
 	}
-	l := &Login{DeviceID: deviceID, verifier: randomHex(32), jar: jar}
+	l := &login{deviceID: deviceID, verifier: randomHex(32), jar: jar}
 	challenge := sha256.Sum256([]byte(l.verifier))
 	q := url.Values{
 		"claims":                {_claims},
@@ -243,73 +248,91 @@ func (c *Client) StartLogin(ctx context.Context, deviceID, phone string) (*Login
 }
 
 // Confirm answers the step the login asks for with value. done is false when the
-// bank asks for another step, which l.Step names; otherwise the session is signed in.
-func (c *Client) Confirm(ctx context.Context, l *Login, value string) (s Session, done bool, err error) {
-	code, err := c.step(ctx, l, url.Values{"step": {l.Step}, l.Step: {value}})
-	if err != nil {
-		return Session{}, false, err
+// bank asks for another step, which l.Step names; otherwise it returns the session
+// signed in.
+func (c *Client) Confirm(ctx context.Context, bl domain.BankLogin, value string) ([]byte, bool, error) {
+	l, ok := bl.(*login)
+	if !ok {
+		return nil, false, errors.Error("tbank: not a t-bank sign-in")
 	}
-	if code == "" && l.Step == _stepComplete {
+	code, err := c.step(ctx, l, url.Values{"step": {l.step}, l.step: {value}})
+	if err != nil {
+		return nil, false, err
+	}
+	if code == "" && l.step == _stepComplete {
 		// every factor is accepted; one more hop without input returns the code
 		if code, err = c.step(ctx, l, url.Values{"step": {_stepComplete}}); err != nil {
-			return Session{}, false, err
+			return nil, false, err
 		}
 	}
 	if code == "" {
-		return Session{}, false, nil
+		return nil, false, nil
 	}
-	s, err = c.token(ctx, l.DeviceID, url.Values{
+	s, err := c.token(ctx, l.deviceID, url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"code_verifier": {l.verifier},
 	})
 	if err != nil {
-		return Session{}, false, err
+		return nil, false, err
 	}
-	return s, true, nil
+	b, err := json.Marshal(s) //nolint:gosec // G117: the caller encrypts it
+	if err != nil {
+		return nil, false, fmt.Errorf("tbank: session: %w", err)
+	}
+	return b, true, nil
 }
 
-// Refresh exchanges the refresh token of s for a new session; the old refresh token
-// stops working. It fails with ErrSessionExpired when the bank rejects it.
-func (c *Client) Refresh(ctx context.Context, s Session) (Session, error) {
+// Refresh exchanges the refresh token of the session for a new session; the old
+// refresh token stops working. It fails with domain.ErrBankLoginRequired when the
+// bank rejects it.
+func (c *Client) Refresh(ctx context.Context, sess []byte) ([]byte, error) {
+	var s session
+	if err := json.Unmarshal(sess, &s); err != nil {
+		return nil, fmt.Errorf("tbank: session: %w", err)
+	}
 	fresh, err := c.token(ctx, s.DeviceID, url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {s.RefreshToken},
 	})
 	if err != nil {
-		return Session{}, err
+		return nil, err
 	}
-	if fresh.RefreshToken == "" {
-		fresh.RefreshToken = s.RefreshToken
+	fresh.RefreshToken = cmp.Or(fresh.RefreshToken, s.RefreshToken)
+	b, err := json.Marshal(fresh) //nolint:gosec // G117: the caller encrypts it
+	if err != nil {
+		return nil, fmt.Errorf("tbank: session: %w", err)
 	}
-	return fresh, nil
+	return b, nil
 }
 
-// Accounts returns all accounts of the user.
-func (c *Client) Accounts(ctx context.Context, s Session) ([]Account, error) {
-	var accs []Account
-	if err := c.api(ctx, s, "/v1/accounts_light", nil, &accs); err != nil {
-		return nil, fmt.Errorf("tbank: accounts: %w", err)
+// Fetch returns the tracked accounts and the operations between from and to that
+// import, with times in loc.
+func (c *Client) Fetch(
+	ctx context.Context, sess []byte, from, to time.Time, loc *time.Location,
+) (domain.BankData, error) {
+	var s session
+	if err := json.Unmarshal(sess, &s); err != nil {
+		return domain.BankData{}, fmt.Errorf("tbank: session: %w", err)
 	}
-	return accs, nil
-}
-
-// Operations returns operations of all accounts between from and to.
-func (c *Client) Operations(ctx context.Context, s Session, from, to time.Time) ([]Operation, error) {
+	var accs []account
+	if err := c.get(ctx, s, "/v1/accounts_light", url.Values{}, &accs); err != nil {
+		return domain.BankData{}, fmt.Errorf("tbank: accounts: %w", err)
+	}
 	q := url.Values{
 		"start": {strconv.FormatInt(from.UnixMilli(), 10)},
 		"end":   {strconv.FormatInt(to.UnixMilli(), 10)},
 	}
-	var ops []Operation
-	if err := c.api(ctx, s, "/v1/operations", q, &ops); err != nil {
-		return nil, fmt.Errorf("tbank: operations: %w", err)
+	var ops []operation
+	if err := c.get(ctx, s, "/v1/operations", q, &ops); err != nil {
+		return domain.BankData{}, fmt.Errorf("tbank: operations: %w", err)
 	}
-	return ops, nil
+	return bankData(accs, ops, loc), nil
 }
 
 // step posts a sign-in step and moves l to the step the bank asks for next. It
 // returns the authorization code once the bank gives one.
-func (c *Client) step(ctx context.Context, l *Login, form url.Values) (string, error) {
+func (c *Client) step(ctx context.Context, l *login, form url.Values) (string, error) {
 	if l.token != "" && form.Get("step") != _stepComplete {
 		form.Set("token", l.token)
 	}
@@ -326,7 +349,7 @@ func (c *Client) step(ctx context.Context, l *Login, form url.Values) (string, e
 		l.token = res.Token
 	}
 	if res.Step != "" {
-		l.Step = res.Step
+		l.step = res.Step
 	}
 	c.log.DebugContext(ctx, "tbank login step", slog.String("sent", form.Get("step")), slog.String("next", res.Step),
 		slog.Bool("code", res.Code != ""))
@@ -334,7 +357,7 @@ func (c *Client) step(ctx context.Context, l *Login, form url.Values) (string, e
 }
 
 // token calls the token endpoint with a grant and returns the session it issues.
-func (c *Client) token(ctx context.Context, deviceID string, grant url.Values) (Session, error) {
+func (c *Client) token(ctx context.Context, deviceID string, grant url.Values) (session, error) {
 	grant.Set("device_id", deviceID)
 	grant.Set("vendor", _vendor)
 	grant.Set("client_version", _clientVersion)
@@ -353,12 +376,12 @@ func (c *Client) token(ctx context.Context, deviceID string, grant url.Values) (
 	}
 	u := c.idURL + "/auth/token/mobile?ccc=true&cpswc=true"
 	if err := c.do(ctx, nil, http.MethodPost, u, grant, true, &res); err != nil {
-		return Session{}, fmt.Errorf("tbank: token: %w", err)
+		return session{}, fmt.Errorf("tbank: token: %w", err)
 	}
 	if res.AccessToken == "" || res.Mobile.SessionID == "" {
-		return Session{}, errors.Error("tbank: token: no access token or session")
+		return session{}, errors.Error("tbank: token: no access token or session")
 	}
-	return Session{
+	return session{
 		DeviceID:     deviceID,
 		AccessToken:  res.AccessToken,
 		RefreshToken: res.RefreshToken,
@@ -367,24 +390,9 @@ func (c *Client) token(ctx context.Context, deviceID string, grant url.Values) (
 	}, nil
 }
 
-// api calls a GET method of the API and decodes the payload of its envelope into out.
-func (c *Client) api(ctx context.Context, s Session, path string, q url.Values, out any) error {
-	payload, err := c.Payload(ctx, s, path, q)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(payload, out); err != nil {
-		return fmt.Errorf("decode payload: %w", err)
-	}
-	return nil
-}
-
-// Payload calls a GET method of the API at path with query q and the parameters of
-// the app, and returns the payload of its answer as is.
-func (c *Client) Payload(ctx context.Context, s Session, path string, q url.Values) (json.RawMessage, error) {
-	if q == nil {
-		q = url.Values{}
-	}
+// get calls a GET method of the API at path with query q and the parameters of the
+// app, and decodes the payload of its answer into out.
+func (c *Client) get(ctx context.Context, s session, path string, q url.Values, out any) error {
 	q.Set("sessionid", s.SessionID)
 	q.Set("deviceId", s.DeviceID)
 	q.Set("oldDeviceId", s.DeviceID)
@@ -397,7 +405,7 @@ func (c *Client) Payload(ctx context.Context, s Session, path string, q url.Valu
 	q.Set("cpswc", "true")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL+path+"?"+q.Encode(), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+s.AccessToken)
 	req.Header.Set("Accept", "application/json")
@@ -408,7 +416,7 @@ func (c *Client) Payload(ctx context.Context, s Session, path string, q url.Valu
 		err = redactURL(err)
 		c.log.DebugContext(ctx, "tbank request failed", slog.String("method", http.MethodGet),
 			slog.String("path", path), slog.Duration("took", time.Since(start)), slog.Any("error", err))
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 	var env struct {
@@ -423,22 +431,25 @@ func (c *Client) Payload(ctx context.Context, s Session, path string, q url.Valu
 		slog.Int("status", resp.StatusCode), slog.String("result", env.ResultCode),
 		slog.Int("payload_bytes", len(env.Payload)), slog.Duration("took", time.Since(start)))
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, ErrSessionExpired
+		return domain.ErrBankLoginRequired
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http status %d", resp.StatusCode)
+		return fmt.Errorf("http status %d", resp.StatusCode)
 	}
 	if decodeErr != nil {
-		return nil, fmt.Errorf("decode: %w", decodeErr)
+		return fmt.Errorf("decode: %w", decodeErr)
 	}
 	switch env.ResultCode {
 	case "OK":
-		return env.Payload, nil
 	case "INSUFFICIENT_PRIVILEGES", "WRONG_SESSION", "SESSION_EXPIRED", "AUTHENTICATION_FAILED":
-		return nil, fmt.Errorf("result %s: %w", env.ResultCode, ErrSessionExpired)
+		return fmt.Errorf("result %s: %w", env.ResultCode, domain.ErrBankLoginRequired)
 	default:
-		return nil, fmt.Errorf("result %q", env.ResultCode)
+		return fmt.Errorf("result %q", env.ResultCode)
 	}
+	if err := json.Unmarshal(env.Payload, out); err != nil {
+		return fmt.Errorf("decode payload: %w", err)
+	}
+	return nil
 }
 
 // do sends a request to the sign-in host, a form when form is not nil, as the app
@@ -493,7 +504,7 @@ func (c *Client) do(
 	}
 	switch {
 	case oauth.Error == "invalid_grant":
-		return ErrSessionExpired
+		return domain.ErrBankLoginRequired
 	case oauth.Error != "":
 		return fmt.Errorf("%s (http status %d)", oauth.Error, resp.StatusCode)
 	case resp.StatusCode != http.StatusOK:

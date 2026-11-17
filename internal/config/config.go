@@ -21,7 +21,7 @@ type Config struct {
 	HTTP    HTTP    `envPrefix:"HTTP_"`
 	Session Session `envPrefix:"SESSION_"`
 	Import  Import  `envPrefix:"IMPORT_"`
-	TBank   TBank   `envPrefix:"TBANK_"`
+	Banks   Banks   `envPrefix:"BANKS_"`
 }
 
 // Logger configures the JSON logs.
@@ -68,10 +68,10 @@ type Import struct {
 	AccountDebitPattern   string
 }
 
-// TBank configures syncing operations from T-Bank.
-type TBank struct {
-	// SecretKey encrypts T-Bank sessions in the database: 32 bytes in standard base64,
-	// such as the output of openssl rand -base64 32. Empty disables T-Bank sync.
+// Banks configures syncing operations from banks.
+type Banks struct {
+	// SecretKey encrypts bank sessions in the database: 32 bytes in standard base64,
+	// such as the output of openssl rand -base64 32. Empty disables bank sync.
 	SecretKey string
 	// SyncInterval is the least time between two syncs started by opening the app.
 	SyncInterval time.Duration

@@ -47,7 +47,6 @@ type BankAccount struct {
 	Kind        string
 	Balance     int64
 	CreditLimit int64
-	BalanceAt   int64
 	AccountID   sql.NullInt64
 	SyncedUntil sql.NullInt64
 	CreatedAt   int64

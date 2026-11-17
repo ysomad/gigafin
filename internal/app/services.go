@@ -20,7 +20,7 @@ import (
 // newServices opens the database of cfg and returns the services over it, logging to log,
 // with a func that closes the database.
 func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*service.Services, func(), error) {
-	tb, err := newTBankOptions(cfg.TBank, log)
+	banks, err := newBankOptions(cfg.Banks, log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("config: %w", err)
 	}
@@ -41,7 +41,7 @@ func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*ser
 			// one request a second stays under the rate limit of the CBR site
 			domain.RateSourceCBR: exchangerate.NewCBR(newHTTPClient(time.Minute), exchangerate.CBRURL, time.Second),
 		},
-		TBank: tb,
+		Banks: banks,
 	})
 	if err != nil {
 		_ = store.Close()
@@ -50,22 +50,24 @@ func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*ser
 	return svc, func() { _ = store.Close() }, nil
 }
 
-// newTBankOptions returns the options of T-Bank sync, its client logging to log,
-// without a client when cfg has no secret key, which disables it.
-func newTBankOptions(cfg config.TBank, log *slog.Logger) (service.TBankOptions, error) {
+// newBankOptions returns the options of bank sync, the clients of the banks logging to
+// log, without a key when cfg has no secret key, which disables it.
+func newBankOptions(cfg config.Banks, log *slog.Logger) (service.BankOptions, error) {
 	if cfg.SecretKey == "" {
-		return service.TBankOptions{}, nil
+		return service.BankOptions{}, nil
 	}
 	key, err := base64.StdEncoding.DecodeString(cfg.SecretKey)
 	if err != nil || len(key) != 32 {
-		return service.TBankOptions{}, errors.Error("TBANK_SECRET_KEY: must be 32 bytes in base64")
+		return service.BankOptions{}, errors.Error("BANKS_SECRET_KEY: must be 32 bytes in base64")
 	}
-	hc, err := newRussianHTTPClient(time.Minute)
+	ru, err := newRussianHTTPClient(time.Minute)
 	if err != nil {
-		return service.TBankOptions{}, err
+		return service.BankOptions{}, err
 	}
-	return service.TBankOptions{
-		Client:       tbank.New(hc, tbank.IDURL, tbank.APIURL, log),
+	return service.BankOptions{
+		Clients: map[domain.Bank]service.BankClient{
+			domain.BankTBank: tbank.New(ru, tbank.IDURL, tbank.APIURL, log),
+		},
 		Key:          key,
 		SyncInterval: cfg.SyncInterval,
 		SyncOverlap:  cfg.SyncOverlap,

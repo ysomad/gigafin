@@ -82,7 +82,6 @@ func (r *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccoun
 			Kind:        domain.AccountKind(a.Kind),
 			Balance:     money.FromMinor(a.Balance, a.Currency),
 			CreditLimit: money.FromMinor(a.CreditLimit, a.Currency),
-			BalanceAt:   time.Unix(a.BalanceAt, 0),
 			AccountID:   a.AccountID.Int64,
 		}
 		if a.SyncedUntil.Valid {
@@ -112,7 +111,6 @@ func (r *Banks) SaveAccount(ctx context.Context, userID int64, a domain.BankAcco
 		Kind:        string(a.Kind),
 		Balance:     balance,
 		CreditLimit: limit,
-		BalanceAt:   a.BalanceAt.Unix(),
 		CreatedAt:   now.Unix(),
 	})
 	if err != nil {

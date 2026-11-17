@@ -8,35 +8,35 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
-	"github.com/ysomad/gigafin/internal/pagination"
-	"github.com/ysomad/gigafin/internal/timex"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
 // loadBanks sets the state of the banks card in d.
 func (h *Handler) loadBanks(r *http.Request, user domain.User, d *banksData) error {
 	ctx := r.Context()
-	svc := h.app.Svc.TBank
-	if d.TBank.Enabled = svc.Enabled(); d.TBank.Enabled {
-		conn, err := svc.Connection(ctx, user.ID)
+	svc := h.app.Svc.Banks
+	for _, bank := range svc.Enabled() {
+		b := bankData{Bank: bank}
+		conn, err := svc.Connection(ctx, user.ID, bank)
 		switch {
 		case err == nil:
-			d.TBank.Connected, d.TBank.Conn = true, conn
+			b.Conn = conn
 		case !errors.Is(err, errors.ErrNotFound):
 			return err
 		}
 		var phone string
-		d.TBank.Step, phone = svc.LoginStep(user.ID)
-		if d.TBank.Phone == "" {
-			d.TBank.Phone = cmp.Or(phone, conn.Login)
+		b.Step, phone = svc.LoginStep(user.ID, bank)
+		b.Phone = cmp.Or(phone, conn.Login)
+		if d.Posted.Bank == bank {
+			b.Phone = d.Posted.Phone
 		}
+		d.Banks = append(d.Banks, b)
 	}
 	var err error
-	if d.Accounts, err = h.app.Svc.Banks.Accounts(ctx, user.ID); err != nil {
+	if d.Accounts, err = svc.Accounts(ctx, user.ID); err != nil {
 		return err
 	}
 	accounts, err := h.app.Svc.Accounts.List(ctx, user.ID)
@@ -67,149 +67,122 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *banksData) err
 	return nil
 }
 
-func (h *Handler) tbankLogin(w http.ResponseWriter, r *http.Request, user domain.User) error {
+// pathBank returns the enabled bank of the path of r, or errors.ErrNotFound.
+func (h *Handler) pathBank(r *http.Request) (domain.Bank, error) {
+	bank := domain.Bank(r.PathValue("bank"))
+	if !slices.Contains(h.app.Svc.Banks.Enabled(), bank) {
+		return "", errors.ErrNotFound
+	}
+	return bank, nil
+}
+
+func (h *Handler) bankLogin(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
+	if err != nil {
+		return err
+	}
 	if err := r.ParseForm(); err != nil {
 		return domain.NewError(errors.ErrInvalid, "invalid form")
 	}
-	phone := strings.TrimSpace(r.PostFormValue("phone"))
-	posted := pageData{Banks: banksData{TBank: tbankData{Phone: phone}}}
-	if _, err := domain.NormalizePhone(phone); err != nil {
-		errs := kit.FieldsError{"tbank.phone": err}
-		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: errs, Form: "tbank"})
+	posted := pageData{Banks: banksData{Posted: bankData{Bank: bank, Phone: strings.TrimSpace(r.PostFormValue("phone"))}}}
+	phone, err := domain.NormalizePhone(posted.Banks.Posted.Phone)
+	if err != nil {
+		errs := kit.FieldsError{string(bank) + ".phone": err}
+		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: errs, Form: string(bank)})
 	}
-	if _, err := h.app.Svc.TBank.StartLogin(r.Context(), user.ID, phone); err != nil {
-		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: err, Form: "tbank"})
+	if _, err := h.app.Svc.Banks.StartLogin(r.Context(), user.ID, bank, phone); err != nil {
+		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: err, Form: string(bank)})
 	}
 	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
 }
 
-func (h *Handler) tbankConfirm(w http.ResponseWriter, r *http.Request, user domain.User) error {
+func (h *Handler) bankConfirm(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
+	if err != nil {
+		return err
+	}
 	if err := r.ParseForm(); err != nil {
 		return domain.NewError(errors.ErrInvalid, "invalid form")
 	}
 	value := strings.TrimSpace(r.PostFormValue("value"))
 	if value == "" {
-		errs := kit.FieldsError{"tbank.value": domain.NewError(errors.ErrInvalid, "required")}
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: errs, Form: "tbank"})
+		errs := kit.FieldsError{string(bank) + ".value": domain.NewError(errors.ErrInvalid, "required")}
+		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: errs, Form: string(bank)})
 	}
 	ctx := r.Context()
-	step, err := h.app.Svc.TBank.ConfirmLogin(ctx, user.ID, value)
+	step, err := h.app.Svc.Banks.ConfirmLogin(ctx, user.ID, bank, value)
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: "tbank"})
+		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: string(bank)})
 	}
 	if step != "" {
 		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
 	}
 	// signed in: the accounts are read, the linked ones catch up
-	res, err := h.app.Svc.TBank.Sync(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
-	d := pageData{Notice: kit.T(ctx, "T-Bank connected.")}
-	switch {
-	case err != nil:
-		h.app.Log.WarnContext(ctx, "sync t-bank", slog.Any("error", err))
-		d.Banks.SyncErr = err.Error()
-	case res.Operations > 0:
-		d.Notice = tbankNotice(r, res)
+	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	d := pageData{Notice: kit.T(ctx, "%s connected.", kit.T(ctx, bank.Name()))}
+	if res.Operations > 0 {
+		d.Notice = kit.SyncNotice(ctx, res)
 	}
-	if !kit.IsHTMX(r) {
-		h.app.SetNotice(w, d.Notice)
-	}
-	return h.settingsReply(w, r, user, _cardBanks, d, kit.Failure{})
+	return h.syncReply(w, r, user, d, err)
 }
 
-func (h *Handler) tbankCancel(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	h.app.Svc.TBank.CancelLogin(user.ID)
+func (h *Handler) bankCancel(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
+	if err != nil {
+		return err
+	}
+	h.app.Svc.Banks.CancelLogin(user.ID, bank)
 	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
 }
 
-func (h *Handler) tbankSync(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	ctx := r.Context()
-	res, err := h.app.Svc.TBank.Sync(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
-	var d pageData
+func (h *Handler) bankSync(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
 	if err != nil {
-		// a failing bank is not a fault of this server; the card shows it too
-		h.app.Log.WarnContext(ctx, "sync t-bank", slog.Any("error", err))
-		d.Banks.SyncErr = err.Error()
-	} else {
-		d.Notice = tbankNotice(r, res)
+		return err
 	}
-	if !kit.IsHTMX(r) && d.Notice != "" {
-		h.app.SetNotice(w, d.Notice)
-	}
-	return h.settingsReply(w, r, user, _cardBanks, d, kit.Failure{})
+	ctx := r.Context()
+	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, err)
 }
 
-// bankLink syncs the bank account posted as bank_account, or every one not synced yet,
-// with the account chosen for it as account_ID, its id: an account of its currency no
-// bank account syncs with, or a new one when "new". All sync in one run, so the
-// transfers between them pair. A new account imports all operations and starts at the
-// balance of the bank; an account with operations imports those after its last day.
+// bankLink syncs the bank account posted as bank_account, or every one at the bank not
+// synced yet, with the account chosen for it as account_ID, its id: an account of its
+// currency no bank account syncs with, or a new one when "new". All sync in one run, so
+// the transfers between them pair.
 func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
+	if err != nil {
+		return err
+	}
 	if err := r.ParseForm(); err != nil {
 		return domain.NewError(errors.ErrInvalid, "invalid form")
 	}
-	ctx, loc := r.Context(), user.Location()
+	ctx := r.Context()
 	bankAccounts, err := h.app.Svc.Banks.Accounts(ctx, user.ID)
 	if err != nil {
 		return err
 	}
-	picks, err := bankPicks(r, bankAccounts)
+	links, err := bankPicks(r, bank, bankAccounts)
+	if err == nil && len(links) > 0 {
+		var res domain.BankSync
+		res, err = h.app.Svc.Banks.Link(ctx, user.ID, bank, links, user.Location(), kit.T(ctx, "Uncategorized"))
+		if err == nil {
+			return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, nil)
+		}
+	}
 	if kit.IsUserError(err) {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: "banks"})
+		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: string(bank) + "-link"})
 	}
+	return h.syncReply(w, r, user, pageData{}, err)
+}
+
+// syncReply answers a sync with the banks card and d, showing its notice, or err when
+// the sync failed.
+func (h *Handler) syncReply(w http.ResponseWriter, r *http.Request, user domain.User, d pageData, err error) error {
 	if err != nil {
-		return err
-	}
-	// all operations, as for an account without operations
-	all := time.Unix(0, 0).In(loc)
-	var (
-		links []domain.BankLink
-		// fresh are the accounts without operations, by id, set to the bank balance
-		fresh = map[int64]domain.BankAccount{}
-	)
-	for _, link := range picks {
-		i := slices.IndexFunc(bankAccounts, func(t domain.BankAccount) bool { return t.ID == link.BankAccountID })
-		t := bankAccounts[i]
-		link.From = all
-		if link.AccountID == 0 {
-			in := domain.AccountInput{Name: t.Name, Currency: t.Currency, Kind: t.Kind}
-			if !t.CreditLimit.IsZero() {
-				in.Kind, in.CreditLimit = domain.AccountCredit, t.CreditLimit
-			}
-			a, err := h.app.Svc.Accounts.Create(ctx, user.ID, in)
-			if kit.IsUserError(err) {
-				return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: "banks"})
-			}
-			if err != nil {
-				return err
-			}
-			link.AccountID = a.ID
-		} else if link.From, err = h.syncStart(r, user, link.AccountID, all); err != nil {
-			return err
-		}
-		if link.From.Equal(all) {
-			fresh[link.AccountID] = t
-		}
-		links = append(links, link)
-	}
-	if len(links) == 0 {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
-	}
-	res, err := h.app.Svc.TBank.Link(ctx, user.ID, links, loc, kit.T(ctx, "Uncategorized"))
-	var d pageData
-	if err != nil {
-		h.app.Log.WarnContext(ctx, "link t-bank accounts", slog.Any("error", err))
-		d.Banks.SyncErr = err.Error()
-	} else {
-		for id, t := range fresh {
-			// the opening balance, before the first imported day, is the balance now less
-			// the imported operations
-			opening := t.Balance.Sub(res.Fetched[id])
-			if _, err := h.app.Svc.Accounts.SetBalance(ctx, user.ID, id, opening,
-				timex.Date(all).AddDate(0, 0, -1)); err != nil {
-				return err
-			}
-		}
-		d.Notice = tbankNotice(r, res)
+		// a failing bank is not a fault of this server; the card shows it too
+		h.app.Log.WarnContext(r.Context(), "sync bank", slog.Any("error", err))
+		d.Notice, d.Banks.SyncErr = "", err.Error()
 	}
 	if !kit.IsHTMX(r) && d.Notice != "" {
 		h.app.SetNotice(w, d.Notice)
@@ -217,28 +190,16 @@ func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.U
 	return h.settingsReply(w, r, user, _cardBanks, d, kit.Failure{})
 }
 
-// syncStart returns the start of the sync of the account accountID: the day after its
-// last operation, or all when it has none.
-func (h *Handler) syncStart(r *http.Request, user domain.User, accountID int64, all time.Time) (time.Time, error) {
-	ops, _, err := h.app.Svc.Operations.List(r.Context(), user.ID, domain.Filter{AccountID: accountID},
-		pagination.Params{Limit: 1})
-	if err != nil || len(ops) == 0 {
-		return all, err
-	}
-	last := ops[0].Date
-	return time.Date(last.Year(), last.Month(), last.Day()+1, 0, 0, 0, 0, user.Location()), nil
-}
-
-// bankPicks returns the links of the T-Bank accounts not synced of the bank link form
-// of r, the one posted as bank_account or all, to the accounts chosen for them, 0 for a
-// new one, without a start. An account may be chosen once.
-func bankPicks(r *http.Request, bankAccounts []domain.BankAccount) ([]domain.BankLink, error) {
+// bankPicks returns the links of the accounts at bank not synced of the link form of
+// r, the one posted as bank_account or all, to the accounts chosen for them, 0 for a
+// new one. An account may be chosen once.
+func bankPicks(r *http.Request, bank domain.Bank, bankAccounts []domain.BankAccount) ([]domain.BankLink, error) {
 	only := r.PostFormValue("bank_account")
 	var picks []domain.BankLink
 	chosen := make(map[int64]bool)
 	for _, t := range bankAccounts {
 		id := strconv.FormatInt(t.ID, 10)
-		if t.Bank != domain.BankTBank || t.AccountID != 0 || (only != "" && only != id) {
+		if t.Bank != bank || t.AccountID != 0 || (only != "" && only != id) {
 			continue
 		}
 		var accountID int64
@@ -257,8 +218,12 @@ func bankPicks(r *http.Request, bankAccounts []domain.BankAccount) ([]domain.Ban
 	return picks, nil
 }
 
-func (h *Handler) tbankDisconnect(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := h.app.Svc.TBank.Disconnect(r.Context(), user.ID); err != nil {
+func (h *Handler) bankDisconnect(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	bank, err := h.pathBank(r)
+	if err != nil {
+		return err
+	}
+	if err := h.app.Svc.Banks.Disconnect(r.Context(), user.ID, bank); err != nil {
 		return err
 	}
 	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
@@ -271,36 +236,22 @@ func (h *Handler) tbankDisconnect(w http.ResponseWriter, r *http.Request, user d
 // to show them.
 func (h *Handler) banksAutoSync(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	ctx := r.Context()
-	res, err := h.app.Svc.TBank.Sync(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), false /* force */)
+	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), false /* force */)
 	if err != nil {
-		h.app.Log.WarnContext(ctx, "sync t-bank", slog.Any("error", err))
+		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
 	}
-	v := kit.Page{User: &user}
 	current, urlErr := url.Parse(r.Header.Get("HX-Current-URL"))
 	switch {
-	case res.NeedsLogin && (urlErr != nil || current.Path != "/settings"):
-		return h.app.Fragment(w, r, http.StatusOK, bankLoginAlert())
+	case len(res.NeedsLogin) > 0 && (urlErr != nil || current.Path != "/settings"):
+		return h.app.Fragment(w, r, http.StatusOK, bankLoginAlert(kit.SyncNotice(ctx, res)))
 	case res.Operations > 0:
-		h.app.SetNotice(w, tbankNotice(r, res))
+		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
 		w.Header().Set("HX-Refresh", "true")
 		return nil
 	case err != nil:
 		d := pageData{Banks: banksData{SyncErr: err.Error()}}
-		return h.app.Fragment(w, r, http.StatusOK, kit.Toasts(v, true, toasts(d)))
+		return h.app.Fragment(w, r, http.StatusOK, kit.Toasts(kit.Page{User: &user}, true, toasts(d)))
 	}
 	// an empty answer removes the placeholder
 	return nil
-}
-
-// tbankNotice describes the result of a sync.
-func tbankNotice(r *http.Request, res domain.BankSync) string {
-	ctx := r.Context()
-	switch {
-	case res.NeedsLogin:
-		return kit.T(ctx, "T-Bank asks to sign in again to keep syncing.")
-	case res.Operations > 0:
-		return kit.T(ctx, "T-Bank synced: operations %d.", res.Operations)
-	default:
-		return kit.T(ctx, "T-Bank is up to date.")
-	}
 }

@@ -14,6 +14,3 @@ bin/
 .gograph/
 *.out
 .claude
-
-# T-Bank probe output: a live bank session and personal data
-/tbank-probe/

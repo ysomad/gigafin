@@ -117,16 +117,23 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 // loadBanks sets in d whether the user syncs a bank and the bank accounts whose
 // balance differs from their accounts in d.AccByID.
 func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error {
-	if h.app.Svc.TBank.Enabled() {
-		conn, err := h.app.Svc.TBank.Connection(r.Context(), user.ID)
+	ctx := r.Context()
+	for _, bank := range h.app.Svc.Banks.Enabled() {
+		conn, err := h.app.Svc.Banks.Connection(ctx, user.ID, bank)
 		switch {
-		case err == nil:
-			d.BankSync, d.BankSyncAt = conn.Status == domain.BankConnected, conn.LastSyncAt
-		case !errors.Is(err, errors.ErrNotFound):
+		case errors.Is(err, errors.ErrNotFound):
+			continue
+		case err != nil:
 			return err
 		}
+		if conn.Status == domain.BankConnected {
+			d.BankSync = true
+		}
+		if conn.LastSyncAt.After(d.BankSyncAt) {
+			d.BankSyncAt = conn.LastSyncAt
+		}
 	}
-	bankAccounts, err := h.app.Svc.Banks.Accounts(r.Context(), user.ID)
+	bankAccounts, err := h.app.Svc.Banks.Accounts(ctx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -141,18 +148,13 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 // syncBanks syncs the banks now and goes back to the operations with the outcome.
 func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	ctx := r.Context()
-	res, err := h.app.Svc.TBank.Sync(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
-	switch {
-	case err != nil:
+	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), kit.T(ctx, "Uncategorized"), true /* force */)
+	if err != nil {
 		// a failing bank is not a fault of this server
-		h.app.Log.WarnContext(ctx, "sync t-bank", slog.Any("error", err))
-		h.app.SetNotice(w, kit.T(ctx, "T-Bank sync failed: %s", err.Error()))
-	case res.NeedsLogin:
-		h.app.SetNotice(w, kit.T(ctx, "T-Bank asks to sign in again to keep syncing."))
-	case res.Operations > 0:
-		h.app.SetNotice(w, kit.T(ctx, "T-Bank synced: operations %d.", res.Operations))
-	default:
-		h.app.SetNotice(w, kit.T(ctx, "T-Bank is up to date."))
+		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
+		h.app.SetNotice(w, kit.T(ctx, "Sync failed: %s", err.Error()))
+	} else {
+		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
 	}
 	kit.Redirect(w, r, "/operations")
 	return nil

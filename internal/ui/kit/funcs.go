@@ -186,3 +186,19 @@ func OpAmount(ctx context.Context, op domain.Operation) string {
 	}
 	return s
 }
+
+// SyncNotice describes the outcome of a bank sync.
+func SyncNotice(ctx context.Context, res domain.BankSync) string {
+	switch {
+	case len(res.NeedsLogin) > 0:
+		names := make([]string, len(res.NeedsLogin))
+		for i, b := range res.NeedsLogin {
+			names[i] = T(ctx, b.Name())
+		}
+		return T(ctx, "%s asks to sign in again to keep syncing.", strings.Join(names, ", "))
+	case res.Operations > 0:
+		return T(ctx, "Synced operations: %d.", res.Operations)
+	default:
+		return T(ctx, "No new operations.")
+	}
+}

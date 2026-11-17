@@ -94,7 +94,7 @@ func (q *Queries) LinkBankAccount(ctx context.Context, arg LinkBankAccountParams
 }
 
 const listBankAccounts = `-- name: ListBankAccounts :many
-SELECT id, user_id, bank, external_id, name, currency, kind, balance, credit_limit, balance_at, account_id, synced_until, created_at, updated_at FROM bank_accounts WHERE user_id = ? ORDER BY bank, name, id
+SELECT id, user_id, bank, external_id, name, currency, kind, balance, credit_limit, account_id, synced_until, created_at, updated_at FROM bank_accounts WHERE user_id = ? ORDER BY bank, name, id
 `
 
 func (q *Queries) ListBankAccounts(ctx context.Context, userID int64) ([]BankAccount, error) {
@@ -116,7 +116,6 @@ func (q *Queries) ListBankAccounts(ctx context.Context, userID int64) ([]BankAcc
 			&i.Kind,
 			&i.Balance,
 			&i.CreditLimit,
-			&i.BalanceAt,
 			&i.AccountID,
 			&i.SyncedUntil,
 			&i.CreatedAt,
@@ -157,15 +156,14 @@ func (q *Queries) SetBankAccountSyncedUntil(ctx context.Context, arg SetBankAcco
 }
 
 const upsertBankAccount = `-- name: UpsertBankAccount :exec
-INSERT INTO bank_accounts (user_id, bank, external_id, name, currency, kind, balance, credit_limit, balance_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO bank_accounts (user_id, bank, external_id, name, currency, kind, balance, credit_limit, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, bank, external_id) DO UPDATE SET
     name = excluded.name,
     currency = excluded.currency,
     kind = excluded.kind,
     balance = excluded.balance,
     credit_limit = excluded.credit_limit,
-    balance_at = excluded.balance_at,
     updated_at = excluded.created_at
 `
 
@@ -178,7 +176,6 @@ type UpsertBankAccountParams struct {
 	Kind        string
 	Balance     int64
 	CreditLimit int64
-	BalanceAt   int64
 	CreatedAt   int64
 }
 
@@ -192,7 +189,6 @@ func (q *Queries) UpsertBankAccount(ctx context.Context, arg UpsertBankAccountPa
 		arg.Kind,
 		arg.Balance,
 		arg.CreditLimit,
-		arg.BalanceAt,
 		arg.CreatedAt,
 	)
 	return err

@@ -238,7 +238,6 @@ CREATE TABLE bank_accounts (
     kind         TEXT    NOT NULL,
     balance      INTEGER NOT NULL,
     credit_limit INTEGER NOT NULL,
-    balance_at   INTEGER NOT NULL,
     account_id   INTEGER REFERENCES accounts (id) ON DELETE SET NULL,
     synced_until INTEGER,
     created_at   INTEGER NOT NULL,

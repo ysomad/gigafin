@@ -40,8 +40,9 @@
 - [x] Auto-categorisation rules. Payee is free text, and the only mapping is the bank's own category name. Other apps let you write rules like "payee contains X → category Y, rename payee."
 - [x] UI revamp
 - [x] Use templ instead of go templates
+- [x] tbank sync, balance check (if does not count - show alert)
 - [ ] rules event sourcing
-- [ ] tbank sync, balance check (if does not count - show alert)
+- [ ] category icons
 
 ## Extra feats
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)

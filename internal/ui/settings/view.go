@@ -33,10 +33,13 @@ type pageData struct {
 	Banks banksData
 }
 
-// banksData is the state of the banks card: a section per bank and the accounts at
-// each, with the accounts they sync with.
+// banksData is the state of the banks card: a section per enabled bank and the
+// accounts at each, with the accounts they sync with.
 type banksData struct {
-	TBank    tbankData
+	Banks []bankData
+	// Posted is the bank and phone of a sign-in form posted with an error, to fill it
+	// again.
+	Posted   bankData
 	Accounts []domain.BankAccount
 	// Linked are the accounts by id.
 	Linked map[int64]domain.Account
@@ -49,12 +52,11 @@ type banksData struct {
 	SyncErr string
 }
 
-// tbankData is the state of the T-Bank section of the banks card.
-type tbankData struct {
-	Enabled bool
-	// Connected is set when Conn is stored.
-	Connected bool
-	Conn      domain.BankConnection
+// bankData is the state of the section of a bank in the banks card.
+type bankData struct {
+	Bank domain.Bank
+	// Conn is the stored connection, of an empty Status when there is none.
+	Conn domain.BankConnection
 	// Step is the input a sign-in in progress waits for, empty when none.
 	Step string
 	// Phone fills the phone input again, the stored one when not posted.
