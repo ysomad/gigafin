@@ -51,10 +51,12 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 				}
 			</div>
 			if connected {
+				{{ link := base + "/link" }}
 				<div class="hstack">
-					<form method="post" action={ base + "/sync" } hx-post={ base + "/sync" } hx-swap="none" hx-disable="find button">
-						<button type="submit" class="small">{ kit.T(ctx, "Sync now") }</button>
-					</form>
+					// posts the account table of the bank, linking the accounts not synced yet
+					if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && t.AccountID == 0 }) {
+						<button type="submit" form={ "form-" + string(b.Bank) + "-link" } formaction={ link } hx-post={ link } hx-swap="none" hx-disable="this" class="outline small">{ kit.T(ctx, "Sync all accounts") }</button>
+					}
 					<form method="post" action={ base + "/disconnect" } hx-post={ base + "/disconnect" } hx-swap="none" hx-confirm={ kit.T(ctx, "Disconnect %s? Synced operations stay.", name) }>
 						<button type="submit" class="outline small" data-variant="danger">{ kit.T(ctx, "Disconnect") }</button>
 					</form>
@@ -117,10 +119,9 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 }
 
 // bankAccounts lists the accounts at bank with the account each syncs with, or picks
-// one for each not synced, a new one or an account of its currency, suggested first, to
-// sync with alone or with all others at once.
+// one for each not synced, a new one or an account of its currency, suggested first,
+// for the sync button of the bank section to link.
 templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
-	{{ free := slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == bank && t.AccountID == 0 }) }}
 	{{ link := "/settings/banks/" + string(bank) + "/link" }}
 	<form id={ "form-" + string(bank) + "-link" } method="post" action={ link } class="form-compact">
 		@kit.FormError(v.Errors.Form(string(bank)+"-link"), "")
@@ -155,15 +156,12 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 										</div>
 									} else {
 										{{ id := strconv.FormatInt(t.ID, 10) }}
-										<fieldset class="group">
-											<select name={ "account_" + id } aria-label={ kit.T(ctx, "Syncs with") }>
-												<option value="new">{ kit.T(ctx, "New account") }</option>
-												for _, a := range d.Choices[t.ID] {
-													<option value={ a.ID } selected?={ a.ID == d.Suggested[t.ID] }>{ a.Name }</option>
-												}
-											</select>
-											<button type="submit" name="bank_account" value={ id } class="outline" formaction={ link } hx-post={ link } hx-vals={ fmt.Sprintf(`{"bank_account":%q}`, id) } hx-swap="none" hx-disable="this">{ kit.T(ctx, "Sync") }</button>
-										</fieldset>
+										<select name={ "account_" + id } aria-label={ kit.T(ctx, "Syncs with") }>
+											<option value="new">{ kit.T(ctx, "New account") }</option>
+											for _, a := range d.Choices[t.ID] {
+												<option value={ a.ID } selected?={ a.ID == d.Suggested[t.ID] }>{ a.Name }</option>
+											}
+										</select>
 									}
 								</td>
 							</tr>
@@ -175,11 +173,6 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 				</tbody>
 			</table>
 		</div>
-		if free {
-			<div class="hstack justify-end">
-				<button type="submit" formaction={ link } hx-post={ link } hx-swap="none" hx-disable="this" title={ kit.T(ctx, "Syncs all accounts at once, so transfers between them are imported as transfers.") }>{ kit.T(ctx, "Sync all") }</button>
-			</div>
-		}
 	</form>
 }
 

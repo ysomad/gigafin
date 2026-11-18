@@ -55,7 +55,6 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"POST /settings/banks/{bank}/login":      h.bankLogin,
 		"POST /settings/banks/{bank}/confirm":    h.bankConfirm,
 		"POST /settings/banks/{bank}/cancel":     h.bankCancel,
-		"POST /settings/banks/{bank}/sync":       h.bankSync,
 		"POST /settings/banks/{bank}/link":       h.bankLink,
 		"POST /settings/banks/{bank}/disconnect": h.bankDisconnect,
 		"GET /settings/banks/autosync":           h.banksAutoSync,

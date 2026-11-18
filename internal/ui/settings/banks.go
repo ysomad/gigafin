@@ -134,20 +134,10 @@ func (h *Handler) bankCancel(w http.ResponseWriter, r *http.Request, user domain
 	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
 }
 
-func (h *Handler) bankSync(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	bank, err := h.pathBank(r)
-	if err != nil {
-		return err
-	}
-	ctx := r.Context()
-	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
-	return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, err)
-}
-
-// bankLink syncs the bank account posted as bank_account, or every one at the bank not
-// synced yet, with the account chosen for it as account_ID, its id: an account of its
-// currency no bank account syncs with, or a new one when "new". All sync in one run, so
-// the transfers between them pair.
+// bankLink syncs every bank account at the bank not synced yet with the account chosen
+// for it as account_ID, its id: an account of its currency no bank account syncs with,
+// or a new one when "new", all in one run, so the transfers between them pair; then
+// syncs the accounts synced already.
 func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	bank, err := h.pathBank(r)
 	if err != nil {
@@ -162,17 +152,19 @@ func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.U
 		return err
 	}
 	links, err := bankPicks(r, bank, bankAccounts)
+	var res domain.BankSync
 	if err == nil && len(links) > 0 {
-		var res domain.BankSync
 		res, err = h.app.Svc.Banks.Link(ctx, user.ID, bank, links, user.Location())
-		if err == nil {
-			return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, nil)
-		}
 	}
 	if kit.IsUserError(err) {
 		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: string(bank) + "-link"})
 	}
-	return h.syncReply(w, r, user, pageData{}, err)
+	if err == nil && len(res.NeedsLogin) == 0 {
+		var synced domain.BankSync
+		synced, err = h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
+		res.NeedsLogin, res.Operations = synced.NeedsLogin, res.Operations+synced.Operations
+	}
+	return h.syncReply(w, r, user, pageData{Notice: kit.SyncNotice(ctx, res)}, err)
 }
 
 // syncReply answers a sync with the banks card and d, showing its notice, or err when
@@ -190,15 +182,13 @@ func (h *Handler) syncReply(w http.ResponseWriter, r *http.Request, user domain.
 }
 
 // bankPicks returns the links of the accounts at bank not synced of the link form of
-// r, the one posted as bank_account or all, to the accounts chosen for them, 0 for a
-// new one. An account may be chosen once.
+// r to the accounts chosen for them, 0 for a new one. An account may be chosen once.
 func bankPicks(r *http.Request, bank domain.Bank, bankAccounts []domain.BankAccount) ([]domain.BankLink, error) {
-	only := r.PostFormValue("bank_account")
 	var picks []domain.BankLink
 	chosen := make(map[int64]bool)
 	for _, t := range bankAccounts {
 		id := strconv.FormatInt(t.ID, 10)
-		if t.Bank != bank || t.AccountID != 0 || (only != "" && only != id) {
+		if t.Bank != bank || t.AccountID != 0 {
 			continue
 		}
 		var accountID int64
