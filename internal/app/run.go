@@ -5,15 +5,32 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/config"
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/logger"
 )
 
-// Serve runs the HTTP server and the background jobs until ctx is done.
-func Serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+// Run runs the HTTP server and the background jobs until SIGINT/SIGTERM arrives.
+func Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	log := slog.New(logger.Handler{Handler: slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     cfg.Logger.Level,
+		AddSource: cfg.Logger.AddSource,
+	})})
+	slog.SetDefault(log)
+
 	version := "unknown"
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range bi.Settings {
