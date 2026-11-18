@@ -24,8 +24,6 @@ make run            # migrates gigafin.db, serves on 127.0.0.1:8080
 Config via env (`DB_PATH`, `HTTP_ADDR`, `BANKS_SECRET_KEY`, `TOTP_SECRET_KEY`, …), see `internal/config`.
 
 ## CLI
-Users are managed with `bin/gigafin-cli` through make; each target builds it and runs it on `$(DB)`.
-The password is prompted for unless given as `p=`.
 ```sh
 make user-add login=alice                 # role=user|admin (default user), p=PASSWORD
 make user-passwd login=alice              # change password, ends all sessions; p=PASSWORD
