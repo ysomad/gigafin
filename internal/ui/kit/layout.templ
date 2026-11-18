@@ -19,12 +19,23 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 	>
 		<head>
 			<meta charset="utf-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			if theme == domain.ThemeAuto {
-				<meta name="color-scheme" content="light dark"/>
-			} else {
-				<meta name="color-scheme" content={ string(theme) }/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+			// theme-color is Oat's background, tinting the browser and installed app bars
+			switch theme {
+				case domain.ThemeAuto:
+					<meta name="color-scheme" content="light dark"/>
+					<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)"/>
+					<meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)"/>
+				case domain.ThemeDark:
+					<meta name="color-scheme" content={ string(theme) }/>
+					<meta name="theme-color" content="#09090b"/>
+				default:
+					<meta name="color-scheme" content={ string(theme) }/>
+					<meta name="theme-color" content="#ffffff"/>
 			}
+			<link rel="manifest" href="/static/manifest.json"/>
+			<link rel="apple-touch-icon" href="/static/apple-touch-icon.png"/>
+			<link rel="icon" href="/static/icon-192.png"/>
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
 			<title>{ v.Title } · gigafin</title>
 			<link rel="stylesheet" href="/static/lib/oat.min.css"/>

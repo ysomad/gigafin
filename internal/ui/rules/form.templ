@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -126,7 +127,7 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 					<select name="cond_value">
 						<option value="">—</option>
 						for _, a := range accounts {
-							<option value={ a.ID } selected?={ a.ID == r.ID }>{ a.Name } ({ a.Currency })</option>
+							<option value={ a.ID } selected?={ a.ID == r.ID }>{ a.Name } ({ money.CurrencySymbol(a.Currency) })</option>
 						}
 					</select>
 				case domain.RuleFieldType:

@@ -11,7 +11,7 @@ import (
 
 templ listPage(v kit.Page, d opList) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
-		<div class="hstack justify-between mb-4">
+		<div class="toolbar hstack justify-between mb-4">
 			<div class="hstack">
 				<ot-dropdown>
 					<menu class="buttons">
@@ -50,27 +50,29 @@ templ listPage(v kit.Page, d opList) {
 							</form>
 						</li>
 					</menu>
+					if !d.BankSyncAt.IsZero() {
+						<small class="text-light">{ kit.Datetime(ctx, d.BankSyncAt, v.User) }</small>
+					}
 				}
 			</div>
 			<form method="get" action="/operations">
 				<div class="hstack">
 					<fieldset class="group">
-						<input type="search" name="q" value={ d.Filter.Query } aria-label={ kit.T(ctx, "Search") }/>
+						<input type="search" name="q" value={ d.Filter.Query } placeholder={ kit.T(ctx, "Search") } aria-label={ kit.T(ctx, "Search") }/>
 						<button type="submit" class="icon" aria-label={ kit.T(ctx, "Search") }><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#search"></use></svg></button>
 					</fieldset>
-					<ot-dropdown>
-						<button type="button" class="outline" popovertarget="filter-popover" aria-label={ kit.T(ctx, "Filter") }>
-							<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
-							if d.FilterCount > 0 {
-								<span class="badge">{ d.FilterCount }</span>
-							}
-						</button>
-						@filterPopover(d)
-					</ot-dropdown>
+					<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ kit.T(ctx, "Filter") }>
+						<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
+						if d.FilterCount > 0 {
+							<span class="badge">{ d.FilterCount }</span>
+						}
+					</button>
 					if d.Filtered {
 						<a class="button ghost" href="/operations">{ kit.T(ctx, "Reset") }</a>
 					}
 				</div>
+				// outside the hstack, which zeroes the margins that center a dialog
+				@filterDialog(d)
 			</form>
 		</div>
 		if len(d.Mismatched) > 0 {
@@ -103,9 +105,9 @@ templ listPage(v kit.Page, d opList) {
 	}
 }
 
-// filterPopover is the dialog of the filters of the operations of d, but the query.
-templ filterPopover(d opList) {
-	<article class="card p-4 form-compact" popover id="filter-popover">
+// filterDialog is the dialog of the filters of the operations of d, but the query.
+templ filterDialog(d opList) {
+	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } autofocus>
 		<div class="row">
 			@kit.Field("col-6", kit.T(ctx, "Account"), "", "", nil) {
 				<select name="account">
@@ -178,8 +180,8 @@ templ filterPopover(d opList) {
 			}
 		</div>
 		<footer class="hstack justify-end mt-4">
-			<button type="button" class="outline" popovertarget="filter-popover" popovertargetaction="hide">{ kit.T(ctx, "Close") }</button>
+			<button type="button" class="outline" commandfor="filter-dialog" command="close">{ kit.T(ctx, "Close") }</button>
 			<button type="submit">{ kit.T(ctx, "Apply") }</button>
 		</footer>
-	</article>
+	</dialog>
 }

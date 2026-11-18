@@ -46,8 +46,10 @@
 - [x] Rename dashboard to analytics
 - [x] 2fa
 - [x] theme toggle
+- [x] pwa
 - [ ] better categories ui/ux (icons, selectors)
 - [ ] operations tags filter
+- [ ] mobile first ui
 - [ ] sber sync
 - [ ] alfa sync
 - [ ] raiifaizen sync

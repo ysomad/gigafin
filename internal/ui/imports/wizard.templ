@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -95,7 +96,7 @@ templ accountsStep(d wizardData, base string) {
 								<input type="hidden" name="acc_name" value={ a.Name }/>
 								<input type="hidden" name="acc_currency" value={ a.Currency }/>
 								<strong>{ a.Name }</strong>
-								<div class="text-light">{ a.Currency } · { kit.T(ctx, "%d rows", a.Rows) }</div>
+								<div class="text-light">{ money.CurrencySymbol(a.Currency) } · { kit.T(ctx, "%d rows", a.Rows) }</div>
 							</td>
 							<td>
 								<select name="acc_id" aria-label={ kit.T(ctx, "Account") }>
@@ -239,7 +240,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 								}
 							</small>
 						</td>
-						<td class="align-right nowrap">{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span></td>
+						<td class="align-right nowrap">{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span></td>
 						<td>
 							switch  {
 								case row.Status == domain.ImportRowDuplicate:
@@ -312,7 +313,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 							</td>
 							<td class="align-right nowrap">
 								if r.Currency != "" {
-									{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span>
+									{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span>
 								} else {
 									—
 								}

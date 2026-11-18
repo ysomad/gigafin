@@ -47,23 +47,41 @@ td.nowrap {
   }
 }
 
-/* On phones the top nav becomes a bottom tab bar without the brand. */
+/* On phones the top nav becomes a bottom tab bar without the brand, above the home
+   indicator of the installed app. */
 @media (max-width: 768px) {
   body {
-    padding-bottom: 4rem;
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
   .to-top {
-    bottom: calc(4rem + var(--space-2));
+    bottom: calc(4.5rem + var(--space-2) + env(safe-area-inset-bottom));
   }
-  /* Oat aligns a popover to its button's right edge; keep it inside the screen */
-  .card[popover] {
-    max-width: calc(100vw - 3rem);
+  /* iOS zooms into a focused field whose text is under 16px, as Oat's is */
+  :is(input, select, textarea) {
+    font-size: 16px;
+  }
+  /* the operations toolbar wraps, its search taking a full row */
+  .toolbar {
+    flex-wrap: wrap;
+    > form,
+    > form > .hstack > .group {
+      flex: 1;
+    }
+  }
+  /* the day of the operations under it stays in view while they scroll */
+  li.day {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-block: var(--space-1);
+    background-color: var(--background);
   }
   header[data-topnav] {
     position: fixed;
     inset: auto 0 0 0;
     border-bottom: none;
     border-top: 1px solid var(--border);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
     .brand {
       display: none;
     }
@@ -73,6 +91,12 @@ td.nowrap {
       justify-content: space-around;
     }
   }
+}
+
+/* A dialog opened with autofocus takes the focus itself, not its first field: no ring
+   around the whole dialog. */
+dialog[autofocus]:focus-visible {
+  outline: none;
 }
 
 /* Form with tight, even spacing between fields, such as the operations filter. */
@@ -113,6 +137,13 @@ fieldset.group {
   }
 }
 
+/* Oat's toasts at the top keep the popover's fit-content height, which iOS Safari
+   stretches to the bottom of the screen, and the toast with it. */
+.toast-container[data-placement^="top"] {
+  bottom: auto;
+  height: auto;
+}
+
 /* Oat's tag input keeps its placeholder next to tags; show it only while empty. */
 ot-taginput:has(.badge) input::placeholder {
   color: transparent;
@@ -125,6 +156,19 @@ ot-taginput:has(.badge) input::placeholder {
   flex-wrap: nowrap;
   > :last-child {
     flex-shrink: 0;
+  }
+  /* details are a line each, its icon kept by its text */
+  small {
+    > .hstack {
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      /* a long text would squeeze its icon; a wrapped one keeps it centered on its first
+         line */
+      > svg {
+        flex-shrink: 0;
+        margin-block-start: calc((1lh - 12px) / 2);
+      }
+    }
   }
 }
 

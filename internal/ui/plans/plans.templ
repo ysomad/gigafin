@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -34,7 +35,7 @@ templ plansPage(v kit.Page, d plansData) {
 					<div class="vstack gap-1 align-right">
 						for _, tot := range sec.Totals {
 							<span>
-								{ kit.Money(ctx, tot.Spent, tot.Currency) } <span class="text-light">{ kit.T(ctx, "of") } { kit.Money(ctx, tot.Plan, tot.Currency) } { tot.Currency } ·</span>
+								{ kit.Money(ctx, tot.Spent, tot.Currency) } <span class="text-light">{ kit.T(ctx, "of") } { kit.Money(ctx, tot.Plan, tot.Currency) } { money.CurrencySymbol(tot.Currency) } ·</span>
 								{ kit.Money(ctx, tot.Left().Abs(), tot.Currency) }
 								<span class="text-light">
 									switch  {

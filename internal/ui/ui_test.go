@@ -190,7 +190,7 @@ func TestPagesAndFlows(t *testing.T) {
 
 	status, body := b.post("/accounts", url.Values{"name": {"Card"}, "currency": {"RUB"}, "balance": {"1 000,50"}})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Contains(t, body, "1\u202f001 <span class=\"text-light\">RUB<", "minor units hidden and rounded by default")
+	assert.Contains(t, body, "1\u202f001 <span class=\"text-light\">₽<", "minor units hidden and rounded by default")
 	assert.NotContains(t, body, "data-minor-units")
 	cards, err := f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
@@ -255,7 +255,7 @@ func TestPagesAndFlows(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Market")
-	assert.Contains(t, body, `-150.25 <span class="text-light">RUB</span>`)
+	assert.Contains(t, body, `-150.25 <span class="text-light">₽</span>`)
 
 	status, body = b.post("/operations", url.Values{
 		"type": {"expense"}, "account": {strconv.FormatInt(card.ID, 10)}, "date": {"2026-10-31"},
@@ -448,7 +448,8 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(t, body, "gf_")
 	assert.Contains(t, body, "be shown again")
 	assert.Contains(t, body, "this browser", "current session listed")
-	assert.Contains(t, body, `<td>read</td><td>never</td><td>never</td>`, "never used, never expires")
+	assert.Contains(t, body, `<td>read</td><td class="nowrap">never</td><td class="nowrap">never</td>`,
+		"never used, never expires")
 }
 
 func TestChangePassword(t *testing.T) {
@@ -602,7 +603,7 @@ func TestCreditAccount(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "Credit and loans")
-	assert.Contains(t, body, "49\u202f000 <span class=\"text-light\">RUB<", "available")
+	assert.Contains(t, body, "49\u202f000 <span class=\"text-light\">₽<", "available")
 
 	status, body = b.post("/accounts", url.Values{
 		"name": {"Cash"}, "kind": {"cash"}, "currency": {"RUB"}, "credit_limit": {"100"},
@@ -700,7 +701,7 @@ func TestImportUpload(t *testing.T) {
 
 	status, body = b.get("/operations")
 	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, "-1\u202f040 <span class=\"text-light\">RUB</span>")
+	assert.Contains(t, body, "-1\u202f040 <span class=\"text-light\">₽</span>")
 	assert.Contains(t, body, "Food / Groceries", `"Parent / Child" created a nested category`)
 }
 

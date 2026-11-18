@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -16,89 +17,72 @@ templ accountsPage(v kit.Page, d accountsData) {
 			<p class="text-light">{ kit.T(ctx, "No accounts yet.") }</p>
 		}
 		if len(d.Assets) > 0 {
-			<div class="table">
-				<table>
-					<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th></tr></thead>
-					<tbody>
-						for _, a := range d.Assets {
-							<tr>
-								<td>
-									<div class="hstack gap-1">
-										if t, ok := d.Banks[a.ID]; ok {
-											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
-										}
-										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
-										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
-											@kit.BankBadge(t, a)
-										}
-									</div>
-								</td>
-								<td>{ kit.T(ctx, string(a.Kind)) }</td>
-								<td class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
+			<ul class="unstyled vstack gap-1">
+				for _, a := range d.Assets {
+					<li class="card compact hstack justify-between">
+						<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>
+							<div class="hstack gap-1">
+								if t, ok := d.Banks[a.ID]; ok {
+									@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
+								}
+								{ a.Name }
+								if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+									@kit.BankBadge(t, a)
+								}
+							</div>
+							<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
+						</a>
+						<div class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+					</li>
+				}
+			</ul>
 		}
 		if len(d.Liabilities) > 0 {
 			<h2>{ kit.T(ctx, "Credit and loans") }</h2>
-			<div class="table">
-				<table>
-					<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th class="align-right">{ kit.T(ctx, "Owed") }</th><th class="align-right">{ kit.T(ctx, "Available") }</th></tr></thead>
-					<tbody>
-						for _, a := range d.Liabilities {
-							<tr>
-								<td>
-									<div class="hstack gap-1">
-										if t, ok := d.Banks[a.ID]; ok {
-											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
-										}
-										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
-										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
-											@kit.BankBadge(t, a)
-										}
-									</div>
-								</td>
-								<td>{ kit.T(ctx, string(a.Kind)) }</td>
-								<td class="align-right">{ kit.Money(ctx, a.Owed(), a.Currency) } <span class="text-light">{ a.Currency }</span></td>
-								<td class="align-right">
-									if !a.CreditLimit.IsZero() {
-										{ kit.Money(ctx, a.Available(), a.Currency) } <span class="text-light">{ a.Currency }</span>
-									}
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
+			<ul class="unstyled vstack gap-1">
+				for _, a := range d.Liabilities {
+					<li class="card compact hstack justify-between">
+						<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>
+							<div class="hstack gap-1">
+								if t, ok := d.Banks[a.ID]; ok {
+									@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
+								}
+								{ a.Name }
+								if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+									@kit.BankBadge(t, a)
+								}
+							</div>
+							<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
+						</a>
+						<div class="align-right">
+							<div>{ kit.Money(ctx, a.Owed(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+							if !a.CreditLimit.IsZero() {
+								<small class="text-light">{ kit.T(ctx, "Available") } { kit.Money(ctx, a.Available(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></small>
+							}
+						</div>
+					</li>
+				}
+			</ul>
 		}
 		if len(d.Archived) > 0 {
 			<details class="mt-4">
 				<summary><span>{ kit.T(ctx, "Archived") } <span class="text-light">{ len(d.Archived) }</span></span></summary>
-				<div>
-					<div class="table">
-						<table>
-							<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th></tr></thead>
-							<tbody>
-								for _, a := range d.Archived {
-									<tr>
-										<td>
-											<div class="hstack gap-1">
-												if t, ok := d.Banks[a.ID]; ok {
-													@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
-												}
-												<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
-											</div>
-										</td>
-										<td>{ kit.T(ctx, string(a.Kind)) }</td>
-										<td class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					</div>
-				</div>
+				<ul class="unstyled vstack gap-1">
+					for _, a := range d.Archived {
+						<li class="card compact hstack justify-between">
+							<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>
+								<div class="hstack gap-1">
+									if t, ok := d.Banks[a.ID]; ok {
+										@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
+									}
+									{ a.Name }
+								</div>
+								<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
+							</a>
+							<div class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+						</li>
+					}
+				</ul>
 			</details>
 		}
 	}
@@ -125,7 +109,7 @@ templ accountPage(v kit.Page, d accountData) {
 				if d.Linked.Mismatch(a) {
 					@kit.BankBadge(d.Linked, a)
 				}
-				<h2 aria-label={ kit.T(ctx, "Balance") }>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></h2>
+				<h2 aria-label={ kit.T(ctx, "Balance") }>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></h2>
 			</div>
 		</div>
 		if !a.CreditLimit.IsZero() {

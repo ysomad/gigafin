@@ -4,6 +4,9 @@
 (() => {
   const halfMonth = 15 * 24 * 60 * 60;
   let charts = [];
+  // phones get a lower chart with slimmer axes, which else take half its width
+  const narrow = (width) => width < 500;
+  const height = (width) => (narrow(width) ? 180 : 220);
 
   // Resolve Oat's light-dark() tokens through an element's computed color;
   // custom properties themselves still contain expressions unsuitable for canvas.
@@ -40,7 +43,9 @@
     figures.forEach((fig) => {
       // Figure attributes arrive with every htmx response, including after settings change.
       const locale = fig.dataset.locale || document.documentElement.lang || undefined;
-      const compact = new Intl.NumberFormat(locale, { notation: 'compact' });
+      const compactFormat = new Intl.NumberFormat(locale, { notation: 'compact' });
+      // Russian thousands are "тыс.": "т." leaves the plot more room
+      const compact = (v) => compactFormat.format(v).replace('тыс.', 'т.');
       const full = new Intl.NumberFormat(locale, {
         maximumFractionDigits: fig.hasAttribute('data-minor-units') ? 2 : 0,
       });
@@ -51,19 +56,28 @@
       const axis = { stroke: palette['muted-foreground'], grid: { stroke: palette.border, width: 1 }, ticks: { show: false } };
       // With no cursor over the chart the legend shows the last (current) month.
       const current = (u) => { if (u.cursor.idx == null) u.setLegend({ idx: u.data[0].length - 1 }); };
+      const small = narrow(fig.clientWidth);
+      // an axis is as wide as its longest label, as in uPlot's axis autosize demo
+      const size = (u, values, i, cycle) => {
+        const a = u.axes[i];
+        if (cycle > 1) return a._size;
+        const longest = (values ?? []).reduce((acc, v) => (v.length > acc.length ? v : acc), '');
+        u.ctx.font = a.font[0];
+        return Math.ceil(a.ticks.size + a.gap + u.ctx.measureText(longest).width / devicePixelRatio);
+      };
       const chart = new uPlot({
         width: fig.clientWidth,
-        height: 220,
+        height: height(fig.clientWidth),
         cursor: { points: { show: false }, drag: { x: false, y: false } },
         hooks: { ready: [current], setCursor: [current] },
         // the net worth line has no fill: give every legend marker its series color
         legend: { markers: { fill: (u, i) => u.series[i].stroke(u, i) } },
         scales: { x: { time: true, range: (u, min, max) => [min - halfMonth, max + halfMonth] } },
         axes: [
-          { ...axis, grid: { show: false }, splits: (u) => u.data[0], values: (u, ts) => ts.map((t) => new Date(t * 1000).toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })) },
-          { ...axis, size: 70, values: (u, vs) => vs.map((v) => compact.format(v)) },
+          { ...axis, grid: { show: false }, splits: (u) => (small ? u.data[0].filter((_, i, ts) => (ts.length - 1 - i) % 2 === 0) : u.data[0]), values: (u, ts) => ts.map((t) => new Date(t * 1000).toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })) },
+          { ...axis, size, values: (u, vs) => vs.map(compact) },
           // net worth dwarfs a month of income or expense: its own scale, no grid
-          ...(networth ? [{ ...axis, scale: 'networth', side: 1, size: 70, grid: { show: false }, values: (u, vs) => vs.map((v) => compact.format(v)) }] : []),
+          ...(networth ? [{ ...axis, scale: 'networth', side: 1, size, grid: { show: false }, values: (u, vs) => vs.map(compact) }] : []),
         ],
         series: [
           {},
@@ -83,6 +97,9 @@
   // colors are read from CSS once per render: redraw when the OS theme flips
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => {
-    charts.forEach((c) => c.setSize({ width: c.root.parentElement.clientWidth, height: 220 }));
+    charts.forEach((c) => {
+      const width = c.root.parentElement.clientWidth;
+      c.setSize({ width, height: height(width) });
+    });
   });
 })();

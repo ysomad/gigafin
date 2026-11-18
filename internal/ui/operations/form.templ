@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -61,7 +62,12 @@ templ formPage(v kit.Page, d opForm) {
 				<input type="hidden" name="origin_id" value={ d.OriginID }/>
 			}
 			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Operation details") }>
-				{{ e := v.Errors.Get("account") }}
+				// amount first, focused on a new operation, so a phone opens its keypad at once
+				{{ e := v.Errors.Get("amount") }}
+				@kit.Field("col-12", kit.T(ctx, "Amount"), e, errID("amount"), nil) {
+					<input name="amount" inputmode="decimal" autocomplete="off" autofocus?={ !editing } value={ kit.AmountInput(ctx, d.Amount) } { kit.Invalid(e, errID("amount"))... }/>
+				}
+				{{ e = v.Errors.Get("account") }}
 				{{ accountLabel := kit.T(ctx, "Account") }}
 				if d.Type == domain.OpTransfer {
 					{{ accountLabel = kit.T(ctx, "From") }}
@@ -88,10 +94,6 @@ templ formPage(v kit.Page, d opForm) {
 							@kit.CategoryOptions(d.Categories, d.CategoryID)
 						</select>
 					}
-				}
-				{{ e = v.Errors.Get("amount") }}
-				@kit.Field("col-12", kit.T(ctx, "Amount"), e, errID("amount"), nil) {
-					<input name="amount" inputmode="decimal" autocomplete="off" value={ kit.AmountInput(ctx, d.Amount) } { kit.Invalid(e, errID("amount"))... }/>
 				}
 			</fieldset>
 			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Date and payee") }>
@@ -169,9 +171,9 @@ templ formPage(v kit.Page, d opForm) {
 templ accountOptions(accounts []domain.Account, selected int64, editing bool) {
 	for _, a := range accounts {
 		if editing {
-			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ a.Currency })</option>
+			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ money.CurrencySymbol(a.Currency) })</option>
 		} else {
-			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ kit.Money(ctx, a.Balance, a.Currency) } { a.Currency })</option>
+			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ kit.Money(ctx, a.Balance, a.Currency) } { money.CurrencySymbol(a.Currency) })</option>
 		}
 	}
 }

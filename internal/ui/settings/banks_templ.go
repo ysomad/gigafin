@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/redact"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
@@ -55,7 +56,7 @@ func banksCard(v kit.Page, d banksData, oob bool) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Banks"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 23, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 24, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -79,7 +80,7 @@ func banksCard(v kit.Page, d banksData, oob bool) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Set BANKS_SECRET_KEY (openssl rand -base64 32) and restart gigafin."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 28, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 29, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -128,7 +129,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 43, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 44, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -146,7 +147,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Connected"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 45, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 46, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -159,7 +160,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(redact.Tail(b.Conn.Login, 4))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 46, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 47, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -177,7 +178,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, b.Conn.LastSyncAt, v.User))).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 48, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 49, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -190,7 +191,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(kit.Datetime(ctx, b.Conn.LastSyncAt, v.User))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 48, Col: 265}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 49, Col: 265}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -209,7 +210,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Sign-in needed"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 51, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 52, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -238,7 +239,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression("form-" + string(b.Bank) + "-link").Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 59, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 60, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
@@ -251,7 +252,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(link).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 59, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 60, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -264,7 +265,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templruntime.NewAttributeExpression(link).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 59, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 60, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -277,7 +278,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Sync all accounts"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 59, Col: 197}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 60, Col: 197}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -295,7 +296,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/disconnect").ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 61, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 62, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -308,7 +309,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/disconnect").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 61, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 62, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 			if templ_7745c5c3_Err != nil {
@@ -321,7 +322,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(kit.T(ctx, "Disconnect %s? Synced operations stay.", name)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 61, Col: 176}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 62, Col: 176}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -334,7 +335,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Disconnect"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 62, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 63, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -358,7 +359,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Signing in as %s.", b.Phone))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 69, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 70, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -371,7 +372,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression("form-" + form).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 70, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 71, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 			if templ_7745c5c3_Err != nil {
@@ -384,7 +385,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/confirm").ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 70, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 71, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 			if templ_7745c5c3_Err != nil {
@@ -397,7 +398,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/confirm").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 70, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 71, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 			if templ_7745c5c3_Err != nil {
@@ -557,7 +558,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Continue"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 92, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 93, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -570,7 +571,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/cancel").ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 93, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 94, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 			if templ_7745c5c3_Err != nil {
@@ -583,7 +584,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/cancel").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 93, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 94, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 			if templ_7745c5c3_Err != nil {
@@ -596,7 +597,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Cancel"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 93, Col: 152}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 94, Col: 152}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -614,7 +615,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression("form-" + form).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 98, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 99, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 			if templ_7745c5c3_Err != nil {
@@ -627,7 +628,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/login").ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 98, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 99, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 			if templ_7745c5c3_Err != nil {
@@ -640,7 +641,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base + "/login").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 98, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 99, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
@@ -679,7 +680,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(b.Phone).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 103, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 104, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 					if templ_7745c5c3_Err != nil {
@@ -720,7 +721,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Get SMS code"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 109, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 110, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -739,7 +740,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Last sync failed:"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 115, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 116, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -752,7 +753,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				var templ_7745c5c3_Var37 string
 				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(b.Conn.LastError)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 115, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 116, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 				if templ_7745c5c3_Err != nil {
@@ -808,7 +809,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression("form-" + string(bank) + "-link").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 127, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 128, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
@@ -821,7 +822,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(link).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 127, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 128, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 		if templ_7745c5c3_Err != nil {
@@ -842,7 +843,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Account"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 131, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 132, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -855,7 +856,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Balance"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 131, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 132, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -868,7 +869,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Credit limit"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 131, Col: 155}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 132, Col: 155}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -881,7 +882,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 		var templ_7745c5c3_Var44 string
 		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Syncs with"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 131, Col: 192}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 132, Col: 192}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 		if templ_7745c5c3_Err != nil {
@@ -910,7 +911,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 				var templ_7745c5c3_Var45 string
 				templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(t.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 141, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 142, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 				if templ_7745c5c3_Err != nil {
@@ -923,7 +924,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 				var templ_7745c5c3_Var46 string
 				templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(kit.Money(ctx, t.Balance, t.Currency))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 144, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 145, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 				if templ_7745c5c3_Err != nil {
@@ -934,9 +935,9 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var47 string
-				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(t.Currency)
+				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(money.CurrencySymbol(t.Currency))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 144, Col: 118}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 145, Col: 140}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 				if templ_7745c5c3_Err != nil {
@@ -950,7 +951,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var48 string
 					templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(kit.Money(ctx, t.CreditLimit, t.Currency))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 147, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 148, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 					if templ_7745c5c3_Err != nil {
@@ -961,9 +962,9 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var49 string
-					templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(t.Currency)
+					templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(money.CurrencySymbol(t.Currency))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 147, Col: 93}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 148, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 					if templ_7745c5c3_Err != nil {
@@ -986,7 +987,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var50 string
 					templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/accounts/%d", a.ID)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 153, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 154, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 					if templ_7745c5c3_Err != nil {
@@ -999,7 +1000,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var51 string
 					templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 153, Col: 106}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 154, Col: 106}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 					if templ_7745c5c3_Err != nil {
@@ -1028,7 +1029,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var52 string
 					templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression("account_" + id).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 160, Col: 40}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 161, Col: 40}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 					if templ_7745c5c3_Err != nil {
@@ -1041,7 +1042,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var53 string
 					templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(kit.T(ctx, "Syncs with")).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 160, Col: 80}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 161, Col: 80}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 					if templ_7745c5c3_Err != nil {
@@ -1054,7 +1055,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 					var templ_7745c5c3_Var54 string
 					templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "New account"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 161, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 162, Col: 58}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 					if templ_7745c5c3_Err != nil {
@@ -1072,7 +1073,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 						var templ_7745c5c3_Var55 string
 						templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(a.ID).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 163, Col: 32}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 164, Col: 32}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 						if templ_7745c5c3_Err != nil {
@@ -1095,7 +1096,7 @@ func bankAccounts(v kit.Page, d banksData, bank domain.Bank) templ.Component {
 						var templ_7745c5c3_Var56 string
 						templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(a.Name)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 163, Col: 83}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 164, Col: 83}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 						if templ_7745c5c3_Err != nil {
@@ -1158,7 +1159,7 @@ func bankLoginAlert(msg string) templ.Component {
 		var templ_7745c5c3_Var58 string
 		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 186, Col: 8}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 187, Col: 8}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 		if templ_7745c5c3_Err != nil {
@@ -1171,7 +1172,7 @@ func bankLoginAlert(msg string) templ.Component {
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Sign in"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 187, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 188, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 		if templ_7745c5c3_Err != nil {

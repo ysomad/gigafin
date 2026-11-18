@@ -541,6 +541,7 @@
   "settings": {
     "%s asks to sign in again to keep syncing.": "%s просит войти заново, чтобы продолжить синхронизацию.",
     "%s connected.": "%s подключён.",
+    "%s on %s": "%s на %s",
     "1 year": "1 год",
     "30 days": "30 дней",
     "7 days": "7 дней",

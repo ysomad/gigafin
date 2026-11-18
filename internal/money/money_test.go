@@ -187,3 +187,24 @@ func TestJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`12.5`), &got))
 	assert.True(t, money.MustParse("12.5").Equal(got))
 }
+
+func TestCurrencySymbol(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		give string
+		want string
+	}{
+		{give: "RUB", want: "₽"},
+		{give: "USD", want: "$"},
+		{give: "EUR", want: "€"},
+		{give: "AED", want: "AED"},
+		{give: "XYZ", want: "XYZ"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.give, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, money.CurrencySymbol(tt.give))
+		})
+	}
+}

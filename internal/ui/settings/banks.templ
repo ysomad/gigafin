@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/redact"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
@@ -141,10 +142,10 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 										{ t.Name }
 									</div>
 								</td>
-								<td class="align-right nowrap">{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ t.Currency }</span></td>
+								<td class="align-right nowrap">{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></td>
 								<td class="align-right nowrap">
 									if !t.CreditLimit.IsZero() {
-										{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ t.Currency }</span>
+										{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span>
 									}
 								</td>
 								<td>

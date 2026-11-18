@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/shopspring/decimal"
+	"golang.org/x/text/currency"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/ysomad/gigafin/internal/errors"
 )
@@ -22,6 +25,9 @@ var _exponents = map[string]int32{
 }
 
 // _cleaner drops digit group separators and normalizes the decimal point and minus.
+// _symbols prints currency symbols; the narrow ones barely differ between languages.
+var _symbols = message.NewPrinter(language.English)
+
 var _cleaner = strings.NewReplacer(" ", "", "\u00a0", "", "\u202f", "", "\u2009", "", ",", ".", "\u2212", "-")
 
 // Currencies returns supported currency codes, sorted.
@@ -42,6 +48,16 @@ func Exponent(currency string) (int32, error) {
 func ValidCurrency(currency string) bool {
 	_, ok := _exponents[currency]
 	return ok
+}
+
+// CurrencySymbol returns the narrow symbol of currency, such as ₽ for RUB, or currency
+// itself when it has none.
+func CurrencySymbol(code string) string {
+	u, err := currency.ParseISO(code)
+	if err != nil {
+		return code
+	}
+	return _symbols.Sprint(currency.NarrowSymbol(u))
 }
 
 // Amount is an amount of money in whole currency units. The zero value is zero.

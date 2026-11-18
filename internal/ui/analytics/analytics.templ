@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/timex"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
@@ -15,7 +16,7 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 			@kit.MonthNav("/", d.An.Month, d.Months, d.Prev, d.Next)
 		</div>
 		for _, c := range d.Charts {
-			<h2>{ kit.T(ctx, "Income vs expense") } <span class="text-light">{ c.Currency }</span></h2>
+			<h2>{ kit.T(ctx, "Income vs expense") } <span class="text-light">{ money.CurrencySymbol(c.Currency) }</span></h2>
 			<div class="table">
 				<figure
 					class="trend"
@@ -38,7 +39,7 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 		}
 		// expenses are ordered by currency: a table per currency
 		for _, group := range currencyGroups(d.An.Expenses, func(s domain.CategoryShare) string { return s.Currency }) {
-			<h2>{ kit.T(ctx, "Expenses by category") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<h2>{ kit.T(ctx, "Expenses by category") } <span class="text-light">{ money.CurrencySymbol(group[0].Currency) }</span></h2>
 			<div class="table">
 				<table>
 					<thead>
@@ -102,7 +103,7 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 		}
 		// category trends are ordered by currency: a table per currency
 		for _, group := range currencyGroups(d.An.CategoryTrends, func(c domain.CategoryTrend) string { return c.Currency }) {
-			<h2>{ kit.T(ctx, "Expenses by month") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<h2>{ kit.T(ctx, "Expenses by month") } <span class="text-light">{ money.CurrencySymbol(group[0].Currency) }</span></h2>
 			<div class="table">
 				<table>
 					<thead>
@@ -135,7 +136,7 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 			</div>
 		}
 		for _, group := range currencyGroups(d.An.Payees, func(p domain.PayeeSum) string { return p.Currency }) {
-			<h2>{ kit.T(ctx, "Top payees") } <span class="text-light">{ group[0].Currency }</span></h2>
+			<h2>{ kit.T(ctx, "Top payees") } <span class="text-light">{ money.CurrencySymbol(group[0].Currency) }</span></h2>
 			<div class="table">
 				<table>
 					<tbody>
