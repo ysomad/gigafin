@@ -12,7 +12,7 @@ templ accountsPage(v kit.Page, d accountsData) {
 		<div class="hstack mb-4">
 			<a class="button" href="/accounts/new">+ { kit.T(ctx, "New account") }</a>
 		</div>
-		if len(d.Assets) == 0 && len(d.Liabilities) == 0 {
+		if len(d.Assets) == 0 && len(d.Liabilities) == 0 && len(d.Archived) == 0 {
 			<p class="text-light">{ kit.T(ctx, "No accounts yet.") }</p>
 		}
 		if len(d.Assets) > 0 {
@@ -28,9 +28,6 @@ templ accountsPage(v kit.Page, d accountsData) {
 											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 										}
 										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
-										if a.Archived {
-											@kit.ArchivedBadge()
-										}
 										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
 											@kit.BankBadge(t, a)
 										}
@@ -58,9 +55,6 @@ templ accountsPage(v kit.Page, d accountsData) {
 											@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 										}
 										<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
-										if a.Archived {
-											@kit.ArchivedBadge()
-										}
 										if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
 											@kit.BankBadge(t, a)
 										}
@@ -78,6 +72,34 @@ templ accountsPage(v kit.Page, d accountsData) {
 					</tbody>
 				</table>
 			</div>
+		}
+		if len(d.Archived) > 0 {
+			<details class="mt-4">
+				<summary><span>{ kit.T(ctx, "Archived") } <span class="text-light">{ len(d.Archived) }</span></span></summary>
+				<div>
+					<div class="table">
+						<table>
+							<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Kind") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th></tr></thead>
+							<tbody>
+								for _, a := range d.Archived {
+									<tr>
+										<td>
+											<div class="hstack gap-1">
+												if t, ok := d.Banks[a.ID]; ok {
+													@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
+												}
+												<a href={ fmt.Sprintf("/accounts/%d", a.ID) }>{ a.Name }</a>
+											</div>
+										</td>
+										<td>{ kit.T(ctx, string(a.Kind)) }</td>
+										<td class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ a.Currency }</span></td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</details>
 		}
 	}
 }

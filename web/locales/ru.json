@@ -1,6 +1,7 @@
 {
   "$schema": "./schema.json",
   "accounts": {
+    "Archived": "Архив",
     "As of": "На дату",
     "Available": "Доступно",
     "Balance": "Баланс",

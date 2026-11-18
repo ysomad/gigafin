@@ -9,6 +9,8 @@ import (
 type accountsData struct {
 	Assets      []domain.Account
 	Liabilities []domain.Account
+	// Archived are the archived accounts of both, shown collapsed.
+	Archived []domain.Account
 	// Banks are the bank accounts by the account they sync with.
 	Banks map[int64]domain.BankAccount
 }

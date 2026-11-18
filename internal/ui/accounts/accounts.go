@@ -59,9 +59,12 @@ func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.U
 		}
 	}
 	for _, a := range accounts {
-		if a.Kind.Liability() {
+		switch {
+		case a.Archived:
+			d.Archived = append(d.Archived, a)
+		case a.Kind.Liability():
 			d.Liabilities = append(d.Liabilities, a)
-		} else {
+		default:
 			d.Assets = append(d.Assets, a)
 		}
 	}
