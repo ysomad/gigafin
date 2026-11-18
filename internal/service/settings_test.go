@@ -26,6 +26,7 @@ func TestSettings(t *testing.T) {
 
 	want := domain.Settings{
 		ShowMinorUnits: true, RateSource: domain.RateSourceCBR, PrimaryCurrency: "USD", Language: "ru",
+		Theme: domain.ThemeDark,
 	}
 	require.NoError(t, svc.Settings.Set(ctx, u.ID, want))
 	s, err = svc.Settings.Get(ctx, u.ID)
@@ -36,7 +37,7 @@ func TestSettings(t *testing.T) {
 	require.NoError(t, svc.Settings.Set(ctx, u.ID, want))
 	s, err = svc.Settings.Get(ctx, u.ID)
 	require.NoError(t, err)
-	assert.Equal(t, want, s, "fields left out are reset")
+	assert.Equal(t, want, s, "fields left out are reset, the theme to auto")
 
 	err = svc.Settings.Set(ctx, u.ID, domain.Settings{RateSource: domain.RateSourceCBR})
 	require.ErrorIs(t, err, errors.ErrInvalid, "rates need a primary currency")
@@ -45,6 +46,8 @@ func TestSettings(t *testing.T) {
 	err = svc.Settings.Set(ctx, u.ID, domain.Settings{RateSource: "ecb", PrimaryCurrency: "USD"})
 	require.ErrorIs(t, err, errors.ErrInvalid)
 	err = svc.Settings.Set(ctx, u.ID, domain.Settings{Language: "not a tag!"})
+	require.ErrorIs(t, err, errors.ErrInvalid)
+	err = svc.Settings.Set(ctx, u.ID, domain.Settings{Theme: "sepia"})
 	require.ErrorIs(t, err, errors.ErrInvalid)
 
 	s, err = svc.Settings.Get(ctx, u.ID)

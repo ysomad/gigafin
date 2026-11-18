@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"slices"
+	"strings"
+
 	"golang.org/x/text/language"
 
 	"github.com/ysomad/gigafin/internal/errors"
@@ -21,6 +24,32 @@ type Settings struct {
 	// AutoCategoryRules makes LearnCategory create rules when the user sets the category
 	// of an operation by hand.
 	AutoCategoryRules bool
+	// Theme is the color theme of the UI, ThemeAuto to follow the system; stored as NULL.
+	Theme Theme
+}
+
+// Theme is the color theme of the UI. The zero value follows the system.
+type Theme string
+
+const (
+	// ThemeAuto follows the theme of the system, switching with it.
+	ThemeAuto  Theme = ""
+	ThemeLight Theme = "light"
+	ThemeDark  Theme = "dark"
+)
+
+// Themes returns all themes, ThemeAuto first.
+func Themes() []Theme {
+	return []Theme{ThemeAuto, ThemeLight, ThemeDark}
+}
+
+// ParseTheme validates a theme string.
+func ParseTheme(s string) (Theme, error) {
+	t := Theme(strings.TrimSpace(s))
+	if !slices.Contains(Themes(), t) {
+		return "", NewError(errors.ErrInvalid, "theme: unknown %q", s)
+	}
+	return t, nil
 }
 
 // DefaultSettings returns the settings of a user who never changed them: rates off and
@@ -29,11 +58,14 @@ func DefaultSettings() Settings {
 	return Settings{AutoCategoryRules: true}
 }
 
-// Validate checks that s names a well-formed language tag, a known rate source and, when rates are
-// on, a supported primary currency. Errors are of kind errors.ErrInvalid.
+// Validate checks that s names a well-formed language tag, a known theme, a known rate source and,
+// when rates are on, a supported primary currency. Errors are of kind errors.ErrInvalid.
 func (s Settings) Validate() error {
 	if _, err := language.Parse(s.Language); s.Language != "" && err != nil {
 		return NewError(errors.ErrInvalid, "language: unknown %q", s.Language)
+	}
+	if _, err := ParseTheme(string(s.Theme)); err != nil {
+		return err
 	}
 	if _, err := ParseRateSource(string(s.RateSource)); err != nil {
 		return err

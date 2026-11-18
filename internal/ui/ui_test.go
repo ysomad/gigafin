@@ -535,10 +535,14 @@ func TestSettingsHtmx(t *testing.T) {
 	assert.Contains(t, body, `<output class="toast" data-variant="success"><p>Password changed.`)
 	assert.Contains(t, body, `id="settings-access"`)
 
-	// the whole page changes language, so it is loaded again
+	// the whole page changes language or theme, <html> included, so it is loaded again
 	status, header, body = hxPost("/settings", url.Values{"timezone": {"Asia/Tokyo"}, "language": {"ru"}})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Equal(t, "/settings", header.Get("HX-Location"))
+	assert.Equal(t, "/settings", header.Get("HX-Redirect"))
+	status, header, body = hxPost("/settings",
+		url.Values{"timezone": {"Asia/Tokyo"}, "language": {"ru"}, "theme": {"dark"}})
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Equal(t, "/settings", header.Get("HX-Redirect"))
 }
 
 func TestRevokeSession(t *testing.T) {

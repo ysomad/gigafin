@@ -66,6 +66,25 @@ templ generalCard(v kit.Page, d pageData, oob bool) {
 				}
 			</div>
 			<div class="row">
+				{{ e = v.Errors.Get("settings.theme") }}
+				@kit.Field("col-3", kit.T(ctx, "Theme"), e, "theme-error", nil) {
+					<select name="theme" { kit.Invalid(e, "theme-error")... }>
+						for _, t := range d.Themes {
+							<option value={ string(t) } selected?={ string(t) == f.Theme }>
+								switch t {
+									case domain.ThemeLight:
+										{ kit.T(ctx, "Light") }
+									case domain.ThemeDark:
+										{ kit.T(ctx, "Dark") }
+									default:
+										{ kit.T(ctx, "Auto") }
+								}
+							</option>
+						}
+					</select>
+				}
+			</div>
+			<div class="row">
 				<label data-field class="col-3"><input type="checkbox" role="switch" name="show_minor_units" checked?={ f.ShowMinorUnits }/> { kit.T(ctx, "Show minor units") }</label>
 				<label data-field class="col-6" title={ kit.T(ctx, "When 3 of the 5 latest operations of a payee have one category, a rule sets it for the payee.") }><input type="checkbox" role="switch" name="auto_category_rules" checked?={ f.AutoCategoryRules }/> { kit.T(ctx, "Learn from my categories") }</label>
 			</div>

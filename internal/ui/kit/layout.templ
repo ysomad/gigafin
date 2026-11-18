@@ -1,14 +1,30 @@
 package kit
 
+import "github.com/ysomad/gigafin/internal/domain"
+
 // Layout is the page of v around children: toTop adds the scroll-to-top button, toasts
-// more toasts after those of v.
+// more toasts after those of v. A theme set by the user overrides the color-scheme of
+// Oat, which else follows the system.
 templ Layout(v Page, toTop bool, toasts templ.Component) {
+	{{ theme := PrefsFrom(ctx).Settings.Theme }}
 	<!DOCTYPE html>
-	<html lang={ Lang(ctx) }>
+	<html
+		lang={ Lang(ctx) }
+		if theme == domain.ThemeLight {
+			style="color-scheme: light"
+		}
+		if theme == domain.ThemeDark {
+			style="color-scheme: dark"
+		}
+	>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<meta name="color-scheme" content="light dark"/>
+			if theme == domain.ThemeAuto {
+				<meta name="color-scheme" content="light dark"/>
+			} else {
+				<meta name="color-scheme" content={ string(theme) }/>
+			}
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
 			<title>{ v.Title } · gigafin</title>
 			<link rel="stylesheet" href="/static/lib/oat.min.css"/>

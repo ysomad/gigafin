@@ -45,13 +45,13 @@
 - [x] rules event sourcing
 - [x] Rename dashboard to analytics
 - [x] 2fa
+- [x] theme toggle
 - [ ] better categories ui/ux (icons, selectors)
 - [ ] operations tags filter
 - [ ] sber sync
 - [ ] alfa sync
 - [ ] raiifaizen sync
 - [ ] bybit sync?
-- [ ] theme toggle
 - [ ] better plans ui/ux
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)
 - [ ] shared household plan (between multiple users)

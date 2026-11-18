@@ -125,6 +125,8 @@ func TestSettingsValidate(t *testing.T) {
 	require.NoError(t, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "RUB"}.Validate())
 	require.ErrorIs(t, domain.Settings{RateSource: domain.RateSourceCBR}.Validate(), errors.ErrInvalid)
 	require.ErrorIs(t, domain.Settings{RateSource: "ecb", PrimaryCurrency: "RUB"}.Validate(), errors.ErrInvalid)
+	require.NoError(t, domain.Settings{Theme: domain.ThemeDark}.Validate())
+	require.ErrorIs(t, domain.Settings{Theme: "sepia"}.Validate(), errors.ErrInvalid)
 }
 
 func TestRateCurrencies(t *testing.T) {

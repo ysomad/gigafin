@@ -241,6 +241,7 @@ type UserSetting struct {
 	RateSource        string
 	Language          string
 	AutoCategoryRules bool
+	Theme             sql.NullString
 	CreatedAt         int64
 	UpdatedAt         sql.NullInt64
 }

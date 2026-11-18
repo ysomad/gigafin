@@ -21,6 +21,7 @@ CREATE TABLE user_settings (
     rate_source         TEXT    NOT NULL,
     language            TEXT    NOT NULL,
     auto_category_rules INTEGER NOT NULL,
+    theme               TEXT,
     created_at          INTEGER NOT NULL,
     updated_at          INTEGER
 ) STRICT;

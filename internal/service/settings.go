@@ -34,6 +34,7 @@ func (s *Settings) Set(ctx context.Context, userID int64, settings domain.Settin
 		slog.String("rate_source", string(settings.RateSource)),
 		slog.String("primary_currency", settings.PrimaryCurrency),
 		slog.String("language", settings.Language),
-		slog.Bool("auto_category_rules", settings.AutoCategoryRules))
+		slog.Bool("auto_category_rules", settings.AutoCategoryRules),
+		slog.String("theme", string(settings.Theme)))
 	return nil
 }

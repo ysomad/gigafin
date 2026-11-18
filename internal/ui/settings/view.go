@@ -34,6 +34,7 @@ type pageData struct {
 	Settings    domain.Settings
 	Languages   []i18n.Language
 	RateSources []domain.RateSource
+	Themes      []domain.Theme
 	Currencies  []string
 	Rates       []domain.Rate
 	RatesSync   ratesSync
@@ -82,6 +83,7 @@ type generalForm struct {
 	PrimaryCurrency   string `form:"primary_currency"`
 	ShowMinorUnits    bool   `form:"show_minor_units"`
 	AutoCategoryRules bool   `form:"auto_category_rules"`
+	Theme             string `form:"theme"`
 }
 
 // rateForm is decoded from the form setting an exchange rate by hand.

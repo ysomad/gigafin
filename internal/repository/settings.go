@@ -31,6 +31,7 @@ func (r *Settings) Get(ctx context.Context, userID int64) (domain.Settings, erro
 		PrimaryCurrency:   s.PrimaryCurrency,
 		Language:          s.Language,
 		AutoCategoryRules: s.AutoCategoryRules,
+		Theme:             domain.Theme(s.Theme.String),
 	}, nil
 }
 
@@ -43,6 +44,7 @@ func (r *Settings) Set(ctx context.Context, userID int64, s domain.Settings, now
 		RateSource:        string(s.RateSource),
 		Language:          s.Language,
 		AutoCategoryRules: s.AutoCategoryRules,
+		Theme:             sql.NullString{String: string(s.Theme), Valid: s.Theme != domain.ThemeAuto},
 		CreatedAt:         now.Unix(),
 	})
 	if err != nil {

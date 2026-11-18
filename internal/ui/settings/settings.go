@@ -105,12 +105,13 @@ func (h *Handler) loadSettings(r *http.Request, user domain.User, d *pageData, c
 		d.Currencies = money.Currencies()
 	}
 	if cards&_cardGeneral != 0 {
-		d.Languages, d.RateSources = i18n.Languages(), domain.RateSources()
+		d.Languages, d.RateSources, d.Themes = i18n.Languages(), domain.RateSources(), domain.Themes()
 		if d.General == nil {
 			s := d.Settings
 			d.General = &generalForm{
 				Timezone: user.Timezone, Language: s.Language, RateSource: string(s.RateSource),
 				PrimaryCurrency: s.PrimaryCurrency, ShowMinorUnits: s.ShowMinorUnits, AutoCategoryRules: s.AutoCategoryRules,
+				Theme: string(s.Theme),
 			}
 		}
 	}
@@ -221,6 +222,11 @@ func (h *Handler) saveSettings(w http.ResponseWriter, r *http.Request, user doma
 	if s.Language != "" && !known {
 		errs["settings.language"] = domain.NewError(errors.ErrInvalid, "choose from the list")
 	}
+	theme, err := domain.ParseTheme(f.Theme)
+	if err != nil {
+		errs["settings.theme"] = domain.NewError(errors.ErrInvalid, "choose from the list")
+	}
+	s.Theme = theme
 	src, err := domain.ParseRateSource(f.RateSource)
 	if err != nil {
 		errs["settings.rate_source"] = domain.NewError(errors.ErrInvalid, "choose from the list")
@@ -245,8 +251,14 @@ func (h *Handler) saveSettings(w http.ResponseWriter, r *http.Request, user doma
 	if err := h.app.Svc.Settings.Set(r.Context(), user.ID, s); err != nil {
 		return h.settingsReply(w, r, user, _cardGeneral, posted, kit.Failure{Err: err, Form: "settings"})
 	}
-	if s.Language != kit.PrefsFrom(r.Context()).Settings.Language {
-		// the whole page changes language, so it is loaded again
+	if prev := kit.PrefsFrom(r.Context()).Settings; s.Language != prev.Language || s.Theme != prev.Theme {
+		// the whole page changes, <html> included, which htmx does not swap, so the
+		// browser loads it again
+		if kit.IsHTMX(r) {
+			w.Header().Set("HX-Redirect", "/settings")
+			w.WriteHeader(http.StatusOK)
+			return nil
+		}
 		kit.Redirect(w, r, "/settings")
 		return nil
 	}

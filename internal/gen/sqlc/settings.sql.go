@@ -7,10 +7,11 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
 )
 
 const getUserSettings = `-- name: GetUserSettings :one
-SELECT user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, created_at, updated_at FROM user_settings WHERE user_id = ?
+SELECT user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, theme, created_at, updated_at FROM user_settings WHERE user_id = ?
 `
 
 func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSetting, error) {
@@ -23,6 +24,7 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 		&i.RateSource,
 		&i.Language,
 		&i.AutoCategoryRules,
+		&i.Theme,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -31,15 +33,16 @@ func (q *Queries) GetUserSettings(ctx context.Context, userID int64) (UserSettin
 
 const upsertUserSettings = `-- name: UpsertUserSettings :exec
 INSERT INTO user_settings (
-    user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, created_at
+    user_id, show_minor_units, primary_currency, rate_source, language, auto_category_rules, theme, created_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id) DO UPDATE SET
     show_minor_units = excluded.show_minor_units,
     primary_currency = excluded.primary_currency,
     rate_source = excluded.rate_source,
     language = excluded.language,
     auto_category_rules = excluded.auto_category_rules,
+    theme = excluded.theme,
     updated_at = excluded.created_at
 `
 
@@ -50,6 +53,7 @@ type UpsertUserSettingsParams struct {
 	RateSource        string
 	Language          string
 	AutoCategoryRules bool
+	Theme             sql.NullString
 	CreatedAt         int64
 }
 
@@ -61,6 +65,7 @@ func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettings
 		arg.RateSource,
 		arg.Language,
 		arg.AutoCategoryRules,
+		arg.Theme,
 		arg.CreatedAt,
 	)
 	return err
