@@ -13,8 +13,8 @@ tools:
 	go mod download
 
 generate:
-	$(TOOL) sqlc generate
-	$(TOOL) ogen --config ogen.yml --target internal/gen/ogen --package ogen --clean api/openapi.yaml
+	$(TOOL) sqlc generate -f .sqlc.yaml
+	$(TOOL) ogen --config .ogen.yaml --target internal/gen/ogen --package ogen --clean api/openapi.yaml
 	$(TOOL) templ generate -path internal/ui
 
 build: build-app build-cli

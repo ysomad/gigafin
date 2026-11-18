@@ -34,6 +34,14 @@ make user-2fa-off login=alice             # turn two-factor auth off, when the a
 ```
 
 ## Development
-`make generate` · `make test` · `make lint` · `make dev` (live reload). See [CLAUDE.md](CLAUDE.md) and [CODE_STYLE.md](CODE_STYLE.md).
+```
+```sh
+make generate       # sqlc, ogen and templ code
+make test
+make lint
+make dev            # live reload
+```
+See [CLAUDE.md](CLAUDE.md) and [CODE_STYLE.md](CODE_STYLE.md).
+```
 
 Roadmap: [ROADMAP.md](ROADMAP.md).
