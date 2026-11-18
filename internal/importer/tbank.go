@@ -39,8 +39,6 @@ const (
 	_tbankComma      = ';'
 	_tbankStatusOK   = "Ок"
 	_tbankTimeLayout = "02.01.2006 15:04:05"
-	// _tbankDefaultCategory is the category of rows the bank left uncategorized.
-	_tbankDefaultCategory = "Другое"
 )
 
 // _tbankNotExport starts errors of files of another format. All errors of
@@ -158,9 +156,6 @@ func parseTBankRow(rec []string, idx map[string]int, loc *time.Location) (domain
 	category := get(_tbankColOwnCategory)
 	if category == "" {
 		category = get(_tbankColCategory)
-	}
-	if category == "" {
-		category = _tbankDefaultCategory
 	}
 	row := domain.Record{
 		Account:  get(_tbankColAccount),

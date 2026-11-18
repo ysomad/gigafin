@@ -7,10 +7,6 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 )
 
-// _defaultCategory is the category CSV exports give operations the bank left
-// uncategorized.
-const _defaultCategory = "Другое"
-
 // bankData converts the accounts and operations of the API: the tracked accounts with
 // their balances less the holds among ops not yet debited, and the operations of
 // those accounts that import, as the rows of a CSV export of the same operations, so
@@ -57,9 +53,6 @@ func bankData(accs []account, ops []operation, loc *time.Location) domain.BankDa
 			Category:   op.SpendingCategory.Name,
 			Payee:      strings.TrimSpace(op.Description),
 			Note:       strings.TrimSpace(op.Message),
-		}
-		if r.Category == "" {
-			r.Category = _defaultCategory
 		}
 		if r.Note == "" {
 			r.Note = strings.TrimSpace(op.Payment.Comment)

@@ -115,7 +115,7 @@ func TestFetchRecords(t *testing.T) {
 	r = data.Records["1002"][0]
 	assert.Equal(t, "Savings", r.Account)
 	assert.Equal(t, "5000", r.Amount.String())
-	assert.Equal(t, "Другое", r.Category, "uncategorized as in the export")
+	assert.Empty(t, r.Category, "uncategorized gets no category")
 	assert.Equal(t, "аванс", r.Note, "the payment comment when there is no message")
 }
 
