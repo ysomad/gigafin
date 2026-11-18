@@ -29,7 +29,6 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("HTTP_SECURE_COOKIES", "true")
 	t.Setenv("HTTP_MAX_UPLOAD_BYTES", "1024")
 	t.Setenv("HTTP_STATIC_CACHE_TTL", "0")
-	t.Setenv("HTTP_API_DOCS", "true")
 	t.Setenv("SESSION_TTL", "720h")
 	t.Setenv("SESSION_IDLE_TTL", "48h")
 	t.Setenv("IMPORT_ACCOUNT_LOAN_PATTERN", "loan")
@@ -46,7 +45,7 @@ func TestLoadFromEnv(t *testing.T) {
 	assert.Equal(t, config.Config{
 		DBPath:  "x.db",
 		Logger:  config.Logger{Level: slog.LevelDebug, AddSource: true},
-		HTTP:    config.HTTP{Addr: ":9000", SecureCookies: true, MaxUploadBytes: 1024, APIDocs: true},
+		HTTP:    config.HTTP{Addr: ":9000", SecureCookies: true, MaxUploadBytes: 1024},
 		Session: config.Session{TTL: 720 * time.Hour, IdleTTL: 48 * time.Hour},
 		Import: config.Import{
 			AccountLoanPattern:    "loan",

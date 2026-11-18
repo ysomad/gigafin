@@ -1,4 +1,4 @@
-package app
+package main
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/ysomad/gigafin/internal/app"
 	"github.com/ysomad/gigafin/internal/config"
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -54,7 +55,7 @@ func userRole(ctx context.Context, cfg config.Config, log *slog.Logger, args []s
 	if *login == "" {
 		return errors.Error("-login is required")
 	}
-	svc, closeStore, err := newServices(ctx, cfg, log)
+	svc, closeStore, err := app.NewServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func userTwoFactorOff(ctx context.Context, cfg config.Config, log *slog.Logger, 
 	if *login == "" {
 		return errors.Error("-login is required")
 	}
-	svc, closeStore, err := newServices(ctx, cfg, log)
+	svc, closeStore, err := app.NewServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func userCommand(
 		}
 		*pass = p
 	}
-	svc, closeStore, err := newServices(ctx, cfg, log)
+	svc, closeStore, err := app.NewServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}

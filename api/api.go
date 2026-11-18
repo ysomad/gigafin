@@ -1,10 +1,14 @@
-// Package api embeds the OpenAPI spec of the public API and, in builds with the apidocs
-// tag, the Scalar page rendering it.
+// Package api embeds the OpenAPI spec of the gigafin API and the Scalar page rendering it.
 package api
 
 import "embed"
 
-// FS holds public.yaml.
+// FS holds openapi.yaml.
 //
-//go:embed public.yaml
+//go:embed openapi.yaml
 var FS embed.FS
+
+// DocsFS holds docs/: docs.html and the scripts it loads.
+//
+//go:embed docs
+var DocsFS embed.FS

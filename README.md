@@ -12,7 +12,7 @@ Self-hosted personal finance manager. Go + SQLite, server-rendered UI (templ + h
 - **Import** — T-Bank, ZenMoney and gigafin CSV, with undo; CBR exchange rates.
 - **Bank sync** — T-Bank background sync with balance check.
 - **Data** — CSV export, SQLite backup (admin), delete all data.
-- **API** — public JSON API (`/api`, OpenAPI at `/api/openapi.yaml`, docs at `/api/docs`) and MCP server (`/mcp`), both via bearer API keys.
+- **API** — gigafin JSON API (`/api`, OpenAPI at `/api/openapi.yaml`, docs at `/api/docs`) and MCP server (`/mcp`), both via bearer API keys.
 - **Security** — password login, session management, revocable API keys.
 
 ## Quick start
@@ -22,6 +22,16 @@ make user-add login=me role=admin
 make run            # migrates gigafin.db, serves on 127.0.0.1:8080
 ```
 Config via env (`DB_PATH`, `HTTP_ADDR`, `BANKS_SECRET_KEY`, `TOTP_SECRET_KEY`, …), see `internal/config`.
+
+## CLI
+Users are managed with `bin/gigafin-cli` through make; each target builds it and runs it on `$(DB)`.
+The password is prompted for unless given as `p=`.
+```sh
+make user-add login=alice                 # role=user|admin (default user), p=PASSWORD
+make user-passwd login=alice              # change password, ends all sessions; p=PASSWORD
+make user-role login=alice role=admin     # role=user|admin
+make user-2fa-off login=alice             # turn two-factor auth off, when the app and recovery codes are lost
+```
 
 ## Development
 `make generate` · `make test` · `make lint` · `make dev` (live reload). See [CLAUDE.md](CLAUDE.md) and [CODE_STYLE.md](CODE_STYLE.md).

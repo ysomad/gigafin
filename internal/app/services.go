@@ -1,3 +1,4 @@
+// Package app wires the dependencies of gigafin and runs its server.
 package app
 
 import (
@@ -17,9 +18,9 @@ import (
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-// newServices opens the database of cfg and returns the services over it, logging to log,
+// NewServices opens the database of cfg and returns the services over it, logging to log,
 // with a func that closes the database.
-func newServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*service.Services, func(), error) {
+func NewServices(ctx context.Context, cfg config.Config, log *slog.Logger) (*service.Services, func(), error) {
 	banks, err := newBankOptions(cfg.Banks, log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("config: %w", err)

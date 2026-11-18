@@ -44,9 +44,6 @@ type HTTP struct {
 	// StaticCacheTTL is how long browsers cache static assets; 0 disables caching, for
 	// development.
 	StaticCacheTTL time.Duration
-	// APIDocs serves the API docs at /api/docs; the binary must be built with the
-	// apidocs tag.
-	APIDocs bool
 }
 
 // Session configures browser sessions.

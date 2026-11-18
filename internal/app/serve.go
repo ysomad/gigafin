@@ -12,8 +12,8 @@ import (
 	"github.com/ysomad/gigafin/internal/errors"
 )
 
-// serve runs the HTTP server and the background jobs until ctx is done.
-func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+// Serve runs the HTTP server and the background jobs until ctx is done.
+func Serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	version := "unknown"
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range bi.Settings {
@@ -26,7 +26,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		slog.String("log_level", cfg.Logger.Level.String()))
 	log.DebugContext(ctx, "config", slog.Any("config", cfg))
 
-	svc, closeStore, err := newServices(ctx, cfg, log)
+	svc, closeStore, err := NewServices(ctx, cfg, log)
 	if err != nil {
 		return err
 	}

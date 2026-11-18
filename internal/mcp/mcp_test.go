@@ -43,7 +43,7 @@ func TestMCP(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
 	apiHandler, err := api.New(svc, log)
 	require.NoError(t, err)
-	spec, err := os.ReadFile("../../api/public.yaml")
+	spec, err := os.ReadFile("../../api/openapi.yaml")
 	require.NoError(t, err)
 	h, err := mcp.New(svc.Auth, apiHandler, spec, log)
 	require.NoError(t, err)

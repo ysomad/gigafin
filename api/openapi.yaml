@@ -1,6 +1,6 @@
 openapi: 3.2.0
 info:
-  title: gigafin public API
+  title: gigafin API
   version: 1.0.0
   description: |
     Personal finance API. Authenticate with an API key created in the web UI:

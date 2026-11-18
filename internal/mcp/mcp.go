@@ -1,4 +1,4 @@
-// Package mcp serves the public API as MCP tools over streamable HTTP, authenticated
+// Package mcp serves the gigafin API as MCP tools over streamable HTTP, authenticated
 // with API keys. Every operation of the OpenAPI spec becomes a tool named by its
 // operationId; a call is served in process by the API handler, so validation, scopes
 // and errors stay in one place.

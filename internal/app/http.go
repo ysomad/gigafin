@@ -25,12 +25,9 @@ import (
 	"github.com/ysomad/gigafin/internal/ui"
 )
 
-// newServer returns the HTTP server of the web UI, the public API with its docs and
+// newServer returns the HTTP server of the web UI, the gigafin API with its docs and
 // the MCP endpoint.
 func newServer(cfg config.Config, svc *service.Services, log *slog.Logger) (*http.Server, error) {
-	if cfg.HTTP.APIDocs && !apispec.DocsEmbedded {
-		return nil, fmt.Errorf("api docs: binary built without the apidocs tag: %w", errors.ErrInvalid)
-	}
 	web, err := ui.New(ui.Config{
 		Services: svc, Log: log, SecureCookies: cfg.HTTP.SecureCookies,
 		SessionTTL: cfg.Session.TTL, MaxUploadSize: cfg.HTTP.MaxUploadBytes, StaticCacheTTL: cfg.HTTP.StaticCacheTTL,
@@ -47,20 +44,18 @@ func newServer(cfg config.Config, svc *service.Services, log *slog.Logger) (*htt
 	mux := http.NewServeMux()
 	mux.Handle(api.PathPrefix+"/", apiHandler)
 	mux.HandleFunc("GET "+api.PathPrefix+"/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, apispec.FS, "public.yaml")
+		http.ServeFileFS(w, r, apispec.FS, "openapi.yaml")
 	})
-	if cfg.HTTP.APIDocs {
-		docs, err := fs.Sub(apispec.DocsFS, "docs")
-		if err != nil {
-			return nil, fmt.Errorf("api docs fs: %w", err)
-		}
-		mux.HandleFunc("GET "+api.PathPrefix+"/docs", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFileFS(w, r, docs, "docs.html")
-		})
-		mux.Handle("GET "+api.PathPrefix+"/docs/", http.StripPrefix(api.PathPrefix+"/docs/", http.FileServerFS(docs)))
+	docs, err := fs.Sub(apispec.DocsFS, "docs")
+	if err != nil {
+		return nil, fmt.Errorf("api docs fs: %w", err)
 	}
+	mux.HandleFunc("GET "+api.PathPrefix+"/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, docs, "docs.html")
+	})
+	mux.Handle("GET "+api.PathPrefix+"/docs/", http.StripPrefix(api.PathPrefix+"/docs/", http.FileServerFS(docs)))
 
-	spec, err := apispec.FS.ReadFile("public.yaml")
+	spec, err := apispec.FS.ReadFile("openapi.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("read api spec: %w", err)
 	}
