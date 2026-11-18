@@ -489,7 +489,6 @@
   "plans": {
     "%d%% of plan": "%d%% от плана",
     "Clear the amount to remove it for this month.": "Очистите сумму, чтобы убрать план на этот месяц.",
-    "Day %d of %d · even pace: %d%% of plan": "День %d из %d · равномерный темп: %d%% плана",
     "Fill repeating plans into %s": "Перенести повторяющиеся планы на %s",
     "New plan": "Новый план",
     "No plans this month.": "В этом месяце нет планов.",
@@ -627,7 +626,6 @@
     "read": "чтение",
     "recovery codes left: %d": "осталось резервных кодов: %d",
     "since %s": "с %s",
-    "synced %s": "синхронизировано %s",
     "this browser": "этот браузер",
     "write": "запись"
   },

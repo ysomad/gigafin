@@ -18,11 +18,6 @@ type plansData struct {
 	To   string
 	// Sections are the plans of expenses, then of income.
 	Sections []planSection
-	// Day of Days is how far the month has gone: Days for a past month, 0 for a future one
-	Day  int
-	Days int
-	// Pace is Day as a share of Days in percent, the spending expected by now
-	Pace int
 	// Posted are the values of a plan form post that failed, to fill its inputs again.
 	Posted planPost
 	// Open is the "category:currency" of the plan row posted last, kept open.

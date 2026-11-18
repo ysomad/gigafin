@@ -62,7 +62,6 @@ func (h *Handler) renderPlans(
 		Months: months,
 		From:   timex.FormatDate(month.First()),
 		To:     timex.FormatDate(month.Last()),
-		Days:   month.Last().Day(),
 		Posted: f,
 	}
 	if f.Category != 0 && !f.New {
@@ -70,13 +69,6 @@ func (h *Handler) renderPlans(
 	}
 	// months is a contiguous range, latest first, always holding month
 	d.Prev, d.Next = timex.Neighbors(months, month)
-	switch cur := timex.MonthOf(today).String(); {
-	case month.String() == cur:
-		d.Day = today.Day()
-	case month.String() < cur:
-		d.Day = d.Days
-	}
-	d.Pace = d.Day * 100 / d.Days
 	reports, err := h.app.Svc.Plans.Report(r.Context(), user.ID, month)
 	if err != nil {
 		return err

@@ -10,7 +10,6 @@ import (
 templ plansPage(v kit.Page, d plansData) {
 	@kit.Layout(v, false, nil) {
 		<div class="hstack justify-between mb-6">
-			@kit.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
 			<ot-dropdown>
 				<menu class="buttons">
 					<li><a class="button" href={ "/plans/new?month=" + d.Month.String() }>+ { kit.T(ctx, "New plan") }</a></li>
@@ -25,6 +24,7 @@ templ plansPage(v kit.Page, d plansData) {
 					</form>
 				</menu>
 			</ot-dropdown>
+			@kit.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
 		</div>
 		for _, sec := range d.Sections {
 			{{ inc := sec.Kind == domain.KindIncome }}
@@ -52,9 +52,6 @@ templ plansPage(v kit.Page, d plansData) {
 						}
 					</div>
 				</div>
-				if !inc && d.Day > 0 && d.Day < d.Days {
-					<p class="text-light mb-2"><small>{ kit.T(ctx, "Day %d of %d · even pace: %d%% of plan", d.Day, d.Days, d.Pace) }</small></p>
-				}
 				for _, it := range sec.Planned {
 					<details open?={ d.Open == fmt.Sprintf("%d:%s", it.Row.Category.ID, it.Row.Currency) }>
 						<summary>
