@@ -242,7 +242,7 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if d.An.Month.First().Year() != kit.PrefsFrom(ctx).Today.Year() {
+				if !kit.IsCurrentYear(ctx, d.An.Month.First()) {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(d.An.Month.First().Format("2006"))
 					if templ_7745c5c3_Err != nil {
@@ -270,7 +270,7 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if d.An.CompareMonth.First().Year() != kit.PrefsFrom(ctx).Today.Year() {
+				if !kit.IsCurrentYear(ctx, d.An.CompareMonth.First()) {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(d.An.CompareMonth.First().Format("2006"))
 					if templ_7745c5c3_Err != nil {
