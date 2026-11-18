@@ -85,8 +85,30 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 		for _, op := range day.Ops {
 			<li class="card compact hstack justify-between">
 				<a href={ fmt.Sprintf("/operations/%d/edit", op.ID) }>
-					<div>{ OpTitle(ctx, op, catNames) }</div>
-					<div class="text-light">{ OpSubtitle(ctx, op, catNames, accByID) }</div>
+					<div class="hstack gap-1">
+						{ OpCategory(ctx, op, catNames) }
+						if op.IsSplit() {
+							<svg width="14" height="14" role="img" aria-label={ T(ctx, "Part of a split") }><title>{ T(ctx, "Part of a split") }</title><use href="/static/icons.svg#split"></use></svg>
+						}
+					</div>
+					<small class="hstack gap-2 text-light">
+						<span class="hstack gap-1">
+							<svg width="12" height="12" role="img" aria-label={ T(ctx, "Account") }><title>{ T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+							{ OpAccounts(op, accByID) }
+						</span>
+						if op.Payee != "" {
+							<span class="hstack gap-1">
+								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Payee") }><title>{ T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+								{ op.Payee }
+							</span>
+						}
+						if op.Note != "" {
+							<span class="hstack gap-1">
+								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Note") }><title>{ T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+								{ op.Note }
+							</span>
+						}
+					</small>
 				</a>
 				<div class="align-right">{ OpAmount(ctx, op) } <span class="text-light">{ op.Currency }</span></div>
 			</li>

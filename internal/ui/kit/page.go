@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/i18n"
@@ -97,6 +98,8 @@ type Prefs struct {
 	Settings domain.Settings
 	Lang     string
 	Dicts    i18n.Dicts
+	// Today is the current date in the user's time zone, zero when signed out.
+	Today time.Time
 }
 
 type prefsKey struct{}

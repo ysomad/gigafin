@@ -91,6 +91,7 @@
     "Not found": "Не найдено",
     "Note": "Заметка",
     "Operations": "Операции",
+    "Part of a split": "Часть разделённой операции",
     "Password": "Пароль",
     "Password changed. Other sessions are signed out.": "Пароль изменён. Остальные сессии завершены.",
     "Payee": "Получатель",
@@ -133,8 +134,7 @@
     "is one of": "одно из",
     "matches regexp": "подходит под регулярное выражение",
     "new": "новая",
-    "or": "или",
-    "split": "разделено"
+    "or": "или"
   },
   "dates": {
     "Apr": "Апр",
@@ -177,8 +177,10 @@
     "Sep|date": "сен",
     "Sun": "вс",
     "Thu": "чт",
+    "Today": "Сегодня",
     "Tue": "вт",
-    "Wed": "ср"
+    "Wed": "ср",
+    "Yesterday": "Вчера"
   },
   "errors": {
     "%q is not a regular expression": "%q не регулярное выражение",

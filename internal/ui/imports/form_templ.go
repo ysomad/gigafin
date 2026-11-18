@@ -1224,7 +1224,7 @@ func fileInput(label, hint, err string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\"><svg width=\"32\" height=\"32\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path d=\"M12 16V4m0 0 4 4m-4-4-4 4\"></path><path d=\"M20 16v4H4v-4\"></path></svg></button><div data-files><small data-hint>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\"><svg width=\"32\" height=\"32\" aria-hidden=\"true\"><use href=\"/static/icons.svg#upload\"></use></svg></button><div data-files><small data-hint>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

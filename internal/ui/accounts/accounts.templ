@@ -175,7 +175,7 @@ templ accountPage(v kit.Page, d accountData) {
 		</article>
 		<div class="hstack justify-between">
 			<h2>{ kit.T(ctx, "Operations") }</h2>
-			<a class="button icon ghost" href={ fmt.Sprintf("/operations?account=%d", a.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></a>
+			<a class="button icon ghost" href={ fmt.Sprintf("/operations?account=%d", a.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg></a>
 		</div>
 		if len(d.Days) > 0 {
 			<ul class="unstyled vstack gap-1">

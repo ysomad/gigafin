@@ -147,7 +147,9 @@ func (a *App) Authed(h Handler) http.Handler {
 			return
 		}
 
-		r = r.WithContext(WithPrefs(r.Context(), a.prefs(r, settings)))
+		p := a.prefs(r, settings)
+		p.Today = a.Svc.Today(user)
+		r = r.WithContext(WithPrefs(r.Context(), p))
 
 		r.Body = http.MaxBytesReader(w, r.Body, a.MaxUpload)
 		if err := h(w, r, user); err != nil {

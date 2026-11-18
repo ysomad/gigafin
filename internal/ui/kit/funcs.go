@@ -61,8 +61,17 @@ func ErrMsg(ctx context.Context, err error) string {
 	return ErrText(p.Dicts, p.Lang, err)
 }
 
-// DayTitle formats tm as a day title, such as "Mon, 2 Jan 2006".
+// DayTitle formats tm as a day title: "Today" or "Yesterday" by the user's date, else
+// such as "Mon, 2 Jan 2006".
 func DayTitle(ctx context.Context, tm time.Time) string {
+	today := PrefsFrom(ctx).Today
+	switch {
+	case today.IsZero():
+	case tm.Equal(today):
+		return T(ctx, "Today")
+	case tm.Equal(today.AddDate(0, 0, -1)):
+		return T(ctx, "Yesterday")
+	}
 	return T(ctx, tm.Format("Mon")) + tm.Format(", 2 ") + T(ctx, tm.Format("Jan")+i18n.ContextSep+"date") +
 		tm.Format(" 2006")
 }
@@ -131,11 +140,10 @@ func ErrText(d i18n.Dicts, lang string, err error) string {
 	return msg + ": " + ErrText(d, lang, e.Cause)
 }
 
-// OpTitle is the title of op in a list: its payee, else its kind or category.
-func OpTitle(ctx context.Context, op domain.Operation, names map[int64]string) string {
+// OpCategory is the first line of op in a list: its category, or its kind for a
+// transfer or a balance adjustment.
+func OpCategory(ctx context.Context, op domain.Operation, names map[int64]string) string {
 	switch {
-	case op.Payee != "":
-		return op.Payee
 	case op.Type == domain.OpTransfer:
 		return T(ctx, "Transfer")
 	case op.Type == domain.OpAdjustment:
@@ -147,34 +155,13 @@ func OpTitle(ctx context.Context, op domain.Operation, names map[int64]string) s
 	}
 }
 
-// OpSubtitle is the line under the title of op in a list: its category, accounts and note.
-func OpSubtitle(
-	ctx context.Context, op domain.Operation, names map[int64]string, accounts map[int64]domain.Account,
-) string {
+// OpAccounts is the account of op in a list, both accounts of a transfer.
+func OpAccounts(op domain.Operation, accounts map[int64]domain.Account) string {
 	acc := accounts[op.AccountID].Name
-	var parts []string
-	switch op.Type {
-	case domain.OpTransfer:
-		parts = append(parts, acc+" → "+accounts[op.ToAccountID].Name)
-	case domain.OpAdjustment:
-		parts = append(parts, acc)
-	case domain.OpExpense, domain.OpIncome:
-		switch {
-		case op.Payee == "":
-		case op.CategoryID == 0:
-			parts = append(parts, T(ctx, "No category"))
-		default:
-			parts = append(parts, names[op.CategoryID])
-		}
-		if op.IsSplit() {
-			parts = append(parts, T(ctx, "split"))
-		}
-		parts = append(parts, acc)
+	if op.Type == domain.OpTransfer {
+		return acc + " → " + accounts[op.ToAccountID].Name
 	}
-	if op.Note != "" {
-		parts = append(parts, op.Note)
-	}
-	return strings.Join(parts, " · ")
+	return acc
 }
 
 // OpAmount formats the amount of op signed: an expense negative, a positive amount
