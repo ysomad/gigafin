@@ -45,9 +45,19 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 						<tr>
 							<th></th>
 							<th></th>
-							<th class="align-right">{ kit.T(ctx, d.An.Month.First().Format("Jan")) } { d.An.Month.First().Format("2006") }</th>
+							<th class="align-right">
+								{ kit.T(ctx, d.An.Month.First().Format("Jan")) }
+								if d.An.Month.First().Year() != kit.PrefsFrom(ctx).Today.Year() {
+									{ d.An.Month.First().Format("2006") }
+								}
+							</th>
 							<th></th>
-							<th class="align-right">{ kit.T(ctx, d.An.CompareMonth.First().Format("Jan")) } { d.An.CompareMonth.First().Format("2006") }</th>
+							<th class="align-right">
+								{ kit.T(ctx, d.An.CompareMonth.First().Format("Jan")) }
+								if d.An.CompareMonth.First().Year() != kit.PrefsFrom(ctx).Today.Year() {
+									{ d.An.CompareMonth.First().Format("2006") }
+								}
+							</th>
 							<th class="align-right">Δ</th>
 						</tr>
 					</thead>

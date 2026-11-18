@@ -62,7 +62,7 @@ func ErrMsg(ctx context.Context, err error) string {
 }
 
 // DayTitle formats tm as a day title: "Today" or "Yesterday" by the user's date, else
-// such as "Mon, 2 Jan 2006".
+// such as "2 Jan 2006, Mon", without the year when it is the current one.
 func DayTitle(ctx context.Context, tm time.Time) string {
 	today := PrefsFrom(ctx).Today
 	switch {
@@ -72,20 +72,32 @@ func DayTitle(ctx context.Context, tm time.Time) string {
 	case tm.Equal(today.AddDate(0, 0, -1)):
 		return T(ctx, "Yesterday")
 	}
-	return T(ctx, tm.Format("Mon")) + tm.Format(", 2 ") + T(ctx, tm.Format("Jan")+i18n.ContextSep+"date") +
-		tm.Format(" 2006")
+	s := tm.Format("2 ") + T(ctx, tm.Format("Jan")+i18n.ContextSep+"date")
+	if tm.Year() != today.Year() {
+		s += tm.Format(" 2006")
+	}
+	return s + ", " + T(ctx, tm.Format("Mon"))
 }
 
-// Datetime formats tm in the time zone of user, if any.
+// Datetime formats tm in the time zone of user, if any, without the year when it is
+// the current one.
 func Datetime(ctx context.Context, tm time.Time, user *domain.User) string {
 	if user != nil {
 		tm = tm.In(user.Location())
 	}
-	return tm.Format("2 ") + T(ctx, tm.Format("Jan")+i18n.ContextSep+"date") + tm.Format(" 2006 15:04")
+	s := tm.Format("2 ") + T(ctx, tm.Format("Jan")+i18n.ContextSep+"date")
+	if tm.Year() != PrefsFrom(ctx).Today.Year() {
+		s += tm.Format(" 2006")
+	}
+	return s + tm.Format(" 15:04")
 }
 
-// MonthName returns the translated full name of the month of tm and its year.
+// MonthName returns the translated full name of the month of tm and its year, if it is
+// not the current one.
 func MonthName(ctx context.Context, tm time.Time) string {
+	if tm.Year() == PrefsFrom(ctx).Today.Year() {
+		return T(ctx, tm.Format("January"))
+	}
 	return T(ctx, tm.Format("January")) + " " + tm.Format("2006")
 }
 

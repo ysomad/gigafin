@@ -205,33 +205,39 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 							@rowTime(r, user)
 						</td>
 						<td>
-							<div>
+							<div class="hstack gap-1">
 								if transfer {
 									<em>{ kit.T(ctx, "transfer") }</em>
 								} else if r.Category != "" {
 									{ r.Category }
 								} else {
-									—
-								}
-								if r.Payee != "" {
-									· { r.Payee }
-								}
-							</div>
-							<div class="text-light">
-								{ r.Account }
-								if r.ToAccount != "" {
-									→ { r.ToAccount }
+									{ kit.T(ctx, "No category") }
 								}
 								if r.Group != "" && !transfer {
-									· { kit.T(ctx, "split %s", r.Group) }
-								}
-								if r.Note != "" {
-									· { r.Note }
-								}
-								if r.MCC != "" {
-									· MCC { r.MCC }
+									<svg width="14" height="14" role="img" aria-label={ kit.T(ctx, "split %s", r.Group) }><title>{ kit.T(ctx, "split %s", r.Group) }</title><use href="/static/icons.svg#split"></use></svg>
 								}
 							</div>
+							<small class="hstack gap-2 text-light">
+								<span class="hstack gap-1">
+									<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+									{ r.Account }
+									if r.ToAccount != "" {
+										→ { r.ToAccount }
+									}
+								</span>
+								if r.Payee != "" {
+									<span class="hstack gap-1">
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+										{ r.Payee }
+									</span>
+								}
+								if r.Note != "" {
+									<span class="hstack gap-1">
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+										{ r.Note }
+									</span>
+								}
+							</small>
 						</td>
 						<td class="align-right nowrap">{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ r.Currency }</span></td>
 						<td>
@@ -275,25 +281,34 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 									if r.Category != "" {
 										{ r.Category }
 									} else {
-										—
-									}
-									if r.Payee != "" {
-										· { r.Payee }
+										{ kit.T(ctx, "No category") }
 									}
 								</div>
-								<div class="text-light">
-									if r.Account != "" {
-										{ r.Account }
-									} else {
-										—
-									}
-									if r.ToAccount != "" {
-										→ { r.ToAccount }
+								<small class="hstack gap-2 text-light">
+									<span class="hstack gap-1">
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+										if r.Account != "" {
+											{ r.Account }
+										} else {
+											—
+										}
+										if r.ToAccount != "" {
+											→ { r.ToAccount }
+										}
+									</span>
+									if r.Payee != "" {
+										<span class="hstack gap-1">
+											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+											{ r.Payee }
+										</span>
 									}
 									if r.Note != "" {
-										· { r.Note }
+										<span class="hstack gap-1">
+											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+											{ r.Note }
+										</span>
 									}
-								</div>
+								</small>
 							</td>
 							<td class="align-right nowrap">
 								if r.Currency != "" {

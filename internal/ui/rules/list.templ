@@ -49,8 +49,6 @@ templ listPage(v kit.Page, d rulesData) {
 		}
 		if d.Filtered {
 			<p class="text-light mb-4">{ kit.T(ctx, "Showing %d of %d rules.", d.Shown, d.Total) }</p>
-		} else {
-			<p class="text-light mb-4">{ kit.T(ctx, "Rules run when importing or creating operations.") }</p>
 		}
 		for _, s := range d.Stages {
 			if len(d.Stages) > 1 || s.Stage != domain.RuleStageDefault {

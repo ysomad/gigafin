@@ -526,7 +526,6 @@
     "Origin": "Источник",
     "Payees whose 3 of 5 latest operations share a category get a rule setting it.": "Получатели, у которых 3 из 5 последних операций в одной категории, получат правило, ставящее её.",
     "Rule": "Правило",
-    "Rules run when importing or creating operations.": "Правила выполняются при импорте или создании операций.",
     "Runs": "Выполняется",
     "Several values:": "Несколько значений:",
     "Show matches": "Показать подходящие",
