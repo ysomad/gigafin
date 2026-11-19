@@ -207,7 +207,8 @@ func TestSkippedRows(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, p.Rows, 1)
 	require.Len(t, p.Skipped, 1)
-	assert.Equal(t, `status "FAILED"`, p.Skipped[0].Row.SkipReason)
+	assert.Equal(t, domain.SkipNotCompleted, p.Skipped[0].Row.SkipReason)
+	assert.Equal(t, "FAILED", p.Skipped[0].Row.SkipCause)
 	assert.Equal(t, 3, p.Skipped[0].Row.Line)
 	require.Len(t, p.Categories, 1, "skipped rows need no mapping")
 

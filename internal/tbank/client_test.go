@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -219,4 +221,41 @@ func TestFetchErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, domain.ErrBankLoginRequired))
 	assert.NotContains(t, err.Error(), "SID", "the session is not put in errors")
+}
+
+func TestFetchWindows(t *testing.T) {
+	t.Parallel()
+
+	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+	var (
+		mu     sync.Mutex
+		starts []string
+		failed bool
+	)
+	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/accounts_light" {
+			write(t, w, `{"resultCode": "OK", "payload": []}`)
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if !failed {
+			failed = true
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		starts = append(starts, r.URL.Query().Get("start"))
+		write(t, w, `{"resultCode": "OK", "payload": []}`)
+	})
+	s := encode(t, session{DeviceID: "DEVICE", AccessToken: "AT", SessionID: "SID"})
+
+	_, err := c.Fetch(t.Context(), s, from, to, time.UTC)
+	require.NoError(t, err, "a 503 is tried again")
+	ms := func(t time.Time) string { return strconv.FormatInt(t.UnixMilli(), 10) }
+	assert.Equal(t, []string{
+		ms(from),
+		ms(from.Add(31*24*time.Hour + time.Millisecond)),
+		ms(from.Add(62*24*time.Hour + 2*time.Millisecond)),
+	}, starts, "31-day windows")
 }

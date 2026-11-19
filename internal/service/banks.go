@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -18,6 +15,7 @@ import (
 	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/repository"
+	"github.com/ysomad/gigafin/internal/secretbox"
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
@@ -66,7 +64,7 @@ type Banks struct {
 	log      *slog.Logger
 	imports  *Imports
 	accounts *Accounts
-	aead     cipher.AEAD
+	box      *secretbox.Box
 	opts     BankOptions
 
 	// mu guards pending and locks
@@ -106,19 +104,16 @@ func newBanks(
 	if len(opts.Key) == 0 {
 		return s, nil
 	}
-	block, err := aes.NewCipher(opts.Key)
-	if err != nil {
-		return nil, fmt.Errorf("bank secret key: %w", err)
-	}
-	if s.aead, err = cipher.NewGCM(block); err != nil {
-		return nil, fmt.Errorf("bank secret key: %w", err)
+	var err error
+	if s.box, err = secretbox.New(opts.Key); err != nil {
+		return nil, fmt.Errorf("bank %w", err)
 	}
 	return s, nil
 }
 
 // Enabled returns the banks whose sync is configured.
 func (s *Banks) Enabled() []domain.Bank {
-	if s.aead == nil {
+	if s.box == nil {
 		return nil
 	}
 	return slices.Sorted(maps.Keys(s.opts.Clients))
@@ -129,7 +124,7 @@ func (s *Banks) Enabled() []domain.Bank {
 //nolint:ireturn // banks are known by their clients only
 func (s *Banks) client(bank domain.Bank) (BankClient, error) {
 	c, ok := s.opts.Clients[bank]
-	if !ok || s.aead == nil {
+	if !ok || s.box == nil {
 		return nil, domain.NewError(errors.ErrConflict, "%s: sync is disabled", domain.Msg(bank.Name()))
 	}
 	return c, nil
@@ -298,11 +293,10 @@ func (s *Banks) Disconnect(ctx context.Context, userID int64, bank domain.Bank) 
 // currency, for good, creating the accounts of links without one, and imports the
 // operations of those bank accounts in one run, so transfers between them pair: of an
 // account with operations since the day after its last one, else all, and then sets
-// its opening balance so the balance matches the bank. Neither side of a link may sync
+// its opening balance so the balance matches the bank. When that run fails, the next
+// Sync imports what it missed and sets the opening balances. Neither side of a link may sync
 // with another one already. Times are read in loc, and the operations come without a
 // category for rules to set.
-//
-//nolint:cyclop,funlen,nestif // one transaction checking each link, then the sync
 func (s *Banks) Link(
 	ctx context.Context, userID int64, bank domain.Bank, links []domain.BankLink, loc *time.Location,
 ) (domain.BankSync, error) {
@@ -325,9 +319,7 @@ func (s *Banks) Link(
 	now := s.clock.Now()
 	var (
 		// starts are the starts of the syncs by the ids of the bank accounts at the bank
-		starts = make(map[string]time.Time, len(links))
-		// fresh are the accounts without operations, by id, set to the bank balance
-		fresh   = make(map[int64]bool)
+		starts  = make(map[string]time.Time, len(links))
 		created []int64
 	)
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
@@ -336,62 +328,13 @@ func (s *Banks) Link(
 			return err
 		}
 		for _, l := range links {
-			i := slices.IndexFunc(accounts, func(a domain.BankAccount) bool {
-				return a.ID == l.BankAccountID && a.Bank == bank
-			})
-			if i < 0 {
-				return domain.NewError(errors.ErrInvalid, "bank account: choose from the list")
-			}
-			t := accounts[i]
-			if t.AccountID != 0 {
-				return domain.NewError(errors.ErrConflict, "bank account: already synced with another account")
-			}
-			// all operations, as for an account without operations
-			start := time.Unix(0, 0)
-			if l.AccountID == 0 {
-				a, err := domain.NewAccount(domain.AccountInput{
-					Name: t.Name, Currency: t.Currency, Kind: t.Kind, CreditLimit: t.CreditLimit,
-				})
-				if err != nil {
-					return err
-				}
-				if a, err = r.Accounts.Create(ctx, userID, a, now); err != nil {
-					return err
-				}
-				l.AccountID, fresh[a.ID], created = a.ID, true, append(created, a.ID)
-			} else {
-				if slices.ContainsFunc(accounts, func(a domain.BankAccount) bool { return a.AccountID == l.AccountID }) {
-					return domain.NewError(errors.ErrConflict, "the account syncs with a bank account already")
-				}
-				a, err := r.Accounts.Get(ctx, userID, l.AccountID)
-				if err != nil {
-					return err
-				}
-				if a.Currency != t.Currency {
-					return domain.NewError(errors.ErrInvalid, "bank account: is in %s, the account is in %s",
-						t.Currency, a.Currency)
-				}
-				ops, err := r.Operations.List(ctx, userID, domain.Filter{AccountID: a.ID}, pagination.Cursor{}, 1)
-				if err != nil {
-					return err
-				}
-				if len(ops) == 0 {
-					fresh[a.ID] = true
-				} else {
-					last := ops[0].Date
-					start = time.Date(last.Year(), last.Month(), last.Day()+1, 0, 0, 0, 0, loc)
-				}
-			}
-			if err := r.Banks.Link(ctx, userID, t.ID, l.AccountID, start, now); err != nil {
+			id, err := linkAccount(ctx, r, userID, bank, l, accounts, starts, loc, now)
+			if err != nil {
 				return err
 			}
-			// Commit maps records by name, and CSV exports of the account map with it too
-			if err := r.Imports.MapAccount(ctx, userID, bank.ImportSource(), t.Name, t.Currency, l.AccountID); err != nil {
-				return err
+			if id != 0 {
+				created = append(created, id)
 			}
-			// later links of this call see this one
-			accounts[i].AccountID = l.AccountID
-			starts[t.ExternalID] = start
 		}
 		return nil
 	})
@@ -404,30 +347,81 @@ func (s *Banks) Link(
 	s.log.InfoContext(ctx, "bank accounts linked", slog.Int64("user_id", userID), slog.String("bank", string(bank)),
 		slog.Int("count", len(links)))
 
-	n, sums, err := s.run(ctx, userID, c, loc, &conn, starts, now)
-	res, err := s.finish(ctx, userID, &conn, now, n, err)
-	if err != nil || len(res.NeedsLogin) > 0 {
-		return res, err
-	}
-	// the opening balance, before the first imported day, is the balance now less the
-	// imported operations
-	accounts, err := s.store.Read().Banks.Accounts(ctx, userID)
+	return s.syncLinked(ctx, userID, c, loc, &conn, starts, now)
+}
+
+// linkStart returns where the sync of the account id, linked with a bank account in
+// currency, starts: the day after its last operation, _syncAll without one.
+func linkStart(
+	ctx context.Context, r repository.Repos, userID, id int64, currency string, loc *time.Location,
+) (time.Time, error) {
+	a, err := r.Accounts.Get(ctx, userID, id)
 	if err != nil {
-		return res, err
+		return time.Time{}, err
 	}
-	for _, t := range accounts {
-		if !fresh[t.AccountID] {
-			continue
+	if a.Currency != currency {
+		return time.Time{}, domain.NewError(errors.ErrInvalid, "bank account: is in %s, the account is in %s",
+			currency, a.Currency)
+	}
+	ops, err := r.Operations.List(ctx, userID, domain.Filter{AccountID: a.ID}, pagination.Cursor{}, 1)
+	if err != nil || len(ops) == 0 {
+		return _syncAll, err
+	}
+	last := ops[0].Date
+	return time.Date(last.Year(), last.Month(), last.Day()+1, 0, 0, 0, 0, loc), nil
+}
+
+// linkAccount makes the account of l sync with its bank account among accounts, at
+// bank, creating the account when l has none, and records the start of its sync in
+// starts by the id of the bank account at the bank. It returns the id of the account it
+// created, 0 for none. Later links see this one in accounts.
+func linkAccount(
+	ctx context.Context, r repository.Repos, userID int64, bank domain.Bank, l domain.BankLink,
+	accounts []domain.BankAccount, starts map[string]time.Time, loc *time.Location, now time.Time,
+) (int64, error) {
+	var created int64
+	i := slices.IndexFunc(accounts, func(a domain.BankAccount) bool {
+		return a.ID == l.BankAccountID && a.Bank == bank
+	})
+	if i < 0 {
+		return 0, domain.NewError(errors.ErrInvalid, "bank account: choose from the list")
+	}
+	t := accounts[i]
+	if t.AccountID != 0 {
+		return 0, domain.NewError(errors.ErrConflict, "bank account: already synced with another account")
+	}
+	start := _syncAll
+	switch {
+	case l.AccountID == 0:
+		a, err := domain.NewAccount(domain.AccountInput{
+			Name: t.Name, Currency: t.Currency, Kind: t.Kind, CreditLimit: t.CreditLimit,
+		})
+		if err != nil {
+			return 0, err
 		}
-		date := timex.Today(s.clock, loc)
-		if sum := sums[t.AccountID]; !sum.first.IsZero() {
-			date = timex.Date(sum.first.In(loc)).AddDate(0, 0, -1)
+		if a, err = r.Accounts.Create(ctx, userID, a, now); err != nil {
+			return 0, err
 		}
-		if _, err := s.accounts.SetBalance(ctx, userID, t.AccountID, t.Balance.Sub(sums[t.AccountID].sum), date); err != nil {
-			return res, err
+		l.AccountID, created = a.ID, a.ID
+	case slices.ContainsFunc(accounts, func(a domain.BankAccount) bool { return a.AccountID == l.AccountID }):
+		return 0, domain.NewError(errors.ErrConflict, "the account syncs with a bank account already")
+	default:
+		var err error
+		if start, err = linkStart(ctx, r, userID, l.AccountID, t.Currency, loc); err != nil {
+			return 0, err
 		}
 	}
-	return res, nil
+	if err := r.Banks.Link(ctx, userID, t.ID, l.AccountID, start, now); err != nil {
+		return 0, err
+	}
+	// Commit maps records by name, and CSV exports of the account map with it too
+	if err := r.Imports.MapAccount(ctx, userID, bank.ImportSource(), t.Name, t.Currency, l.AccountID); err != nil {
+		return 0, err
+	}
+	// later links of this call see this one
+	accounts[i].AccountID = l.AccountID
+	starts[t.ExternalID] = start
+	return created, nil
 }
 
 // Sync reads the accounts at bank and imports the operations of the linked ones since
@@ -471,7 +465,8 @@ func (s *Banks) Sync(
 		if t.Bank != bank || t.AccountID == 0 {
 			continue
 		}
-		start := now.Add(-s.opts.SyncOverlap)
+		// never synced, as when the sync of Link failed: from where Link meant to start
+		start := t.SyncedFrom
 		if !t.SyncedUntil.IsZero() {
 			start = t.SyncedUntil.Add(-s.opts.SyncOverlap)
 		}
@@ -482,8 +477,44 @@ func (s *Banks) Sync(
 		}
 		starts[t.ExternalID] = start
 	}
-	n, _, err := s.run(ctx, userID, c, loc, &conn, starts, now)
-	return s.finish(ctx, userID, &conn, now, n, err)
+	return s.syncLinked(ctx, userID, c, loc, &conn, starts, now)
+}
+
+// _syncAll is the start of the sync of an account linked without operations: all of
+// the bank's.
+var _syncAll = time.Unix(0, 0)
+
+// syncLinked runs the sync of the bank accounts in starts and records its outcome.
+// After a successful run, the accounts synced from _syncAll get their opening balance,
+// before the first imported day, so their balance matches the bank: the balance now
+// less the imported operations.
+func (s *Banks) syncLinked(
+	ctx context.Context, userID int64, c BankClient, loc *time.Location,
+	conn *domain.BankConnection, starts map[string]time.Time, now time.Time,
+) (domain.BankSync, error) {
+	n, sums, err := s.run(ctx, userID, c, loc, conn, starts, now)
+	res, err := s.finish(ctx, userID, conn, now, n, err)
+	if err != nil || len(res.NeedsLogin) > 0 {
+		return res, err
+	}
+	accounts, err := s.store.Read().Banks.Accounts(ctx, userID)
+	if err != nil {
+		return res, err
+	}
+	for _, t := range accounts {
+		if t.Bank != conn.Bank || t.AccountID == 0 || !starts[t.ExternalID].Equal(_syncAll) {
+			continue
+		}
+		sum := sums[t.AccountID]
+		date := timex.Today(s.clock, loc)
+		if !sum.first.IsZero() {
+			date = timex.Date(sum.first.In(loc)).AddDate(0, 0, -1)
+		}
+		if _, err := s.accounts.SetBalance(ctx, userID, t.AccountID, t.Balance.Sub(sum.sum), date); err != nil {
+			return res, err
+		}
+	}
+	return res, nil
 }
 
 // SyncAll syncs every enabled bank as Sync does, one after another. A failing bank
@@ -712,22 +743,10 @@ func (s *Banks) saveAccounts(
 
 // seal encrypts a session of the user; the user id binds it to the row.
 func (s *Banks) seal(userID int64, sess []byte) ([]byte, error) {
-	nonce := make([]byte, s.aead.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("bank session nonce: %w", err)
-	}
-	return s.aead.Seal(nonce, nonce, sess, []byte(strconv.FormatInt(userID, 10))), nil
+	return s.box.Seal(strconv.FormatInt(userID, 10), sess)
 }
 
 // open decrypts a session sealed by seal.
 func (s *Banks) open(userID int64, secret []byte) ([]byte, error) {
-	n := s.aead.NonceSize()
-	if len(secret) < n {
-		return nil, errors.Error("bank session: too short")
-	}
-	b, err := s.aead.Open(nil, secret[:n], secret[n:], []byte(strconv.FormatInt(userID, 10)))
-	if err != nil {
-		return nil, fmt.Errorf("open bank session: %w", err)
-	}
-	return b, nil
+	return s.box.Open(strconv.FormatInt(userID, 10), secret)
 }

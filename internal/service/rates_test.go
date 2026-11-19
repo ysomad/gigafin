@@ -117,3 +117,55 @@ func TestRates(t *testing.T) {
 	err = svc.Rates.Set(ctx, userID, "RUB", "2026-10-11", "1")
 	require.ErrorIs(t, err, errors.ErrInvalid, "pivot has no rate")
 }
+
+func TestRatesPerUser(t *testing.T) {
+	t.Parallel()
+
+	store := repotest.New(t)
+	fetcher := &fakeFetcher{}
+	clock := timex.Fixed(time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC))
+	svc, err := service.New(store, clock, slog.New(slog.DiscardHandler), service.Options{
+		Session:      domain.SessionLifetime{Max: time.Hour, Idle: time.Hour},
+		RateFetchers: map[domain.RateSource]service.RateFetcher{domain.RateSourceCBR: fetcher},
+	})
+	require.NoError(t, err)
+	ctx := t.Context()
+
+	alice, bob := newUser(t, store), newUser(t, store)
+	for _, id := range []int64{alice, bob} {
+		err = svc.Settings.Set(ctx, id, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "USD"})
+		require.NoError(t, err)
+	}
+
+	n, err := svc.Rates.Sync(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n, "today's rate for each user")
+	assert.Len(t, fetcher.calls, 1, "the same gap is fetched once")
+
+	require.NoError(t, svc.Rates.Set(ctx, alice, "USD", "2026-10-11", "50"))
+	n, err = svc.Rates.Import(ctx, alice, strings.NewReader("date,from,to,rate\n2026-10-11,USD,RUB,51\n"))
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	latest, err := svc.Rates.Latest(ctx, alice)
+	require.NoError(t, err)
+	require.Len(t, latest, 1)
+	assert.True(t, decimal.NewFromInt(51).Equal(latest[0].Rate))
+
+	latest, err = svc.Rates.Latest(ctx, bob)
+	require.NoError(t, err)
+	require.Len(t, latest, 1)
+	assert.False(t, latest[0].Manual, "another user's rate does not change bob's")
+	assert.True(t, decimal.NewFromInt(109).Equal(latest[0].Rate))
+
+	// a user syncs their own rates only
+	carol := newUser(t, store)
+	err = svc.Settings.Set(ctx, carol, domain.Settings{RateSource: domain.RateSourceCBR, PrimaryCurrency: "EUR"})
+	require.NoError(t, err)
+	n, err = svc.Rates.SyncUser(ctx, bob)
+	require.NoError(t, err)
+	assert.Zero(t, n)
+	latest, err = svc.Rates.Latest(ctx, carol)
+	require.NoError(t, err)
+	assert.Empty(t, latest)
+}

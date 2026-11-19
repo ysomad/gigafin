@@ -119,5 +119,8 @@ SELECT * FROM api_keys WHERE prefix = ?;
 -- name: RevokeAPIKey :execrows
 UPDATE api_keys SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL;
 
+-- name: RevokeUserAPIKeys :exec
+UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL;
+
 -- name: TouchAPIKey :exec
 UPDATE api_keys SET last_used_at = ? WHERE id = ?;

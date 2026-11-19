@@ -25,7 +25,9 @@ func (r *Accounts) List(ctx context.Context, userID int64) ([]domain.Account, er
 	}
 	out := make([]domain.Account, len(rows))
 	for i, row := range rows {
-		out[i] = accountFromRow(row.Account, row.Balance)
+		if out[i], err = accountFromRow(row.Account, row.Balance); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -36,7 +38,7 @@ func (r *Accounts) Get(ctx context.Context, userID, id int64) (domain.Account, e
 	if err != nil {
 		return domain.Account{}, notFound(err, "account")
 	}
-	return accountFromRow(row.Account, row.Balance), nil
+	return accountFromRow(row.Account, row.Balance)
 }
 
 // BalanceAt returns the balance of the account at the end of date.
@@ -49,7 +51,7 @@ func (r *Accounts) BalanceAt(
 	if err != nil {
 		return money.Amount{}, fmt.Errorf("get balance at: %w", err)
 	}
-	return money.FromMinor(minor, a.Currency), nil
+	return money.FromMinor(minor, a.Currency)
 }
 
 // Create stores a new account and returns it with its id.
@@ -74,7 +76,7 @@ func (r *Accounts) Create(
 	if err != nil {
 		return domain.Account{}, fmt.Errorf("create account: %w", err)
 	}
-	return accountFromRow(row, 0 /* balance */), nil
+	return accountFromRow(row, 0 /* balance */)
 }
 
 // Update stores the name, kind and credit limit of a.
@@ -126,17 +128,22 @@ func (r *Accounts) DeleteAll(ctx context.Context, userID int64) error {
 	return nil
 }
 
-func accountFromRow(a sqlc.Account, balance int64) domain.Account {
+func accountFromRow(a sqlc.Account, balance int64) (domain.Account, error) {
 	acc := domain.Account{
 		ID:       a.ID,
 		Name:     a.Name,
 		Currency: a.Currency,
 		Kind:     domain.AccountKind(a.Kind),
 		Archived: a.ArchivedAt.Valid,
-		Balance:  money.FromMinor(balance, a.Currency),
+	}
+	var err error
+	if acc.Balance, err = money.FromMinor(balance, a.Currency); err != nil {
+		return domain.Account{}, fmt.Errorf("account %d balance: %w", a.ID, err)
 	}
 	if a.CreditLimit.Valid {
-		acc.CreditLimit = money.FromMinor(a.CreditLimit.Int64, a.Currency)
+		if acc.CreditLimit, err = money.FromMinor(a.CreditLimit.Int64, a.Currency); err != nil {
+			return domain.Account{}, fmt.Errorf("account %d credit limit: %w", a.ID, err)
+		}
 	}
-	return acc
+	return acc, nil
 }

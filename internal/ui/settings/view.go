@@ -60,8 +60,9 @@ type banksData struct {
 	// picked first, 0 for a new account.
 	Choices   map[int64][]domain.Account
 	Suggested map[int64]int64
-	// SyncErr is a failed sync of an htmx post, shown as a toast.
-	SyncErr string
+	// SyncFailed marks a failed sync of an htmx post, shown as a toast; the error is
+	// logged, not shown, as it may carry what the bank answered.
+	SyncFailed bool
 }
 
 // bankData is the state of the section of a bank in the banks card.
@@ -86,19 +87,47 @@ type generalForm struct {
 	Theme             string `form:"theme"`
 }
 
-// rateForm is decoded from the form setting an exchange rate by hand.
+// rateForm is decoded from the form setting an exchange rate by hand, and from the one
+// resetting such a rate, which posts no Rate.
 type rateForm struct {
 	Currency string `form:"currency"`
 	Date     string `form:"date"`
 	Rate     string `form:"rate"`
 }
 
-// apiKeyForm is decoded from the form creating an API key, but for the password,
-// which is never shown again.
+// apiKeyForm is decoded from the form creating an API key. Password is cleared before
+// the form is filled again, never shown.
 type apiKeyForm struct {
-	Name    string `form:"name"`
-	Scope   string `form:"scope"`
-	Expires string `form:"expires"`
+	Name     string `form:"name"`
+	Scope    string `form:"scope"`
+	Expires  string `form:"expires"`
+	Password string `form:"password"`
+}
+
+// passwordForm is decoded from the form changing the password.
+type passwordForm struct {
+	Current       string `form:"current"`
+	Password      string `form:"password"`
+	RevokeAPIKeys bool   `form:"revoke_api_keys"`
+}
+
+// twoFactorForm is decoded from the forms turning two-factor authentication on and
+// managing it, where Action is what to do.
+type twoFactorForm struct {
+	Code     string `form:"code"`
+	Password string `form:"password"`
+	Action   string `form:"action"`
+}
+
+// backupForm is decoded from the form downloading a backup.
+type backupForm struct {
+	Password   string `form:"password"`
+	Passphrase string `form:"passphrase"`
+}
+
+// deleteForm is decoded from the form deleting all data.
+type deleteForm struct {
+	Password string `form:"password"`
 }
 
 // ratesSync is the result of a rate sync, shown on the settings page as toasts.

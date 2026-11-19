@@ -76,6 +76,14 @@ func (r *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccoun
 	}
 	out := make([]domain.BankAccount, len(rows))
 	for i, a := range rows {
+		balance, err := money.FromMinor(a.Balance, a.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("bank account %d balance: %w", a.ID, err)
+		}
+		limit, err := money.FromMinor(a.CreditLimit, a.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("bank account %d credit limit: %w", a.ID, err)
+		}
 		out[i] = domain.BankAccount{
 			ID:          a.ID,
 			Bank:        domain.Bank(a.Bank),
@@ -83,8 +91,8 @@ func (r *Banks) Accounts(ctx context.Context, userID int64) ([]domain.BankAccoun
 			Name:        a.Name,
 			Currency:    a.Currency,
 			Kind:        domain.AccountKind(a.Kind),
-			Balance:     money.FromMinor(a.Balance, a.Currency),
-			CreditLimit: money.FromMinor(a.CreditLimit, a.Currency),
+			Balance:     balance,
+			CreditLimit: limit,
 			AccountID:   a.AccountID.Int64,
 		}
 		if a.SyncedUntil.Valid {

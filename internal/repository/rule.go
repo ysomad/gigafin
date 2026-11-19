@@ -32,6 +32,15 @@ func (r *Rules) List(ctx context.Context, userID int64) ([]domain.Rule, error) {
 	return rules, nil
 }
 
+// Count returns how many rules the user has.
+func (r *Rules) Count(ctx context.Context, userID int64) (int64, error) {
+	n, err := r.q.CountRules(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("count rules: %w", err)
+	}
+	return n, nil
+}
+
 // Get returns one rule.
 func (r *Rules) Get(ctx context.Context, userID, id int64) (domain.Rule, error) {
 	row, err := r.q.GetRule(ctx, sqlc.GetRuleParams{ID: id, UserID: userID})

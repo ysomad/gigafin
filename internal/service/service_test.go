@@ -1046,3 +1046,94 @@ func TestDataBackup(t *testing.T) {
 	require.Len(t, accounts, 1, "the backup holds every user's data")
 	assert.Equal(t, "Card", accounts[0].Name)
 }
+
+// TestSumMatchesList guards SumFilteredOperations against drifting from the conditions
+// of ListOperations: for every filter field, the totals equal the sums of the listed
+// operations.
+func TestSumMatchesList(t *testing.T) {
+	t.Parallel()
+
+	store := repotest.New(t)
+	svc := newServices(t, store)
+	uid := newUser(t, store)
+	ctx := t.Context()
+
+	card, err := svc.Accounts.Create(ctx, uid, domain.AccountInput{Name: "Card", Currency: "RUB"})
+	require.NoError(t, err)
+	cash, err := svc.Accounts.Create(ctx, uid, domain.AccountInput{Name: "Cash", Currency: "RUB"})
+	require.NoError(t, err)
+	usd, err := svc.Accounts.Create(ctx, uid, domain.AccountInput{Name: "Dollars", Currency: "USD"})
+	require.NoError(t, err)
+	food, err := svc.Categories.Create(ctx, uid, 0, domain.KindExpense, "Food")
+	require.NoError(t, err)
+	cafe, err := svc.Categories.Create(ctx, uid, food.ID, "", "Cafe")
+	require.NoError(t, err)
+
+	for _, in := range []domain.OperationInput{
+		{
+			Type: domain.OpExpense, AccountID: card.ID, CategoryID: food.ID, Amount: dec("100"),
+			Date: day(t, "2026-10-01"), Payee: "Market", Tags: []string{"home"},
+		},
+		{
+			Type: domain.OpExpense, AccountID: card.ID, CategoryID: cafe.ID, Amount: dec("250.50"),
+			Date: day(t, "2026-10-05"), Payee: "Coffee Bar", Note: "latte",
+		},
+		{Type: domain.OpExpense, AccountID: cash.ID, Amount: dec("40"), Date: day(t, "2026-10-10")},
+		{
+			Type: domain.OpIncome, AccountID: card.ID, Amount: dec("5000"), Date: day(t, "2026-10-15"),
+			Payee: "Work", Tags: []string{"job", "home"},
+		},
+		{
+			Type: domain.OpExpense, AccountID: usd.ID, Amount: dec("12.34"), Date: day(t, "2026-10-20"),
+			Payee: "Coffee Shop",
+		},
+		{
+			Type: domain.OpTransfer, AccountID: card.ID, ToAccountID: cash.ID, Amount: dec("300"),
+			Date: day(t, "2026-10-25"),
+		},
+	} {
+		_, err := svc.Operations.Create(ctx, uid, in)
+		require.NoError(t, err)
+	}
+
+	amount := func(s string) money.NullAmount { return money.NullAmount{Amount: dec(s), Valid: true} }
+	tests := []struct {
+		name string
+		give domain.Filter
+	}{
+		{name: "none"},
+		{name: "account", give: domain.Filter{AccountID: cash.ID}},
+		{name: "category", give: domain.Filter{CategoryID: food.ID}},
+		{name: "uncategorized", give: domain.Filter{Uncategorized: true}},
+		{name: "type", give: domain.Filter{Type: domain.OpExpense}},
+		{name: "dates", give: domain.Filter{DateFrom: day(t, "2026-10-05"), DateTo: day(t, "2026-10-15")}},
+		{name: "query", give: domain.Filter{Query: "coffee"}},
+		{name: "amounts", give: domain.Filter{AmountMin: amount("12.34"), AmountMax: amount("300")}},
+		{name: "tags", give: domain.Filter{Tags: []string{"home"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ops, err := store.Read().Operations.List(t.Context(), uid, tt.give, pagination.Cursor{}, 100)
+			require.NoError(t, err)
+			require.NotEmpty(t, ops)
+			totals := map[string]money.Amount{}
+			for _, op := range ops {
+				key := string(op.Type) + " " + op.Currency
+				totals[key] = totals[key].Add(op.Amount)
+			}
+			want := map[string]string{}
+			for key, total := range totals {
+				want[key] = total.String()
+			}
+
+			sums, err := store.Read().Operations.Sum(t.Context(), uid, tt.give)
+			require.NoError(t, err)
+			got := map[string]string{}
+			for _, s := range sums {
+				got[string(s.Type)+" "+s.Currency] = s.Total.String()
+			}
+			assert.Equal(t, want, got)
+		})
+	}
+}

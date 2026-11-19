@@ -65,7 +65,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			</header>
 			<main class="container mb-8">
 				if v.BankSync {
-					<div id="bank-sync" hx-get="/settings/banks/autosync" hx-trigger="load" hx-swap="outerHTML"></div>
+					<div id="bank-sync" hx-post="/settings/banks/autosync" hx-trigger="load" hx-swap="outerHTML"></div>
 				}
 				{ children... }
 				if toTop {

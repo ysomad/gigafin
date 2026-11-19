@@ -22,13 +22,17 @@ FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
 WHERE o.id = ? AND o.user_id = ?;
 
--- name: ListOperationsByPayee :many
+-- name: ListOperationsByIDs :many
 SELECT sqlc.embed(o), a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE
-    o.user_id = sqlc.arg(user_id) AND o.payee = sqlc.arg(payee)
-    AND o.date >= sqlc.arg(date_from) AND o.date <= sqlc.arg(date_to)
+WHERE o.user_id = sqlc.arg(user_id) AND o.id IN (sqlc.slice(ids));
+
+-- name: ListOperationsByPayees :many
+SELECT sqlc.embed(o), a.currency
+FROM operations AS o
+JOIN accounts AS a ON a.id = o.account_id
+WHERE o.user_id = sqlc.arg(user_id) AND o.payee IN (sqlc.slice(payees))
 ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC;
 
 -- name: DeleteOperation :execrows

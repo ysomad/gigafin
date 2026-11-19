@@ -48,6 +48,8 @@ type fakeBank struct {
 	accounts []domain.BankAccount
 	records  map[string][]domain.Record
 	expired  bool
+	// fetchErr fails the fetches while set
+	fetchErr error
 	// refreshed are the sessions refreshed, froms the starts of the fetches
 	refreshed []string
 	froms     []time.Time
@@ -76,6 +78,9 @@ func (f *fakeBank) Fetch(_ context.Context, _ []byte, from, to time.Time, _ *tim
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.froms = append(f.froms, from.UTC())
+	if f.fetchErr != nil {
+		return domain.BankData{}, f.fetchErr
+	}
 	data := domain.BankData{Accounts: f.accounts, Records: make(map[string][]domain.Record)}
 	for id, rs := range f.records {
 		for _, r := range rs {
@@ -287,6 +292,37 @@ func TestBanksLinkAndSync(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []domain.Bank{domain.BankTBank}, res.NeedsLogin, "not linked until signed in again")
 	assert.Zero(t, f.bankAccount(t, "1002").AccountID)
+}
+
+func TestBanksLinkFailedSync(t *testing.T) {
+	t.Parallel()
+
+	f := newBankFixture(t)
+	f.bank.add("1002", "-500", time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC))
+	f.bank.add("1002", "700", time.Date(2026, 11, 10, 10, 0, 0, 0, time.UTC))
+
+	f.bank.mu.Lock()
+	f.bank.fetchErr = errors.Error("bank is down")
+	f.bank.mu.Unlock()
+	_, err := f.link(t, int64(0), "1002")
+	require.Error(t, err)
+	savings := f.bankAccount(t, "1002")
+	require.NotZero(t, savings.AccountID, "linked though the sync failed")
+	assert.Equal(t, "0", f.balance(t, savings.AccountID))
+
+	f.bank.mu.Lock()
+	f.bank.fetchErr = nil
+	f.bank.mu.Unlock()
+	f.clock.add(time.Hour)
+	res := f.sync(t, false)
+	assert.Equal(t, 2, res.Operations, "the whole history the link missed")
+	assert.Equal(t, time.Unix(0, 0).UTC(), f.bank.froms[len(f.bank.froms)-1])
+	assert.Equal(t, "20000", f.balance(t, savings.AccountID), "the opening balance is set")
+
+	f.clock.add(time.Hour)
+	f.bank.add("1002", "-100", f.clock.Now().Add(-time.Minute))
+	assert.Equal(t, 1, f.sync(t, false).Operations)
+	assert.Equal(t, "19900", f.balance(t, savings.AccountID), "the opening balance is set once")
 }
 
 func TestBanksSyncReadsAccounts(t *testing.T) {

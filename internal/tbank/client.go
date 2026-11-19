@@ -48,6 +48,15 @@ const (
 		`"picture":{"essential":true},"api_sso_id":{"essential":true}}}`
 )
 
+const (
+	// _maxBody bounds an answer read; the API is undocumented, so nothing else does
+	_maxBody = 16 << 20
+	// _fetchWindow is the longest period of operations asked for at once
+	_fetchWindow = 31 * 24 * time.Hour
+	// _getAttempts bounds tries of an API call failing with 5xx or on the network
+	_getAttempts = 3
+)
+
 // _stepComplete is the step the bank asks for once every factor is accepted; it
 // needs no input. The steps that do are named as domain.BankStepOTP and
 // domain.BankStepPassword.
@@ -319,13 +328,24 @@ func (c *Client) Fetch(
 	if err := c.get(ctx, s, "/v1/accounts_light", url.Values{}, &accs); err != nil {
 		return domain.BankData{}, fmt.Errorf("tbank: accounts: %w", err)
 	}
-	q := url.Values{
-		"start": {strconv.FormatInt(from.UnixMilli(), 10)},
-		"end":   {strconv.FormatInt(to.UnixMilli(), 10)},
-	}
+	// a long period is asked for in windows, so one answer stays small and a failure
+	// costs one window; the ends are inclusive, so a window starts after the last
 	var ops []operation
-	if err := c.get(ctx, s, "/v1/operations", q, &ops); err != nil {
-		return domain.BankData{}, fmt.Errorf("tbank: operations: %w", err)
+	for start := from; !start.After(to); {
+		end := start.Add(_fetchWindow)
+		if end.After(to) {
+			end = to
+		}
+		q := url.Values{
+			"start": {strconv.FormatInt(start.UnixMilli(), 10)},
+			"end":   {strconv.FormatInt(end.UnixMilli(), 10)},
+		}
+		var window []operation
+		if err := c.get(ctx, s, "/v1/operations", q, &window); err != nil {
+			return domain.BankData{}, fmt.Errorf("tbank: operations: %w", err)
+		}
+		ops = append(ops, window...)
+		start = end.Add(time.Millisecond)
 	}
 	return bankData(accs, ops, loc), nil
 }
@@ -391,7 +411,8 @@ func (c *Client) token(ctx context.Context, deviceID string, grant url.Values) (
 }
 
 // get calls a GET method of the API at path with query q and the parameters of the
-// app, and decodes the payload of its answer into out.
+// app, and decodes the payload of its answer into out. Answers of 5xx and network
+// failures are tried again, up to _getAttempts times with a growing wait.
 func (c *Client) get(ctx context.Context, s session, path string, q url.Values, out any) error {
 	q.Set("sessionid", s.SessionID)
 	q.Set("deviceId", s.DeviceID)
@@ -403,9 +424,30 @@ func (c *Client) get(ctx context.Context, s session, path string, q url.Values, 
 	q.Set("connectionType", "WiFi")
 	q.Set("ccc", "true")
 	q.Set("cpswc", "true")
+	var err error
+	for attempt := range _getAttempts {
+		if attempt > 0 {
+			t := time.NewTimer(time.Second << (attempt - 1))
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return ctx.Err()
+			case <-t.C:
+			}
+		}
+		var retry bool
+		if retry, err = c.getOnce(ctx, s, path, q, out); !retry {
+			return err
+		}
+	}
+	return err
+}
+
+// getOnce is one try of get; it reports whether a failure is worth trying again.
+func (c *Client) getOnce(ctx context.Context, s session, path string, q url.Values, out any) (bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL+path+"?"+q.Encode(), nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+s.AccessToken)
 	req.Header.Set("Accept", "application/json")
@@ -416,7 +458,7 @@ func (c *Client) get(ctx context.Context, s session, path string, q url.Values, 
 		err = redactURL(err)
 		c.log.DebugContext(ctx, "tbank request failed", slog.String("method", http.MethodGet),
 			slog.String("path", path), slog.Duration("took", time.Since(start)), slog.Any("error", err))
-		return err
+		return ctx.Err() == nil, err
 	}
 	defer resp.Body.Close()
 	var env struct {
@@ -425,31 +467,31 @@ func (c *Client) get(ctx context.Context, s session, path string, q url.Values, 
 	}
 	var decodeErr error
 	if resp.StatusCode == http.StatusOK {
-		decodeErr = json.NewDecoder(resp.Body).Decode(&env)
+		decodeErr = json.NewDecoder(io.LimitReader(resp.Body, _maxBody)).Decode(&env)
 	}
 	c.log.DebugContext(ctx, "tbank request", slog.String("method", http.MethodGet), slog.String("path", path),
 		slog.Int("status", resp.StatusCode), slog.String("result", env.ResultCode),
 		slog.Int("payload_bytes", len(env.Payload)), slog.Duration("took", time.Since(start)))
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return domain.ErrBankLoginRequired
+		return false, domain.ErrBankLoginRequired
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("http status %d", resp.StatusCode)
+		return resp.StatusCode >= http.StatusInternalServerError, fmt.Errorf("http status %d", resp.StatusCode)
 	}
 	if decodeErr != nil {
-		return fmt.Errorf("decode: %w", decodeErr)
+		return false, fmt.Errorf("decode: %w", decodeErr)
 	}
 	switch env.ResultCode {
 	case "OK":
 	case "INSUFFICIENT_PRIVILEGES", "WRONG_SESSION", "SESSION_EXPIRED", "AUTHENTICATION_FAILED":
-		return fmt.Errorf("result %s: %w", env.ResultCode, domain.ErrBankLoginRequired)
+		return false, fmt.Errorf("result %s: %w", env.ResultCode, domain.ErrBankLoginRequired)
 	default:
-		return fmt.Errorf("result %q", env.ResultCode)
+		return false, fmt.Errorf("result %q", env.ResultCode)
 	}
 	if err := json.Unmarshal(env.Payload, out); err != nil {
-		return fmt.Errorf("decode payload: %w", err)
+		return false, fmt.Errorf("decode payload: %w", err)
 	}
-	return nil
+	return false, nil
 }
 
 // do sends a request to the sign-in host, a form when form is not nil, as the app
@@ -486,7 +528,7 @@ func (c *Client) do(
 		return err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, _maxBody))
 	if err != nil {
 		return fmt.Errorf("read: %w", err)
 	}

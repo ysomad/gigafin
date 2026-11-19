@@ -57,11 +57,9 @@ func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User
 	}
 	total := len(rules)
 	if f.Filtered() {
-		all, err := h.app.Svc.Rules.List(r.Context(), user.ID, domain.RuleFilter{})
-		if err != nil {
+		if total, err = h.app.Svc.Rules.Count(r.Context(), user.ID); err != nil {
 			return err
 		}
-		total = len(all)
 	}
 	accounts, err := h.app.Svc.Accounts.List(r.Context(), user.ID)
 	if err != nil {

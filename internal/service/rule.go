@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -39,13 +40,9 @@ func (s *Rules) Categorize(
 	if err != nil || len(rules) == 0 {
 		return ins, err
 	}
-	cats, err := r.Categories.List(ctx, userID)
+	byID, err := r.Categories.Map(ctx, userID)
 	if err != nil {
 		return nil, err
-	}
-	byID := make(map[int64]domain.Category, len(cats))
-	for _, c := range cats {
-		byID[c.ID] = c
 	}
 	// a stored rule that no longer validates is skipped, so it does not block creating
 	// and importing operations
@@ -67,6 +64,12 @@ func (s *Rules) Categorize(
 		out[i], _ = rs.Apply(in)
 	}
 	return out, nil
+}
+
+// Count returns how many rules the user has.
+func (s *Rules) Count(ctx context.Context, userID int64) (int, error) {
+	n, err := s.store.Read().Rules.Count(ctx, userID)
+	return int(n), err
 }
 
 // List returns the user's rules matching f, oldest first.
@@ -102,13 +105,9 @@ func (s *Rules) Get(ctx context.Context, userID, id int64) (domain.Rule, error) 
 func (s *Rules) Create(ctx context.Context, userID int64, in domain.RuleInput) (domain.Rule, error) {
 	var rule domain.Rule
 	err := s.store.InTx(ctx, func(r repository.Repos) error {
-		cats, err := r.Categories.List(ctx, userID)
+		byID, err := r.Categories.Map(ctx, userID)
 		if err != nil {
 			return err
-		}
-		byID := make(map[int64]domain.Category, len(cats))
-		for _, c := range cats {
-			byID[c.ID] = c
 		}
 		if rule, err = domain.NewRule(in, domain.RuleOriginUser, byID); err != nil {
 			return err
@@ -127,13 +126,9 @@ func (s *Rules) Create(ctx context.Context, userID int64, in domain.RuleInput) (
 func (s *Rules) Update(ctx context.Context, userID, id int64, in domain.RuleInput) (domain.Rule, error) {
 	var rule domain.Rule
 	err := s.store.InTx(ctx, func(r repository.Repos) error {
-		cats, err := r.Categories.List(ctx, userID)
+		byID, err := r.Categories.Map(ctx, userID)
 		if err != nil {
 			return err
-		}
-		byID := make(map[int64]domain.Category, len(cats))
-		for _, c := range cats {
-			byID[c.ID] = c
 		}
 		if rule, err = domain.NewRule(in, domain.RuleOriginUser, byID); err != nil {
 			return err
@@ -165,13 +160,9 @@ func (s *Rules) Preview(
 	ctx context.Context, userID int64, in domain.RuleInput, limit int,
 ) ([]domain.Operation, int, error) {
 	r := s.store.Read()
-	cats, err := r.Categories.List(ctx, userID)
+	byID, err := r.Categories.Map(ctx, userID)
 	if err != nil {
 		return nil, 0, err
-	}
-	byID := make(map[int64]domain.Category, len(cats))
-	for _, c := range cats {
-		byID[c.ID] = c
 	}
 	rule, err := domain.NewRule(in, domain.RuleOriginUser, byID)
 	if err != nil {
@@ -209,13 +200,9 @@ func (s *Rules) Apply(ctx context.Context, userID, id int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	cats, err := r.Categories.List(ctx, userID)
+	byID, err := r.Categories.Map(ctx, userID)
 	if err != nil {
 		return 0, err
-	}
-	byID := make(map[int64]domain.Category, len(cats))
-	for _, c := range cats {
-		byID[c.ID] = c
 	}
 	rs, err := domain.NewRuleSet([]domain.Rule{rule}, byID)
 	if err != nil {
@@ -253,7 +240,11 @@ func (s *Rules) Learn(ctx context.Context, userID int64) (int, error) {
 	var n int
 	err := s.store.InTx(ctx, func(r repository.Repos) error {
 		var err error
-		n, err = learnHistory(ctx, r, userID, s.clock.Now())
+		ops, err := allOperations(ctx, r, userID, domain.Filter{})
+		if err != nil {
+			return err
+		}
+		n, err = learnHistory(ctx, r, userID, ops, s.clock.Now())
 		return err
 	})
 	if err != nil {
@@ -263,22 +254,29 @@ func (s *Rules) Learn(ctx context.Context, userID int64) (int, error) {
 	return n, nil
 }
 
-// learnCategory learns a rule from the user setting the category of op by hand, see
-// domain.LearnCategory, when learning is on. It returns how many rules it stored.
+// learnCategory learns rules from the user setting the categories of ops by hand, see
+// domain.LearnCategory, when learning is on. The history of every payee is read at
+// once. It returns how many rules it stored.
 func learnCategory(
-	ctx context.Context, r repository.Repos, userID int64, op domain.Operation, now time.Time,
+	ctx context.Context, r repository.Repos, userID int64, ops []domain.Operation, now time.Time,
 ) (int, error) {
 	const window = 180 // days around the operation, as Actual Budget looks
-	if op.Payee == "" || op.CategoryID == 0 {
+	ops = slices.DeleteFunc(slices.Clone(ops), func(op domain.Operation) bool {
+		return op.Payee == "" || op.CategoryID == 0
+	})
+	if len(ops) == 0 {
 		return 0, nil
 	}
 	settings, err := r.Settings.Get(ctx, userID)
 	if err != nil || !settings.AutoCategoryRules {
 		return 0, err
 	}
-	history, err := r.Operations.ByPayee(
-		ctx, userID, op.Payee, op.Date.AddDate(0, 0, -window), op.Date.AddDate(0, 0, window),
-	)
+	payees := make([]string, len(ops))
+	for i, op := range ops {
+		payees[i] = op.Payee
+	}
+	slices.Sort(payees)
+	all, err := r.Operations.ByPayees(ctx, userID, slices.Compact(payees))
 	if err != nil {
 		return 0, err
 	}
@@ -286,62 +284,69 @@ func learnCategory(
 	if err != nil {
 		return 0, err
 	}
-	cats, err := r.Categories.List(ctx, userID)
+	byID, err := r.Categories.Map(ctx, userID)
 	if err != nil {
 		return 0, err
 	}
-	byID := make(map[int64]domain.Category, len(cats))
-	for _, c := range cats {
-		byID[c.ID] = c
-	}
-	learned, ok := domain.LearnCategory(history, op, rules, byID)
-	if !ok {
-		return 0, nil
-	}
-	for _, rule := range learned {
-		if rule.ID == 0 {
-			_, err = r.Rules.Create(ctx, userID, rule, now)
-		} else {
-			_, err = r.Rules.Update(ctx, userID, rule, now)
+	n := 0
+	for _, op := range ops {
+		from, to := op.Date.AddDate(0, 0, -window), op.Date.AddDate(0, 0, window)
+		var history []domain.Operation
+		for _, h := range all {
+			if h.Payee == op.Payee && !h.Date.Before(from) && !h.Date.After(to) {
+				history = append(history, h)
+			}
 		}
-		if err != nil {
+		learned, ok := domain.LearnCategory(history, op, rules, byID)
+		if !ok {
+			continue
+		}
+		if err := storeRules(ctx, r, userID, learned, now); err != nil {
 			return 0, err
 		}
+		n += len(learned)
+		// the next operations see the rules just stored
+		if rules, err = r.Rules.List(ctx, userID); err != nil {
+			return 0, err
+		}
+	}
+	return n, nil
+}
+
+// learnHistory learns rules from ops, the user's operations newest first, see
+// domain.LearnCategories, and returns how many rules it stored.
+func learnHistory(
+	ctx context.Context, r repository.Repos, userID int64, ops []domain.Operation, now time.Time,
+) (int, error) {
+	rules, err := r.Rules.List(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	byID, err := r.Categories.Map(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	learned := domain.LearnCategories(ops, rules, byID)
+	if err := storeRules(ctx, r, userID, learned, now); err != nil {
+		return 0, err
 	}
 	return len(learned), nil
 }
 
-// learnHistory learns rules from all the user's operations, see
-// domain.LearnCategories, and returns how many rules it stored.
-func learnHistory(ctx context.Context, r repository.Repos, userID int64, now time.Time) (int, error) {
-	ops, err := allOperations(ctx, r, userID, domain.Filter{})
-	if err != nil {
-		return 0, err
-	}
-	rules, err := r.Rules.List(ctx, userID)
-	if err != nil {
-		return 0, err
-	}
-	cats, err := r.Categories.List(ctx, userID)
-	if err != nil {
-		return 0, err
-	}
-	byID := make(map[int64]domain.Category, len(cats))
-	for _, c := range cats {
-		byID[c.ID] = c
-	}
-	learned := domain.LearnCategories(ops, rules, byID)
-	for _, rule := range learned {
+// storeRules creates the rules without an id and updates the others.
+func storeRules(ctx context.Context, r repository.Repos, userID int64, rules []domain.Rule, now time.Time) error {
+	for _, rule := range rules {
+		var err error
 		if rule.ID == 0 {
 			_, err = r.Rules.Create(ctx, userID, rule, now)
 		} else {
 			_, err = r.Rules.Update(ctx, userID, rule, now)
 		}
 		if err != nil {
-			return 0, err
+			return err
 		}
 	}
-	return len(learned), nil
+	return nil
 }
 
 // allOperations returns all the user's operations matching f, newest first, reading
@@ -367,7 +372,9 @@ func allOperations(ctx context.Context, r repository.Repos, userID int64, f doma
 }
 
 // replaceOperations replaces each operation of ops with its input in ins in one
-// transaction, validated as an update would be, and returns how many it replaced.
+// transaction, validated as an update would be, and returns how many it replaced. ins
+// are made from ops as read before, so an operation deleted or changed since is left
+// as it is.
 func replaceOperations(
 	ctx context.Context, store *repository.Store, userID int64, ops []domain.Operation,
 	ins map[int64]domain.OperationInput, now time.Time,
@@ -381,7 +388,18 @@ func replaceOperations(
 		if err != nil {
 			return err
 		}
+		ids := make([]int64, len(ops))
+		for i, op := range ops {
+			ids[i] = op.ID
+		}
+		current, err := r.Operations.ByIDs(ctx, userID, ids)
+		if err != nil {
+			return err
+		}
 		for _, old := range ops {
+			if !current[old.ID].Equal(old) {
+				continue
+			}
 			op, err := refs.newOperation(ins[old.ID])
 			if err != nil {
 				return domain.NewError(err, "operation %d", old.ID)

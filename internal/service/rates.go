@@ -26,8 +26,7 @@ type RateFetcher interface {
 	Rates(ctx context.Context, currency string, from, to time.Time) ([]domain.Rate, error)
 }
 
-// Rates keeps exchange rates shared by all users up to date and lets users enter their
-// own.
+// Rates keeps the exchange rates of each user up to date and lets users enter their own.
 type Rates struct {
 	store    *repository.Store
 	clock    timex.Clock
@@ -37,73 +36,87 @@ type Rates struct {
 	mu sync.Mutex
 }
 
-// Sync fetches the missing rates of every currency users with rates on need, from the
-// first operation of those users to today, and returns how many daily rates it stored.
-// It does nothing while every user has rates off. A currency that fails does not stop
-// the others; their errors are joined.
+// Sync fetches the missing rates of every user with rates on, from the first operation
+// of the user to today, and returns how many daily rates it stored. A currency that
+// fails does not stop the others; their errors are joined.
 func (s *Rates) Sync(ctx context.Context) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	users, err := s.store.Read().Rates.Users(ctx)
 	if err != nil {
 		return 0, err
 	}
+	return s.sync(ctx, users)
+}
+
+// SyncUser is Sync for the user only.
+func (s *Rates) SyncUser(ctx context.Context, userID int64) (int, error) {
+	users, err := s.store.Read().Rates.Users(ctx)
+	if err != nil {
+		return 0, err
+	}
+	users = slices.DeleteFunc(users, func(u repository.RateUser) bool { return u.UserID != userID })
+	return s.sync(ctx, users)
+}
+
+func (s *Rates) sync(ctx context.Context, users []repository.RateUser) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	today := timex.Date(s.clock.Now().UTC())
 
 	type key struct {
 		source   domain.RateSource
 		currency string
+		gap      domain.DateRange
 	}
-	// first day each currency of a source is needed from
-	first := make(map[key]time.Time)
+	// users with the same history miss the same days, so each gap is fetched once
+	fetched := make(map[key][]domain.Rate)
+	failed := make(map[key]bool)
+	var (
+		stored int
+		errs   []error
+	)
 	for _, u := range users {
 		src := u.Settings.RateSource
 		if src == domain.RateSourceNone {
 			continue
 		}
-		start := cmp.Or(u.FirstDate, today)
-		for _, c := range domain.RateCurrencies(src, u.Settings.PrimaryCurrency, u.Currencies) {
-			k := key{source: src, currency: c}
-			if f, ok := first[k]; !ok || start.Before(f) {
-				first[k] = start
-			}
-		}
-	}
-
-	keys := slices.SortedFunc(maps.Keys(first), func(a, b key) int {
-		return cmp.Or(cmp.Compare(a.source, b.source), cmp.Compare(a.currency, b.currency))
-	})
-	var (
-		stored int
-		errs   []error
-	)
-	for _, k := range keys {
-		fetcher, ok := s.fetchers[k.source]
+		fetcher, ok := s.fetchers[src]
 		if !ok {
-			errs = append(errs, fmt.Errorf("rate source %q: no fetcher", k.source))
+			errs = append(errs, fmt.Errorf("rate source %q: no fetcher", src))
 			continue
 		}
-		bounds, err := s.store.Read().Rates.Bounds(ctx, k.source, k.currency)
-		if err != nil {
-			return stored, err
-		}
-		for _, gap := range domain.RateGaps(first[k], today, bounds) {
-			published, err := fetcher.Rates(ctx, k.currency, gap.From.Add(-domain.RateLookback), gap.To)
-			if ctx.Err() != nil {
-				return stored, ctx.Err()
-			}
+		start := cmp.Or(u.FirstDate, today)
+		for _, c := range domain.RateCurrencies(src, u.Settings.PrimaryCurrency, u.Currencies) {
+			bounds, err := s.store.Read().Rates.Bounds(ctx, u.UserID, src, c)
 			if err != nil {
-				errs = append(errs, err)
-				break
-			}
-			rates := domain.FillRates(published, gap.From, gap.To)
-			if err := s.store.InTx(ctx, func(r repository.Repos) error {
-				return r.Rates.Sync(ctx, rates, s.clock.Now())
-			}); err != nil {
 				return stored, err
 			}
-			stored += len(rates)
+			for _, gap := range domain.RateGaps(start, today, bounds) {
+				k := key{source: src, currency: c, gap: gap}
+				if failed[k] {
+					break
+				}
+				published, ok := fetched[k]
+				if !ok {
+					published, err = fetcher.Rates(ctx, c, gap.From.Add(-domain.RateLookback), gap.To)
+					if ctx.Err() != nil {
+						return stored, ctx.Err()
+					}
+					if err != nil {
+						failed[k] = true
+						errs = append(errs, err)
+						break
+					}
+					fetched[k] = published
+				}
+				rates := domain.FillRates(published, gap.From, gap.To)
+				if err := s.store.InTx(ctx, func(r repository.Repos) error {
+					return r.Rates.Sync(ctx, u.UserID, rates, s.clock.Now())
+				}); err != nil {
+					return stored, err
+				}
+				stored += len(rates)
+			}
 		}
 	}
 	return stored, errors.Join(errs...)
@@ -119,7 +132,7 @@ func (s *Rates) Latest(ctx context.Context, userID int64) ([]domain.Rate, error)
 	if settings.RateSource == domain.RateSourceNone {
 		return nil, nil
 	}
-	return s.store.Read().Rates.Latest(ctx, settings.RateSource)
+	return s.store.Read().Rates.Latest(ctx, userID, settings.RateSource)
 }
 
 // Currencies returns the currencies the user needs rates of, none when the user has
@@ -160,7 +173,7 @@ func (s *Rates) Set(ctx context.Context, userID int64, currency, date, rate stri
 		return err
 	}
 	r.Manual = true
-	return s.store.Write().Rates.Set(ctx, []domain.Rate{r}, s.clock.Now())
+	return s.store.Write().Rates.Set(ctx, userID, []domain.Rate{r}, s.clock.Now())
 }
 
 // Reset replaces the rate of currency on date with the one of the user's rate source,
@@ -186,7 +199,7 @@ func (s *Rates) Reset(ctx context.Context, userID int64, currency, date string) 
 	if len(rates) == 0 {
 		return fmt.Errorf("rate of %s on %s: %w", currency, date, errors.ErrNotFound)
 	}
-	return s.store.Write().Rates.Set(ctx, rates, s.clock.Now())
+	return s.store.Write().Rates.Set(ctx, userID, rates, s.clock.Now())
 }
 
 // Preview returns the daily rates Import would store from a CSV file, each with the
@@ -204,7 +217,7 @@ func (s *Rates) Preview(ctx context.Context, userID int64, r io.Reader) ([]domai
 			j++
 		}
 		group := rates[i:j]
-		stored, err := s.store.Read().Rates.List(ctx, src, group[0].Currency,
+		stored, err := s.store.Read().Rates.List(ctx, userID, src, group[0].Currency,
 			domain.DateRange{From: group[0].Date, To: group[len(group)-1].Date})
 		if err != nil {
 			return nil, err
@@ -234,7 +247,7 @@ func (s *Rates) Import(ctx context.Context, userID int64, r io.Reader) (int, err
 		return 0, err
 	}
 	if err := s.store.InTx(ctx, func(r repository.Repos) error {
-		return r.Rates.Set(ctx, rates, s.clock.Now())
+		return r.Rates.Set(ctx, userID, rates, s.clock.Now())
 	}); err != nil {
 		return 0, err
 	}

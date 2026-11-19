@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -255,6 +256,17 @@ func TestRuleSetApplyAgain(t *testing.T) {
 	again, changed := rs.Apply(out)
 	assert.False(t, changed, "the note and the tag are not repeated")
 	assert.Equal(t, out, again)
+
+	// a note merely ending or starting with the text gets it as a word of its own
+	out, _ = rs.Apply(domain.OperationInput{
+		Type: domain.OpExpense, CategoryID: 10, Amount: money.FromInt(1), Note: "big:lunch#food",
+	})
+	assert.Equal(t, "big: big:lunch#food #food", out.Note)
+
+	// a note over the limit is not made, as the operation would not validate
+	long := strings.Repeat("x", domain.MaxTextLen-3)
+	out, _ = rs.Apply(domain.OperationInput{Type: domain.OpExpense, CategoryID: 10, Amount: money.FromInt(1), Note: long})
+	assert.Equal(t, long, out.Note)
 
 	// a tag over the limit is not added, as the operation would not validate
 	full := []string{"t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10"}

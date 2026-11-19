@@ -54,21 +54,21 @@ func TestLoginSessions(t *testing.T) {
 	assert.Equal(t, u.ID, got.ID)
 	token := in.Token
 
-	require.NoError(t, svc.SetPasswordByLogin(ctx, "alice", "password5678"))
+	require.NoError(t, svc.SetPasswordByLogin(ctx, "alice", "password5678", false))
 	_, err = svc.SessionUser(ctx, token)
 	require.ErrorIs(t, err, errors.ErrUnauthorized, "password change ends sessions")
 
 	in, err = svc.Login(ctx, "alice", "password5678", "Firefox")
 	require.NoError(t, err)
 	token = in.Token
-	_, err = svc.ChangePassword(ctx, u.ID, "password1234", "password9012", "Firefox")
+	_, err = svc.ChangePassword(ctx, u.ID, "password1234", "password9012", "Firefox", false)
 	require.ErrorIs(t, err, errors.ErrUnauthorized)
-	_, err = svc.ChangePassword(ctx, u.ID, "password5678", "short", "Firefox")
+	_, err = svc.ChangePassword(ctx, u.ID, "password5678", "short", "Firefox", false)
 	require.ErrorIs(t, err, errors.ErrInvalid)
 	_, err = svc.SessionUser(ctx, token)
 	require.NoError(t, err, "failed change keeps sessions")
 
-	newToken, err := svc.ChangePassword(ctx, u.ID, "password5678", "password9012", "Firefox")
+	newToken, err := svc.ChangePassword(ctx, u.ID, "password5678", "password9012", "Firefox", false)
 	require.NoError(t, err)
 	_, err = svc.SessionUser(ctx, token)
 	require.ErrorIs(t, err, errors.ErrUnauthorized, "password change ends other sessions")
@@ -163,6 +163,38 @@ func TestAPIKeys(t *testing.T) {
 	require.Len(t, keys, 1, "revoked key is not listed")
 	assert.Equal(t, writeKey.ID, keys[0].ID)
 	assert.False(t, keys[0].LastUsedAt.IsZero())
+}
+
+func TestPasswordChangeRevokesAPIKeys(t *testing.T) {
+	t.Parallel()
+
+	svc := newServices(t, repotest.New(t)).Auth
+	ctx := t.Context()
+
+	u, err := svc.CreateUser(ctx, "alice", "password1234", "UTC", "user")
+	require.NoError(t, err)
+	token, _, err := svc.CreateAPIKey(ctx, u.ID, "password1234", "script", domain.ScopeRead, "never")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.SetPasswordByLogin(ctx, "alice", "password5678", false))
+	_, err = svc.ChangePassword(ctx, u.ID, "password5678", "password9012", "Firefox", false)
+	require.NoError(t, err)
+	_, err = svc.AuthenticateAPIKey(ctx, token, domain.ScopeRead)
+	require.NoError(t, err, "keys stay unless asked")
+
+	_, err = svc.ChangePassword(ctx, u.ID, "password9012", "password3456", "Firefox", true)
+	require.NoError(t, err)
+	_, err = svc.AuthenticateAPIKey(ctx, token, domain.ScopeRead)
+	require.ErrorIs(t, err, errors.ErrUnauthorized, "change revokes keys")
+
+	token, _, err = svc.CreateAPIKey(ctx, u.ID, "password3456", "script", domain.ScopeRead, "never")
+	require.NoError(t, err)
+	require.NoError(t, svc.SetPasswordByLogin(ctx, "alice", "password7890", true))
+	_, err = svc.AuthenticateAPIKey(ctx, token, domain.ScopeRead)
+	require.ErrorIs(t, err, errors.ErrUnauthorized, "reset revokes keys")
+	keys, err := svc.ListAPIKeys(ctx, u.ID)
+	require.NoError(t, err)
+	assert.Empty(t, keys)
 }
 
 func TestListRevokeSessions(t *testing.T) {
@@ -385,7 +417,7 @@ func TestTwoFactor(t *testing.T) {
 	{
 		in, err := a.Login(ctx, "alice", "password1234", "Firefox")
 		require.NoError(t, err)
-		require.NoError(t, a.SetPassword(ctx, u.ID, "password1234"))
+		require.NoError(t, a.SetPassword(ctx, u.ID, "password1234", false))
 		next()
 		_, err = a.LoginTwoFactor(ctx, in.Token, code(secret))
 		require.ErrorIs(t, err, domain.ErrLoginExpired)

@@ -36,6 +36,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /logout", h.logout)
 }
 
+// loginForm is decoded from the sign-in form.
+type loginForm struct {
+	Login    string `form:"login"`
+	Password string `form:"password"`
+}
+
 func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 	err := kit.Render(h.app, w, r, http.StatusOK, loginPage, kit.Page{Title: "Sign in"}, loginData{}, kit.Failure{})
 	if err != nil {
@@ -45,27 +51,30 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, _maxForm)
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	login, pass := r.PostFormValue("login"), r.PostFormValue("password")
-	errs := kit.FieldsError{}
-	if strings.TrimSpace(login) == "" {
-		errs["login"] = domain.NewError(errors.ErrInvalid, "required")
-	}
-	if pass == "" {
-		errs["password"] = domain.NewError(errors.ErrInvalid, "required")
-	}
-	if len(errs) > 0 {
-		err := kit.Render(h.app, w, r, http.StatusUnprocessableEntity, loginPage, kit.Page{Title: "Sign in"},
-			loginData{Login: login}, kit.Failure{Err: errs, Form: "login"})
+	var f loginForm
+	fail := func(err error) {
+		err = kit.Render(h.app, w, r, http.StatusUnprocessableEntity, loginPage, kit.Page{Title: "Sign in"},
+			loginData{Login: f.Login}, kit.Failure{Err: err, Form: "login"})
 		if err != nil {
 			h.app.ServerError(w, r, err)
 		}
+	}
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		fail(err)
 		return
 	}
-	in, err := h.app.Svc.Auth.Login(r.Context(), login, pass, r.UserAgent())
+	errs := kit.FieldsError{}
+	if strings.TrimSpace(f.Login) == "" {
+		errs["login"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if f.Password == "" {
+		errs["password"] = domain.NewError(errors.ErrInvalid, "required")
+	}
+	if len(errs) > 0 {
+		fail(errs)
+		return
+	}
+	in, err := h.app.Svc.Auth.Login(r.Context(), f.Login, f.Password, r.UserAgent())
 	if err != nil && !kit.IsUserError(err) {
 		h.app.ServerError(w, r, err)
 		return
@@ -74,13 +83,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errors.ErrUnauthorized) {
 			// for fail2ban and alerts; behind a proxy the address is the proxy's
 			h.app.Log.WarnContext(r.Context(), "login failed",
-				slog.String("login", login), slog.String("remote_addr", r.RemoteAddr))
+				slog.String("login", f.Login), slog.String("remote_addr", r.RemoteAddr))
 		}
-		err := kit.Render(h.app, w, r, http.StatusUnprocessableEntity, loginPage, kit.Page{Title: "Sign in"},
-			loginData{Login: login}, kit.Failure{Err: err, Form: "login"})
-		if err != nil {
-			h.app.ServerError(w, r, err)
-		}
+		fail(err)
 		return
 	}
 	if in.TwoFactor {
@@ -106,11 +111,6 @@ func (h *Handler) twoFactorPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) twoFactor(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, _maxForm)
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	code := strings.TrimSpace(r.PostFormValue("code"))
 	fail := func(err error) {
 		err = kit.Render(h.app, w, r, http.StatusUnprocessableEntity, twoFactorPage, kit.Page{Title: "Sign in"},
 			struct{}{}, kit.Failure{Err: kit.FieldsError{"code": err}, Form: "2fa"})
@@ -118,6 +118,14 @@ func (h *Handler) twoFactor(w http.ResponseWriter, r *http.Request) {
 			h.app.ServerError(w, r, err)
 		}
 	}
+	var f struct {
+		Code string `form:"code"`
+	}
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		fail(err)
+		return
+	}
+	code := strings.TrimSpace(f.Code)
 	if code == "" {
 		fail(domain.NewError(errors.ErrInvalid, "required"))
 		return

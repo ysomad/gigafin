@@ -24,11 +24,15 @@ func (r *Plans) List(ctx context.Context, userID int64, month timex.Month) ([]do
 	}
 	out := make([]domain.Plan, len(rows))
 	for i, b := range rows {
+		amount, err := money.FromMinor(b.Amount, b.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("plan %d amount: %w", b.ID, err)
+		}
 		out[i] = domain.Plan{
 			CategoryID: b.CategoryID,
 			Month:      month,
 			Currency:   b.Currency,
-			Amount:     money.FromMinor(b.Amount, b.Currency),
+			Amount:     amount,
 			Repeating:  b.IsRepeating,
 		}
 	}
@@ -49,11 +53,15 @@ func (r *Plans) ListRepeating(ctx context.Context, userID int64, before timex.Mo
 		if err != nil {
 			return nil, fmt.Errorf("plan %d month: %w", b.ID, err)
 		}
+		amount, err := money.FromMinor(b.Amount, b.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("plan %d amount: %w", b.ID, err)
+		}
 		out[i] = domain.Plan{
 			CategoryID: b.CategoryID,
 			Month:      month,
 			Currency:   b.Currency,
-			Amount:     money.FromMinor(b.Amount, b.Currency),
+			Amount:     amount,
 			Repeating:  b.IsRepeating,
 		}
 	}

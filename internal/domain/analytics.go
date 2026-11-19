@@ -54,8 +54,11 @@ type Trend struct {
 	Months   []MonthTotal
 }
 
-// Last returns the totals of the latest month.
+// Last returns the totals of the latest month, zero without months.
 func (t Trend) Last() MonthTotal {
+	if len(t.Months) == 0 {
+		return MonthTotal{}
+	}
 	return t.Months[len(t.Months)-1]
 }
 
@@ -177,8 +180,11 @@ type CategoryTrend struct {
 	Total    money.Amount
 }
 
-// Average returns the total per month.
+// Average returns the total per month, zero without months.
 func (t CategoryTrend) Average() money.Amount {
+	if len(t.Months) == 0 {
+		return money.Amount{}
+	}
 	return t.Total.Div(int64(len(t.Months)))
 }
 

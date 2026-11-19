@@ -425,7 +425,7 @@ func (c *condition) add(v string, cats map[int64]Category) error {
 	case RuleFieldAmount:
 		a, err := money.Parse(v)
 		if err != nil {
-			return NewError(err, "values: %q", v)
+			return NewError(errors.ErrInvalid, "values: %q is not an amount", v)
 		}
 		c.amounts = append(c.amounts, a)
 	case RuleFieldAccount, RuleFieldCategory:
@@ -636,6 +636,22 @@ func (r compiledRule) match(in OperationInput) bool {
 }
 
 // apply does the action a to in and reports whether in changed.
+// joinNote adds value to the end of note, or to the start without atEnd. It is false
+// for a note already ending or starting with value as a word of its own, so running
+// rules again does not repeat it, and for a note over the limit, which would fail the
+// whole operation.
+func joinNote(note, value string, atEnd bool) (string, bool) {
+	joined, done := value+" "+note, strings.HasPrefix(note, value+" ")
+	if atEnd {
+		joined, done = note+" "+value, strings.HasSuffix(note, " "+value)
+	}
+	joined = strings.TrimSpace(joined)
+	if done || note == value || utf8.RuneCountInString(joined) > MaxTextLen {
+		return "", false
+	}
+	return joined, true
+}
+
 func (rs RuleSet) apply(in *OperationInput, a Action) bool {
 	switch a.Type {
 	case ActionSetCategory:
@@ -659,18 +675,12 @@ func (rs RuleSet) apply(in *OperationInput, a Action) bool {
 			return false
 		}
 		in.Note = a.Value
-	// notes already ending or starting with the value are left alone, so running
-	// rules again does not repeat it
-	case ActionAppendNote:
-		if strings.HasSuffix(in.Note, a.Value) {
+	case ActionAppendNote, ActionPrependNote:
+		note, ok := joinNote(in.Note, a.Value, a.Type == ActionAppendNote)
+		if !ok {
 			return false
 		}
-		in.Note = strings.TrimSpace(in.Note + " " + a.Value)
-	case ActionPrependNote:
-		if strings.HasPrefix(in.Note, a.Value) {
-			return false
-		}
-		in.Note = strings.TrimSpace(a.Value + " " + in.Note)
+		in.Note = note
 	case ActionAddTag:
 		// a tag over the limit would fail the whole operation, so it is not added
 		if len(in.Tags) >= MaxTags ||

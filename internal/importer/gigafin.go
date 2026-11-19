@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/text/encoding/unicode"
-
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/money"
@@ -65,89 +63,17 @@ const _gigaFinNotExport domain.Msg = "not a gigafin CSV file"
 //	            not allowed on transfers
 //	tags        optional, tag names separated by ","
 func parseGigaFin(r io.Reader, loc *time.Location) (domain.ParseResult, error) {
-	// drops the byte order mark Excel and banks put in front of UTF-8 files
-	cr := csv.NewReader(unicode.UTF8BOM.NewDecoder().Reader(r))
-	cr.Comma = _gigaFinComma
-	cr.FieldsPerRecord = -1
-	cr.LazyQuotes = true
-	cr.ReuseRecord = true
-
-	var (
-		res domain.ParseResult
-		idx map[string]int
-	)
-	for {
-		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if _, ok := errors.AsType[*csv.ParseError](err); ok {
-			return domain.ParseResult{}, fmt.Errorf("%w: %w", err, errors.ErrInvalid)
-		}
-		if err != nil {
-			return domain.ParseResult{}, fmt.Errorf("read csv: %w", err)
-		}
-		line, _ := cr.FieldPos(0)
-		if idx == nil {
-			if idx, err = gigaFinHeader(rec); err != nil {
-				return domain.ParseResult{}, domain.NewError(err, "line %d", line)
-			}
-			continue
-		}
-		blank := true
-		for _, f := range rec {
-			if strings.TrimSpace(f) != "" {
-				blank = false
-				break
-			}
-		}
-		if blank {
-			continue
-		}
-		row, err := parseGigaFinRow(rec, idx, loc)
-		if err != nil {
-			return domain.ParseResult{}, domain.NewError(err, "line %d", line)
-		}
-		row.Line = line
-		if row.SkipReason != "" {
-			res.Skipped = append(res.Skipped, row)
-			continue
-		}
-		res.Rows = append(res.Rows, row)
-	}
-	if idx == nil {
-		return domain.ParseResult{}, domain.NewError(errors.ErrInvalid, "%s: empty file", _gigaFinNotExport)
-	}
-	if len(res.Rows) == 0 && len(res.Skipped) == 0 {
-		return domain.ParseResult{}, domain.NewError(errors.ErrInvalid, "%s: no operations in file", _gigaFinNotExport)
-	}
-	return res, nil
-}
-
-// gigaFinHeader returns the index of each column by its lower case name.
-func gigaFinHeader(rec []string) (map[string]int, error) {
-	idx := make(map[string]int, len(rec))
-	for i, name := range rec {
-		idx[strings.ToLower(strings.TrimSpace(name))] = i
-	}
-	for _, name := range [...]string{_gigaFinColDate, _gigaFinColAccount, _gigaFinColAmount, _gigaFinColCurrency} {
-		if _, ok := idx[name]; !ok {
-			return nil, domain.NewError(errors.ErrInvalid, "%s: missing column %q", _gigaFinNotExport, name)
-		}
-	}
-	return idx, nil
+	return parseRecords(r, csvFormat{
+		comma: _gigaFinComma, lazyQuotes: true, notFormat: _gigaFinNotExport,
+		required: []string{_gigaFinColDate, _gigaFinColAccount, _gigaFinColAmount, _gigaFinColCurrency},
+	}, loc, func(get func(string) string) (domain.Record, error) {
+		return parseGigaFinRow(get, loc)
+	})
 }
 
 // parseGigaFinRow parses a record. A row with a zero amount has SkipReason set; any other
 // row must have every field valid.
-func parseGigaFinRow(rec []string, idx map[string]int, loc *time.Location) (domain.Record, error) {
-	get := func(name string) string {
-		i, ok := idx[name]
-		if !ok || i >= len(rec) {
-			return ""
-		}
-		return strings.TrimSpace(rec[i])
-	}
+func parseGigaFinRow(get func(column string) string, loc *time.Location) (domain.Record, error) {
 	row := domain.Record{
 		Account:   get(_gigaFinColAccount),
 		ToAccount: get(_gigaFinColToAccount),
@@ -195,7 +121,7 @@ func parseGigaFinRow(rec []string, idx map[string]int, loc *time.Location) (doma
 		return domain.Record{}, fmt.Errorf("%s: %w", _gigaFinColAmount, err)
 	}
 	if row.Amount.IsZero() {
-		row.SkipReason = "zero amount"
+		row.SkipReason = domain.SkipZeroAmount
 		return row, nil
 	}
 	if row.MCC != "" && !domain.ValidMCC(row.MCC) {

@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/cipher"
-	"crypto/rand"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -14,6 +11,7 @@ import (
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/password"
 	"github.com/ysomad/gigafin/internal/repository"
+	"github.com/ysomad/gigafin/internal/secretbox"
 	"github.com/ysomad/gigafin/internal/timex"
 	"github.com/ysomad/gigafin/internal/totp"
 )
@@ -34,9 +32,9 @@ type Auth struct {
 	clock   timex.Clock
 	log     *slog.Logger
 	session domain.SessionLifetime
-	// aead encrypts TOTP secrets, nil without a key, which disables setting up
+	// box encrypts TOTP secrets, nil without a key, which disables setting up
 	// two-factor authentication
-	aead cipher.AEAD
+	box *secretbox.Box
 }
 
 // CreateUser creates a user with role.
@@ -94,8 +92,9 @@ func (s *Auth) SetRoleByLogin(ctx context.Context, login, role string) error {
 	return nil
 }
 
-// SetPasswordByLogin sets the password of a user and ends all their sessions.
-func (s *Auth) SetPasswordByLogin(ctx context.Context, login, pass string) error {
+// SetPasswordByLogin sets the password of a user and ends all their sessions, revoking
+// their API keys too when revokeKeys is set.
+func (s *Auth) SetPasswordByLogin(ctx context.Context, login, pass string, revokeKeys bool) error {
 	login, err := domain.ParseLogin(login)
 	if err != nil {
 		return err
@@ -106,11 +105,12 @@ func (s *Auth) SetPasswordByLogin(ctx context.Context, login, pass string) error
 		return err
 	}
 
-	return s.SetPassword(ctx, c.User.ID, pass)
+	return s.SetPassword(ctx, c.User.ID, pass, revokeKeys)
 }
 
-// SetPassword sets the password of a user and ends all their sessions.
-func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error {
+// SetPassword sets the password of a user and ends all their sessions, revoking their
+// API keys too when revokeKeys is set.
+func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string, revokeKeys bool) error {
 	if err := domain.CheckPasswordPolicy(pass); err != nil {
 		return domain.NewError(err, "password")
 	}
@@ -120,13 +120,19 @@ func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error
 		return err
 	}
 
+	now := s.clock.Now()
 	err = s.store.InTx(ctx, func(r repository.Repos) error {
-		if err := r.Users.SetPassword(ctx, userID, hash, s.clock.Now()); err != nil {
+		if err := r.Users.SetPassword(ctx, userID, hash, now); err != nil {
 			return err
 		}
 		// a sign-in that passed the old password must not finish
 		if err := r.Challenges.DeleteForUser(ctx, userID); err != nil {
 			return err
+		}
+		if revokeKeys {
+			if err := r.APIKeys.RevokeAll(ctx, userID, now); err != nil {
+				return err
+			}
 		}
 		return r.Sessions.DeleteForUser(ctx, userID)
 	})
@@ -134,7 +140,8 @@ func (s *Auth) SetPassword(ctx context.Context, userID int64, pass string) error
 		return err
 	}
 
-	s.log.InfoContext(ctx, "password set, sessions ended", slog.Int64("user_id", userID))
+	s.log.InfoContext(ctx, "password set, sessions ended",
+		slog.Int64("user_id", userID), slog.Bool("api_keys_revoked", revokeKeys))
 	return nil
 }
 
@@ -158,9 +165,12 @@ func (s *Auth) CheckPassword(ctx context.Context, userID int64, pass string) err
 }
 
 // ChangePassword checks the current password, sets a new one and ends all sessions of
-// the user, then starts a new one for the browser identified by userAgent. It returns
-// the new session token to put in a cookie.
-func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, userAgent string) (string, error) {
+// the user, revoking their API keys too when revokeKeys is set, then starts a new
+// session for the browser identified by userAgent. It returns the new session token to
+// put in a cookie.
+func (s *Auth) ChangePassword(
+	ctx context.Context, userID int64, current, pass, userAgent string, revokeKeys bool,
+) (string, error) {
 	if err := s.CheckPassword(ctx, userID, current); err != nil {
 		return "", err
 	}
@@ -189,6 +199,11 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 		if err := r.Challenges.DeleteForUser(ctx, userID); err != nil {
 			return err
 		}
+		if revokeKeys {
+			if err := r.APIKeys.RevokeAll(ctx, userID, now); err != nil {
+				return err
+			}
+		}
 		if err := r.Sessions.DeleteForUser(ctx, userID); err != nil {
 			return err
 		}
@@ -198,7 +213,8 @@ func (s *Auth) ChangePassword(ctx context.Context, userID int64, current, pass, 
 		return "", err
 	}
 
-	s.log.InfoContext(ctx, "password changed, other sessions ended", slog.Int64("user_id", userID))
+	s.log.InfoContext(ctx, "password changed, other sessions ended",
+		slog.Int64("user_id", userID), slog.Bool("api_keys_revoked", revokeKeys))
 	return tok.Token, nil
 }
 
@@ -348,7 +364,7 @@ func (s *Auth) useSecondFactor(
 	if len(cred.TOTPSecret) == 0 {
 		return false, errTwoFactorOff
 	}
-	if s.aead != nil {
+	if s.box != nil {
 		secret, err := s.openTOTP(cred.User.ID, cred.TOTPSecret)
 		if err != nil {
 			return false, err
@@ -389,9 +405,9 @@ func (s *Auth) TwoFactor(ctx context.Context, userID int64) (domain.TwoFactor, e
 	if err != nil {
 		return domain.TwoFactor{}, err
 	}
-	state := domain.TwoFactor{Available: s.aead != nil}
+	state := domain.TwoFactor{Available: s.box != nil}
 	if len(c.TOTPSecret) == 0 {
-		if len(c.TOTPPendingSecret) > 0 && s.aead != nil {
+		if len(c.TOTPPendingSecret) > 0 && s.box != nil {
 			if state.PendingSecret, err = s.openTOTP(userID, c.TOTPPendingSecret); err != nil {
 				return domain.TwoFactor{}, err
 			}
@@ -410,7 +426,7 @@ func (s *Auth) TwoFactor(ctx context.Context, userID int64) (domain.TwoFactor, e
 // replacing one set up before, and returns it to show in the authenticator app. It is
 // kept on the server, so EnableTwoFactor turns on the secret the user was shown.
 func (s *Auth) SetupTwoFactor(ctx context.Context, userID int64) (string, error) {
-	if s.aead == nil {
+	if s.box == nil {
 		return "", errTwoFactorUnavailable
 	}
 	secret, err := totp.NewSecret()
@@ -447,7 +463,7 @@ func (s *Auth) EnableTwoFactor(
 	if err := s.CheckPassword(ctx, userID, pass); err != nil {
 		return nil, "", err
 	}
-	if s.aead == nil {
+	if s.box == nil {
 		return nil, "", errTwoFactorUnavailable
 	}
 
@@ -625,24 +641,13 @@ func recoveryTokens(tokens []credential.Token) []string {
 
 // sealTOTP encrypts a TOTP secret of the user; the user id binds it to the row.
 func (s *Auth) sealTOTP(userID int64, secret string) ([]byte, error) {
-	nonce := make([]byte, s.aead.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("totp secret nonce: %w", err)
-	}
-	return s.aead.Seal(nonce, nonce, []byte(secret), []byte("totp:"+strconv.FormatInt(userID, 10))), nil
+	return s.box.Seal("totp:"+strconv.FormatInt(userID, 10), []byte(secret))
 }
 
 // openTOTP decrypts a secret sealed by sealTOTP.
 func (s *Auth) openTOTP(userID int64, sealed []byte) (string, error) {
-	n := s.aead.NonceSize()
-	if len(sealed) < n {
-		return "", errors.Error("totp secret: too short")
-	}
-	b, err := s.aead.Open(nil, sealed[:n], sealed[n:], []byte("totp:"+strconv.FormatInt(userID, 10)))
-	if err != nil {
-		return "", fmt.Errorf("open totp secret: %w", err)
-	}
-	return string(b), nil
+	b, err := s.box.Open("totp:"+strconv.FormatInt(userID, 10), sealed)
+	return string(b), err
 }
 
 // SessionUser returns the user of a live session or errors.ErrUnauthorized, and

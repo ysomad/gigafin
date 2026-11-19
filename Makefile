@@ -62,8 +62,8 @@ user-add: build-cli
 	$(DOTENV) DB_PATH=$(DB) ./bin/gigafin-cli user add -login $(login) -role $(or $(role),user)$(if $(p), -p '$(p)')
 
 user-passwd: build-cli
-	@test -n "$(login)" || (echo "usage: make user-passwd login=<login> [p=<password>]" && exit 1)
-	$(DOTENV) DB_PATH=$(DB) ./bin/gigafin-cli user passwd -login $(login)$(if $(p), -p '$(p)')
+	@test -n "$(login)" || (echo "usage: make user-passwd login=<login> [p=<password>] [revoke_keys=1]" && exit 1)
+	$(DOTENV) DB_PATH=$(DB) ./bin/gigafin-cli user passwd -login $(login)$(if $(p), -p '$(p)')$(if $(revoke_keys), -revoke-keys)
 
 user-role: build-cli
 	@test -n "$(login)" -a -n "$(role)" || (echo "usage: make user-role login=<login> role=<user|admin>" && exit 1)

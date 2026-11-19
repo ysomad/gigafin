@@ -29,6 +29,29 @@ func ImportSources() []ImportSource {
 	return []ImportSource{ImportSourceGigaFin, ImportSourceTBank, ImportSourceZenMoney}
 }
 
+// SkipReason is why a row of a file is not imported. Its values are messages, shown
+// translated.
+type SkipReason string
+
+const (
+	SkipZeroAmount         SkipReason = "zero amount"
+	SkipNotCompleted       SkipReason = "not completed"
+	SkipSameAccount        SkipReason = "outcome and income on one account"
+	SkipTransferCurrencies SkipReason = "transfer between currencies"
+	SkipTransferAmounts    SkipReason = "transfer amounts differ"
+)
+
+// Instants reports whether the times of the source are instants, such as those a bank
+// API sends, rather than the wall clock of the user.
+func (s ImportSource) Instants() bool {
+	switch s {
+	case ImportSourceTBank:
+		return true
+	default:
+		return false
+	}
+}
+
 // ParseImportSource validates an import source string.
 func ParseImportSource(s string) (ImportSource, error) {
 	src := ImportSource(s)
@@ -88,7 +111,11 @@ type Record struct {
 	// Tags are tag names, validated when the record is committed.
 	Tags []string `json:"tags,omitempty"`
 	// SkipReason is set on rows that are not imported.
-	SkipReason string `json:"skip_reason,omitempty"`
+	SkipReason SkipReason `json:"skip_reason,omitempty"`
+	// SkipCause is what the source gave for SkipReason, as it gave it, such as the
+	// status of an operation the bank did not complete; empty when there is nothing
+	// more to show.
+	SkipCause string `json:"skip_cause,omitempty"`
 	// ExternalID is the id of the operation at the source, empty when the source has
 	// none. A row with the id of an imported row is a duplicate whatever else changed.
 	ExternalID string `json:"external_id,omitempty"`
@@ -118,11 +145,11 @@ func (r Record) Kind() Kind {
 // Hash identifies a row across uploads. n is the occurrence of identical rows in the
 // file, so two equal purchases in one export both import.
 func (r Record) Hash(src ImportSource, n int) string {
-	// T-Bank times are instants. Other sources give the wall clock of the user, so a
-	// change of the user time zone must not change their hashes.
-	at := r.Time.UTC().Format(time.RFC3339)
-	if src != ImportSourceTBank {
-		at = r.Time.Format(time.DateTime)
+	// the wall clock of the user is hashed as it is, so a change of the user time zone
+	// does not change the hashes
+	at := r.Time.Format(time.DateTime)
+	if src.Instants() {
+		at = r.Time.UTC().Format(time.RFC3339)
 	}
 	parts := []string{
 		string(src),

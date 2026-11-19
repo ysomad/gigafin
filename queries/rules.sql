@@ -15,6 +15,9 @@ SELECT * FROM rules WHERE id = ? AND user_id = ?;
 -- name: ListRules :many
 SELECT * FROM rules WHERE user_id = ? ORDER BY id;
 
+-- name: CountRules :one
+SELECT COUNT(*) FROM rules WHERE user_id = ?;
+
 -- name: DeleteRule :execrows
 DELETE FROM rules WHERE id = ? AND user_id = ?;
 

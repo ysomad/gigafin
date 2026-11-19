@@ -154,7 +154,7 @@ func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		// a failing bank is not a fault of this server
 		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
-		h.app.SetNotice(w, kit.T(ctx, "Sync failed: %s", err.Error()))
+		h.app.SetNotice(w, kit.T(ctx, "Sync failed. Try again later."))
 	} else {
 		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
 	}

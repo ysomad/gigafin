@@ -95,8 +95,8 @@ templ accountsStep(d wizardData, base string) {
 							<td>
 								<input type="hidden" name="acc_name" value={ a.Name }/>
 								<input type="hidden" name="acc_currency" value={ a.Currency }/>
-								<strong>{ a.Name }</strong>
-								<div class="text-light">{ money.CurrencySymbol(a.Currency) } · { kit.T(ctx, "%d rows", a.Rows) }</div>
+								<strong>{ a.Name }</strong> <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span>
+								<div class="text-light">{ kit.T(ctx, "%d rows", a.Rows) }</div>
 							</td>
 							<td>
 								<select name="acc_id" aria-label={ kit.T(ctx, "Account") }>
@@ -318,7 +318,12 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 									—
 								}
 							</td>
-							<td>{ kit.T(ctx, r.SkipReason) }</td>
+							<td>
+								{ kit.T(ctx, string(r.SkipReason)) }
+								if r.SkipCause != "" {
+									<span class="text-light">{ r.SkipCause }</span>
+								}
+							</td>
 						</tr>
 					}
 				</tbody>

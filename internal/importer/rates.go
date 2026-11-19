@@ -1,13 +1,11 @@
 package importer
 
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/shopspring/decimal"
-	"golang.org/x/text/encoding/unicode"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -21,6 +19,9 @@ const (
 	_ratesColTo   = "to"
 	_ratesColRate = "rate"
 )
+
+// _ratesNotFile starts errors of files of another format.
+const _ratesNotFile domain.Msg = "not a rates CSV file"
 
 // RatesHeader is the header of a rates file.
 const RatesHeader = _ratesColDate + "," + _ratesColFrom + "," + _ratesColTo + "," + _ratesColRate
@@ -37,61 +38,17 @@ const RatesHeader = _ratesColDate + "," + _ratesColFrom + "," + _ratesColTo + ",
 // One side of each row must be the pivot currency of source. Errors are of kind
 // errors.ErrInvalid except reading failures.
 func ParseRates(source domain.RateSource, r io.Reader) ([]domain.Rate, error) {
-	cr := csv.NewReader(unicode.UTF8BOM.NewDecoder().Reader(r))
-	cr.FieldsPerRecord = -1
-	cr.ReuseRecord = true
-
-	var (
-		rates []domain.Rate
-		idx   map[string]int
-	)
-	for {
-		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if _, ok := errors.AsType[*csv.ParseError](err); ok {
-			return nil, fmt.Errorf("%w: %w", err, errors.ErrInvalid)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read csv: %w", err)
-		}
-		line, _ := cr.FieldPos(0)
-		if idx == nil {
-			idx = make(map[string]int, len(rec))
-			for i, name := range rec {
-				idx[strings.ToLower(strings.TrimSpace(name))] = i
-			}
-			for _, name := range [...]string{_ratesColDate, _ratesColFrom, _ratesColTo, _ratesColRate} {
-				if _, ok := idx[name]; !ok {
-					return nil, domain.NewError(
-						errors.ErrInvalid,
-						"line %d: missing column %q, the header must be %q",
-						line,
-						name,
-						RatesHeader,
-					)
-				}
-			}
-			continue
-		}
-		get := func(name string) string {
-			if i := idx[name]; i < len(rec) {
-				return strings.TrimSpace(rec[i])
-			}
-			return ""
-		}
-		if get(_ratesColDate) == "" && get(_ratesColFrom) == "" && get(_ratesColTo) == "" &&
-			get(_ratesColRate) == "" {
-			continue
-		}
+	var rates []domain.Rate
+	err := readCSV(r, csvFormat{
+		comma: ',', notFormat: _ratesNotFile, required: []string{_ratesColDate, _ratesColFrom, _ratesColTo, _ratesColRate},
+	}, func(line int, get func(string) string) error {
 		date, err := timex.ParseDate(get(_ratesColDate))
 		if err != nil {
-			return nil, fmt.Errorf("line %d: %s: %w", line, _ratesColDate, err)
+			return fmt.Errorf("line %d: %s: %w", line, _ratesColDate, err)
 		}
 		v, err := decimal.NewFromString(get(_ratesColRate))
 		if err != nil {
-			return nil, domain.NewError(
+			return domain.NewError(
 				errors.ErrInvalid,
 				"line %d: %s: %q is not a number",
 				line,
@@ -102,9 +59,13 @@ func ParseRates(source domain.RateSource, r io.Reader) ([]domain.Rate, error) {
 		rate, err := domain.NewRate(source, strings.ToUpper(get(_ratesColFrom)),
 			strings.ToUpper(get(_ratesColTo)), date, v)
 		if err != nil {
-			return nil, domain.NewError(err, "line %d", line)
+			return domain.NewError(err, "line %d", line)
 		}
 		rates = append(rates, rate)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	if len(rates) == 0 {
 		return nil, domain.NewError(errors.ErrInvalid, "no rates in file, the header must be %q", RatesHeader)

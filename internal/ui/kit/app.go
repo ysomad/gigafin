@@ -244,6 +244,16 @@ func Render[T any](
 	if err := page(v, d).Render(ctx, &buf); err != nil {
 		return fmt.Errorf("render %s: %w", r.URL.Path, err)
 	}
+	// a field error no input shows, a key the handler and the template disagree on,
+	// would leave the form failing without a word, so it is shown as a toast
+	if unread := v.Errors.Unread(); len(unread) > 0 {
+		a.Log.WarnContext(ctx, "field errors not shown", slog.Any("error", fail.Err))
+		v.Errors.Toast = strings.Join(unread, "; ")
+		buf.Reset()
+		if err := page(v, d).Render(ctx, &buf); err != nil {
+			return fmt.Errorf("render %s: %w", r.URL.Path, err)
+		}
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")

@@ -83,6 +83,15 @@ type Operation struct {
 	UpdatedAt time.Time
 }
 
+// Equal reports whether o and other are the same operation with the same data, when
+// and how they were created aside.
+func (o Operation) Equal(other Operation) bool {
+	return o.ID == other.ID && o.Type == other.Type && o.AccountID == other.AccountID &&
+		o.ToAccountID == other.ToAccountID && o.CategoryID == other.CategoryID && o.OriginID == other.OriginID &&
+		o.Amount.Equal(other.Amount) && o.Date.Equal(other.Date) && o.Time == other.Time &&
+		o.Payee == other.Payee && o.Note == other.Note && slices.Equal(o.Tags, other.Tags)
+}
+
 // IsSplit reports whether the operation is a part of a split.
 func (o Operation) IsSplit() bool {
 	return o.OriginID != 0

@@ -1,17 +1,17 @@
 -- +goose Up
 CREATE TABLE users (
-    id            INTEGER PRIMARY KEY,
-    login         TEXT    NOT NULL UNIQUE,
-    password_hash TEXT    NOT NULL,
-    timezone      TEXT    NOT NULL,
-    role          TEXT    NOT NULL,
+    id                  INTEGER PRIMARY KEY,
+    login               TEXT    NOT NULL UNIQUE,
+    password_hash       TEXT    NOT NULL,
+    timezone            TEXT    NOT NULL,
+    role                TEXT    NOT NULL,
     -- TOTP two-factor authentication, NULL when off; secrets are encrypted
     totp_secret         BLOB,
     totp_pending_secret BLOB,
     totp_last_step      INTEGER,
     totp_enabled_at     INTEGER,
-    created_at    INTEGER NOT NULL,
-    updated_at    INTEGER
+    created_at          INTEGER NOT NULL,
+    updated_at          INTEGER
 ) STRICT;
 
 CREATE TABLE user_settings (
@@ -37,7 +37,7 @@ CREATE TABLE sessions (
 ) STRICT;
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
-CREATE INDEX sessions_token_hash_idx ON sessions (token_hash);
+CREATE UNIQUE INDEX sessions_token_hash_idx ON sessions (token_hash);
 
 CREATE TABLE recovery_codes (
     id         INTEGER PRIMARY KEY,
@@ -60,7 +60,7 @@ CREATE TABLE login_challenges (
 ) STRICT;
 
 CREATE INDEX login_challenges_user_id_idx ON login_challenges (user_id);
-CREATE INDEX login_challenges_token_hash_idx ON login_challenges (token_hash);
+CREATE UNIQUE INDEX login_challenges_token_hash_idx ON login_challenges (token_hash);
 
 CREATE TABLE api_keys (
     id           INTEGER PRIMARY KEY,
@@ -76,7 +76,7 @@ CREATE TABLE api_keys (
 ) STRICT;
 
 CREATE INDEX api_keys_user_id_idx ON api_keys (user_id);
-CREATE INDEX api_keys_prefix_idx ON api_keys (prefix);
+CREATE UNIQUE INDEX api_keys_prefix_idx ON api_keys (prefix);
 
 CREATE TABLE accounts (
     id           INTEGER PRIMARY KEY,
@@ -302,6 +302,7 @@ CREATE TABLE rules (
 CREATE INDEX rules_user_id_idx ON rules (user_id);
 
 CREATE TABLE exchange_rates (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     source     TEXT    NOT NULL,
     currency   TEXT    NOT NULL,
     date       TEXT    NOT NULL,
@@ -309,7 +310,7 @@ CREATE TABLE exchange_rates (
     is_manual  INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER,
-    PRIMARY KEY (source, currency, date)
+    PRIMARY KEY (user_id, source, currency, date)
 ) STRICT;
 
 CREATE VIEW account_balances AS

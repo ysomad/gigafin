@@ -12,10 +12,11 @@ import (
 const getRateBounds = `-- name: GetRateBounds :one
 SELECT CAST(COALESCE(MIN(date), '') AS TEXT) AS first_date, CAST(COALESCE(MAX(date), '') AS TEXT) AS last_date
 FROM exchange_rates
-WHERE source = ? AND currency = ?
+WHERE user_id = ? AND source = ? AND currency = ?
 `
 
 type GetRateBoundsParams struct {
+	UserID   int64
 	Source   string
 	Currency string
 }
@@ -26,24 +27,32 @@ type GetRateBoundsRow struct {
 }
 
 func (q *Queries) GetRateBounds(ctx context.Context, arg GetRateBoundsParams) (GetRateBoundsRow, error) {
-	row := q.db.QueryRowContext(ctx, getRateBounds, arg.Source, arg.Currency)
+	row := q.db.QueryRowContext(ctx, getRateBounds, arg.UserID, arg.Source, arg.Currency)
 	var i GetRateBoundsRow
 	err := row.Scan(&i.FirstDate, &i.LastDate)
 	return i, err
 }
 
 const listLatestRates = `-- name: ListLatestRates :many
-SELECT r.source, r.currency, r.date, r.rate, r.is_manual, r.created_at, r.updated_at
+SELECT r.user_id, r.source, r.currency, r.date, r.rate, r.is_manual, r.created_at, r.updated_at
 FROM exchange_rates AS r
 JOIN (
-    SELECT x.currency, MAX(x.date) AS date FROM exchange_rates AS x WHERE x.source = ?1 GROUP BY x.currency
+    SELECT x.currency, MAX(x.date) AS date
+    FROM exchange_rates AS x
+    WHERE x.user_id = ?1 AND x.source = ?2
+    GROUP BY x.currency
 ) AS l ON l.currency = r.currency AND l.date = r.date
-WHERE r.source = ?1
+WHERE r.user_id = ?1 AND r.source = ?2
 ORDER BY r.currency
 `
 
-func (q *Queries) ListLatestRates(ctx context.Context, source string) ([]ExchangeRate, error) {
-	rows, err := q.db.QueryContext(ctx, listLatestRates, source)
+type ListLatestRatesParams struct {
+	UserID int64
+	Source string
+}
+
+func (q *Queries) ListLatestRates(ctx context.Context, arg ListLatestRatesParams) ([]ExchangeRate, error) {
+	rows, err := q.db.QueryContext(ctx, listLatestRates, arg.UserID, arg.Source)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +61,7 @@ func (q *Queries) ListLatestRates(ctx context.Context, source string) ([]Exchang
 	for rows.Next() {
 		var i ExchangeRate
 		if err := rows.Scan(
+			&i.UserID,
 			&i.Source,
 			&i.Currency,
 			&i.Date,
@@ -125,12 +135,13 @@ func (q *Queries) ListRateUsers(ctx context.Context) ([]ListRateUsersRow, error)
 }
 
 const listRates = `-- name: ListRates :many
-SELECT source, currency, date, rate, is_manual, created_at, updated_at FROM exchange_rates
-WHERE source = ? AND currency = ? AND date >= ?3 AND date <= ?4
+SELECT user_id, source, currency, date, rate, is_manual, created_at, updated_at FROM exchange_rates
+WHERE user_id = ? AND source = ? AND currency = ? AND date >= ?4 AND date <= ?5
 ORDER BY date
 `
 
 type ListRatesParams struct {
+	UserID   int64
 	Source   string
 	Currency string
 	FromDate string
@@ -139,6 +150,7 @@ type ListRatesParams struct {
 
 func (q *Queries) ListRates(ctx context.Context, arg ListRatesParams) ([]ExchangeRate, error) {
 	rows, err := q.db.QueryContext(ctx, listRates,
+		arg.UserID,
 		arg.Source,
 		arg.Currency,
 		arg.FromDate,
@@ -152,6 +164,7 @@ func (q *Queries) ListRates(ctx context.Context, arg ListRatesParams) ([]Exchang
 	for rows.Next() {
 		var i ExchangeRate
 		if err := rows.Scan(
+			&i.UserID,
 			&i.Source,
 			&i.Currency,
 			&i.Date,
@@ -174,13 +187,14 @@ func (q *Queries) ListRates(ctx context.Context, arg ListRatesParams) ([]Exchang
 }
 
 const upsertRate = `-- name: UpsertRate :exec
-INSERT INTO exchange_rates (source, currency, date, rate, is_manual, created_at)
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT (source, currency, date) DO UPDATE SET
+INSERT INTO exchange_rates (user_id, source, currency, date, rate, is_manual, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (user_id, source, currency, date) DO UPDATE SET
     rate = excluded.rate, is_manual = excluded.is_manual, updated_at = excluded.created_at
 `
 
 type UpsertRateParams struct {
+	UserID    int64
 	Source    string
 	Currency  string
 	Date      string
@@ -191,6 +205,7 @@ type UpsertRateParams struct {
 
 func (q *Queries) UpsertRate(ctx context.Context, arg UpsertRateParams) error {
 	_, err := q.db.ExecContext(ctx, upsertRate,
+		arg.UserID,
 		arg.Source,
 		arg.Currency,
 		arg.Date,
@@ -202,13 +217,14 @@ func (q *Queries) UpsertRate(ctx context.Context, arg UpsertRateParams) error {
 }
 
 const upsertSyncedRate = `-- name: UpsertSyncedRate :exec
-INSERT INTO exchange_rates (source, currency, date, rate, is_manual, created_at)
-VALUES (?, ?, ?, ?, 0, ?)
-ON CONFLICT (source, currency, date) DO UPDATE SET rate = excluded.rate, updated_at = excluded.created_at
+INSERT INTO exchange_rates (user_id, source, currency, date, rate, is_manual, created_at)
+VALUES (?, ?, ?, ?, ?, 0, ?)
+ON CONFLICT (user_id, source, currency, date) DO UPDATE SET rate = excluded.rate, updated_at = excluded.created_at
 WHERE exchange_rates.is_manual = 0 AND exchange_rates.rate <> excluded.rate
 `
 
 type UpsertSyncedRateParams struct {
+	UserID    int64
 	Source    string
 	Currency  string
 	Date      string
@@ -219,6 +235,7 @@ type UpsertSyncedRateParams struct {
 // keeps manual rates and the updated_at of unchanged ones
 func (q *Queries) UpsertSyncedRate(ctx context.Context, arg UpsertSyncedRateParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSyncedRate,
+		arg.UserID,
 		arg.Source,
 		arg.Currency,
 		arg.Date,

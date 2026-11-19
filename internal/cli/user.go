@@ -92,9 +92,14 @@ func userTwoFactorOff(ctx context.Context, cfg config.Config, log *slog.Logger, 
 
 func userPasswd(ctx context.Context, cfg config.Config, log *slog.Logger, args []string) error {
 	fs := flag.NewFlagSet("user passwd", flag.ContinueOnError)
+	revokeKeys := fs.Bool("revoke-keys", false, "revoke all API keys of the user too")
 	return userCommand(ctx, cfg, log, fs, args, "New password: ", func(a *service.Auth, login, pass string) error {
-		if err := a.SetPasswordByLogin(ctx, login, pass); err != nil {
+		if err := a.SetPasswordByLogin(ctx, login, pass, *revokeKeys); err != nil {
 			return err
+		}
+		if *revokeKeys {
+			fmt.Printf("password of %q changed, sessions ended, API keys revoked\n", login)
+			return nil
 		}
 		fmt.Printf("password of %q changed, sessions ended\n", login)
 		return nil

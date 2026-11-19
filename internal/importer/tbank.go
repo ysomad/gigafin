@@ -1,14 +1,10 @@
 package importer
 
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/text/encoding/unicode"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -54,105 +50,20 @@ func parseTBank(r io.Reader, loc *time.Location) (domain.ParseResult, error) {
 	if err != nil {
 		msk = time.FixedZone("MSK", int((3 * time.Hour).Seconds()))
 	}
-	// drops the byte order mark in front of the file
-	cr := csv.NewReader(unicode.UTF8BOM.NewDecoder().Reader(r))
-	cr.Comma = _tbankComma
-	cr.FieldsPerRecord = -1
-	cr.LazyQuotes = true
-	cr.ReuseRecord = true
-
-	var (
-		res domain.ParseResult
-		idx map[string]int
-	)
-	for {
-		rec, err := cr.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if _, ok := errors.AsType[*csv.ParseError](err); ok {
-			return domain.ParseResult{}, fmt.Errorf("%w: %w", err, errors.ErrInvalid)
-		}
-		if err != nil {
-			return domain.ParseResult{}, fmt.Errorf("read csv: %w", err)
-		}
-		line, _ := cr.FieldPos(0)
-		if len(rec) > 0 && strings.TrimSpace(strings.TrimPrefix(rec[0], "\ufeff")) == _tbankColAccount {
-			idx, err = tbankHeader(rec)
-			if err != nil {
-				return domain.ParseResult{}, domain.NewError(err, "line %d", line)
-			}
-			continue
-		}
-		if idx == nil {
-			return domain.ParseResult{}, domain.NewError(
-				errors.ErrInvalid,
-				"line %d: %s: header %q not found",
-				line,
-				_tbankNotExport,
-				_tbankColAccount,
-			)
-		}
-		blank := true
-		for _, f := range rec {
-			if strings.TrimSpace(f) != "" {
-				blank = false
-				break
-			}
-		}
-		if blank {
-			continue
-		}
-		row, err := parseTBankRow(rec, idx, msk)
-		if err != nil {
-			return domain.ParseResult{}, domain.NewError(err, "line %d", line)
-		}
-		row.Line = line
-		if !row.Time.IsZero() {
-			row.Time = row.Time.In(loc)
-		}
-		if row.SkipReason != "" {
-			res.Skipped = append(res.Skipped, row)
-			continue
-		}
-		res.Rows = append(res.Rows, row)
-	}
-	if idx == nil {
-		return domain.ParseResult{}, domain.NewError(errors.ErrInvalid, "%s: empty file", _tbankNotExport)
-	}
-	if len(res.Rows) == 0 && len(res.Skipped) == 0 {
-		return domain.ParseResult{}, domain.NewError(errors.ErrInvalid, "%s: no operations in file", _tbankNotExport)
-	}
-	return res, nil
-}
-
-func tbankHeader(rec []string) (map[string]int, error) {
-	idx := make(map[string]int, len(rec))
-	for i, name := range rec {
-		idx[strings.TrimSpace(strings.TrimPrefix(name, "\ufeff"))] = i
-	}
-	required := [...]string{
-		_tbankColAccount, _tbankColTime, _tbankColAmount, _tbankColCurrency, _tbankColStatus,
-		_tbankColCategory, _tbankColDescription,
-	}
-	for _, name := range required {
-		if _, ok := idx[name]; !ok {
-			return nil, domain.NewError(errors.ErrInvalid, "%s: missing column %q", _tbankNotExport, name)
-		}
-	}
-	return idx, nil
+	return parseRecords(r, csvFormat{
+		comma: _tbankComma, lazyQuotes: true, notFormat: _tbankNotExport, repeatedHeader: true,
+		required: []string{
+			_tbankColAccount, _tbankColTime, _tbankColAmount, _tbankColCurrency, _tbankColStatus,
+			_tbankColCategory, _tbankColDescription,
+		},
+	}, loc, func(get func(string) string) (domain.Record, error) {
+		return parseTBankRow(get, msk)
+	})
 }
 
 // parseTBankRow parses a record. A row that will not be imported has SkipReason set and
 // never fails; a successful row must have every field valid.
-func parseTBankRow(rec []string, idx map[string]int, loc *time.Location) (domain.Record, error) {
-	get := func(name string) string {
-		i, ok := idx[name]
-		if !ok || i >= len(rec) {
-			return ""
-		}
-		return strings.TrimSpace(rec[i])
-	}
+func parseTBankRow(get func(column string) string, loc *time.Location) (domain.Record, error) {
 	category := get(_tbankColOwnCategory)
 	if category == "" {
 		category = get(_tbankColCategory)
@@ -178,14 +89,14 @@ func parseTBankRow(rec []string, idx map[string]int, loc *time.Location) (domain
 	}
 
 	if status := get(_tbankColStatus); status != _tbankStatusOK {
-		row.SkipReason = "status " + strconv.Quote(status)
+		row.SkipReason, row.SkipCause = domain.SkipNotCompleted, status
 		return row, nil
 	}
 	if amountErr != nil {
 		return domain.Record{}, fmt.Errorf("%s: %w", _tbankColAmount, amountErr)
 	}
 	if amount.IsZero() {
-		row.SkipReason = "zero amount"
+		row.SkipReason = domain.SkipZeroAmount
 		return row, nil
 	}
 	if timeErr != nil {

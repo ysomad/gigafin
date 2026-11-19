@@ -174,3 +174,10 @@ func TestTopPayees(t *testing.T) {
 	assert.Equal(t, "C", top[1].Payee)
 	assert.Equal(t, "D", top[2].Payee)
 }
+
+func TestTrendsWithoutMonths(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, domain.MonthTotal{}, domain.Trend{}.Last())
+	assert.True(t, domain.CategoryTrend{}.Average().IsZero())
+}

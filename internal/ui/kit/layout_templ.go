@@ -161,7 +161,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if v.BankSync {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div id=\"bank-sync\" hx-get=\"/settings/banks/autosync\" hx-trigger=\"load\" hx-swap=\"outerHTML\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div id=\"bank-sync\" hx-post=\"/settings/banks/autosync\" hx-trigger=\"load\" hx-swap=\"outerHTML\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

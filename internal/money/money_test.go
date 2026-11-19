@@ -84,14 +84,19 @@ func TestFromMinorFixed(t *testing.T) {
 		{give: 104050, currency: "RUB", want: "1040.50"},
 		{give: 1500, currency: "JPY", want: "1500"},
 		{give: 1234, currency: "KWD", want: "1.234"},
-		{give: 1234, currency: "XXX", want: "12.34"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, money.FromMinor(tt.give, tt.currency).Fixed(tt.currency))
+			a, err := money.FromMinor(tt.give, tt.currency)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, a.Fixed(tt.currency))
 		})
 	}
+
+	_, err := money.FromMinor(1234, "XXX")
+	require.ErrorIs(t, err, errors.ErrInvalid, "unknown currency")
+	assert.Equal(t, "12.34", money.MustParse("12.34").Fixed("XXX"), "display falls back to two places")
 }
 
 func TestFormat(t *testing.T) {
@@ -142,11 +147,23 @@ func TestMinorBounds(t *testing.T) {
 	t.Parallel()
 
 	a := money.MustParse("2.005")
-	assert.Equal(t, int64(201), a.CeilMinor("RUB"))
-	assert.Equal(t, int64(200), a.FloorMinor("RUB"))
-	assert.Equal(t, int64(3), a.CeilMinor("JPY"))
-	assert.Equal(t, int64(2), a.FloorMinor("JPY"))
-	assert.Equal(t, int64(-200), a.Neg().CeilMinor("RUB"))
+	for _, tt := range []struct {
+		got  func(string) (int64, error)
+		cur  string
+		want int64
+	}{
+		{a.CeilMinor, "RUB", 201},
+		{a.FloorMinor, "RUB", 200},
+		{a.CeilMinor, "JPY", 3},
+		{a.FloorMinor, "JPY", 2},
+		{a.Neg().CeilMinor, "RUB", -200},
+	} {
+		got, err := tt.got(tt.cur)
+		require.NoError(t, err)
+		assert.Equal(t, tt.want, got)
+	}
+	_, err := a.CeilMinor("XXX")
+	require.ErrorIs(t, err, errors.ErrInvalid, "unknown currency")
 }
 
 func TestDiv(t *testing.T) {
@@ -161,6 +178,7 @@ func TestPercentOf(t *testing.T) {
 	assert.Equal(t, int64(33), money.FromInt(1).PercentOf(money.FromInt(3)))
 	assert.Equal(t, int64(150), money.FromInt(15).PercentOf(money.FromInt(10)))
 	assert.Equal(t, int64(-50), money.FromInt(-5).PercentOf(money.FromInt(10)))
+	assert.Zero(t, money.FromInt(5).PercentOf(money.Amount{}), "zero total")
 }
 
 func TestIsWhole(t *testing.T) {

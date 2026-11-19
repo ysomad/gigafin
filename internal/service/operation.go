@@ -66,17 +66,15 @@ func (s *Operations) CreateMany(
 				return err
 			}
 		}
+		// only the categories the user gave teach rules, not those rules set
+		var byHand []domain.Operation
 		for i, op := range ops {
-			if ins[i].CategoryID == 0 {
-				continue
+			if ins[i].CategoryID != 0 {
+				byHand = append(byHand, op)
 			}
-			n, err := learnCategory(ctx, r, userID, op, now)
-			if err != nil {
-				return err
-			}
-			learned += n
 		}
-		return nil
+		learned, err = learnCategory(ctx, r, userID, byHand, now)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -175,7 +173,7 @@ func (s *Operations) Update(
 		if op.CategoryID == old.CategoryID && op.Payee == old.Payee {
 			return nil
 		}
-		learned, err = learnCategory(ctx, r, userID, op, now)
+		learned, err = learnCategory(ctx, r, userID, []domain.Operation{op}, now)
 		return err
 	})
 	if err != nil {
@@ -349,19 +347,12 @@ func loadOpRefs(ctx context.Context, r repository.Repos, userID int64) (opRefs, 
 	if err != nil {
 		return opRefs{}, err
 	}
-	cats, err := r.Categories.List(ctx, userID)
-	if err != nil {
+	refs := opRefs{accounts: make(map[int64]domain.Account, len(accounts))}
+	if refs.cats, err = r.Categories.Map(ctx, userID); err != nil {
 		return opRefs{}, err
-	}
-	refs := opRefs{
-		accounts: make(map[int64]domain.Account, len(accounts)),
-		cats:     make(map[int64]domain.Category, len(cats)),
 	}
 	for _, a := range accounts {
 		refs.accounts[a.ID] = a
-	}
-	for _, c := range cats {
-		refs.cats[c.ID] = c
 	}
 	if refs.tags, err = r.Operations.Tags(ctx, userID); err != nil {
 		return opRefs{}, err

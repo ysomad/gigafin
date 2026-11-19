@@ -13,13 +13,14 @@ import (
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
-// Rates stores exchange rates shared by all users.
+// Rates stores the exchange rates of each user.
 type Rates struct {
 	q *sqlc.Queries
 }
 
 // RateUser is what the rate sync needs to know of one user.
 type RateUser struct {
+	UserID   int64
 	Settings domain.Settings
 	// FirstDate is the date of the user's first operation, zero without operations.
 	FirstDate time.Time
@@ -27,10 +28,11 @@ type RateUser struct {
 	Currencies []string
 }
 
-// Sync stores rates fetched from their source, keeping manual rates.
-func (r *Rates) Sync(ctx context.Context, rates []domain.Rate, now time.Time) error {
+// Sync stores rates of the user fetched from their source, keeping manual rates.
+func (r *Rates) Sync(ctx context.Context, userID int64, rates []domain.Rate, now time.Time) error {
 	for _, rate := range rates {
 		err := r.q.UpsertSyncedRate(ctx, sqlc.UpsertSyncedRateParams{
+			UserID:    userID,
 			Source:    string(rate.Source),
 			Currency:  rate.Currency,
 			Date:      timex.FormatDate(rate.Date),
@@ -44,10 +46,11 @@ func (r *Rates) Sync(ctx context.Context, rates []domain.Rate, now time.Time) er
 	return nil
 }
 
-// Set stores rates, replacing any stored for the same days.
-func (r *Rates) Set(ctx context.Context, rates []domain.Rate, now time.Time) error {
+// Set stores rates of the user, replacing any stored for the same days.
+func (r *Rates) Set(ctx context.Context, userID int64, rates []domain.Rate, now time.Time) error {
 	for _, rate := range rates {
 		err := r.q.UpsertRate(ctx, sqlc.UpsertRateParams{
+			UserID:    userID,
 			Source:    string(rate.Source),
 			Currency:  rate.Currency,
 			Date:      timex.FormatDate(rate.Date),
@@ -62,10 +65,12 @@ func (r *Rates) Set(ctx context.Context, rates []domain.Rate, now time.Time) err
 	return nil
 }
 
-// Bounds returns the first and last day with a stored rate of currency, a zero range
-// when none is stored.
-func (r *Rates) Bounds(ctx context.Context, source domain.RateSource, currency string) (domain.DateRange, error) {
-	b, err := r.q.GetRateBounds(ctx, sqlc.GetRateBoundsParams{Source: string(source), Currency: currency})
+// Bounds returns the first and last day with a stored rate of currency of the user, a
+// zero range when none is stored.
+func (r *Rates) Bounds(
+	ctx context.Context, userID int64, source domain.RateSource, currency string,
+) (domain.DateRange, error) {
+	b, err := r.q.GetRateBounds(ctx, sqlc.GetRateBoundsParams{UserID: userID, Source: string(source), Currency: currency})
 	if err != nil {
 		return domain.DateRange{}, fmt.Errorf("get rate bounds: %w", err)
 	}
@@ -83,9 +88,9 @@ func (r *Rates) Bounds(ctx context.Context, source domain.RateSource, currency s
 	return domain.DateRange{From: from, To: to}, nil
 }
 
-// Latest returns the last stored rate of each currency of source, by currency.
-func (r *Rates) Latest(ctx context.Context, source domain.RateSource) ([]domain.Rate, error) {
-	rows, err := r.q.ListLatestRates(ctx, string(source))
+// Latest returns the last stored rate of each currency of source of the user, by currency.
+func (r *Rates) Latest(ctx context.Context, userID int64, source domain.RateSource) ([]domain.Rate, error) {
+	rows, err := r.q.ListLatestRates(ctx, sqlc.ListLatestRatesParams{UserID: userID, Source: string(source)})
 	if err != nil {
 		return nil, fmt.Errorf("list latest rates: %w", err)
 	}
@@ -111,12 +116,12 @@ func ratesFromRows(rows []sqlc.ExchangeRate) ([]domain.Rate, error) {
 	return rates, nil
 }
 
-// List returns the stored rates of currency of source on days, by date.
+// List returns the stored rates of currency of source of the user on days, by date.
 func (r *Rates) List(
-	ctx context.Context, source domain.RateSource, currency string, days domain.DateRange,
+	ctx context.Context, userID int64, source domain.RateSource, currency string, days domain.DateRange,
 ) ([]domain.Rate, error) {
 	rows, err := r.q.ListRates(ctx, sqlc.ListRatesParams{
-		Source: string(source), Currency: currency,
+		UserID: userID, Source: string(source), Currency: currency,
 		FromDate: timex.FormatDate(days.From), ToDate: timex.FormatDate(days.To),
 	})
 	if err != nil {
@@ -133,7 +138,7 @@ func (r *Rates) Users(ctx context.Context) ([]RateUser, error) {
 	}
 	users := make([]RateUser, len(rows))
 	for i, row := range rows {
-		u := RateUser{Settings: domain.Settings{
+		u := RateUser{UserID: row.UserID, Settings: domain.Settings{
 			RateSource: domain.RateSource(row.RateSource), PrimaryCurrency: row.PrimaryCurrency,
 		}}
 		if row.FirstDate != "" {

@@ -77,6 +77,7 @@ type Category struct {
 }
 
 type ExchangeRate struct {
+	UserID    int64
 	Source    string
 	Currency  string
 	Date      string

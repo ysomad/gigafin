@@ -219,19 +219,41 @@ func (r *Operations) Get(ctx context.Context, userID, id int64) (domain.Operatio
 	return ops[0], nil
 }
 
-// ByPayee returns the operations with exactly payee dated between from and to, both
-// included, newest first, without tags.
-func (r *Operations) ByPayee(
-	ctx context.Context, userID int64, payee string, from, to time.Time,
-) ([]domain.Operation, error) {
-	rows, err := r.q.ListOperationsByPayee(ctx, sqlc.ListOperationsByPayeeParams{
-		UserID:   userID,
-		Payee:    sql.NullString{String: payee, Valid: true},
-		DateFrom: timex.FormatDate(from),
-		DateTo:   timex.FormatDate(to),
-	})
+// ByIDs returns the user's operations of ids by id; ids of none are left out.
+func (r *Operations) ByIDs(ctx context.Context, userID int64, ids []int64) (map[int64]domain.Operation, error) {
+	rows, err := r.q.ListOperationsByIDs(ctx, sqlc.ListOperationsByIDsParams{UserID: userID, Ids: ids})
 	if err != nil {
-		return nil, fmt.Errorf("list operations by payee: %w", err)
+		return nil, fmt.Errorf("list operations by ids: %w", err)
+	}
+	ops := make([]domain.Operation, len(rows))
+	for i, row := range rows {
+		if ops[i], err = operationFromRow(row.Operation, row.Currency); err != nil {
+			return nil, err
+		}
+	}
+	if err := r.loadTags(ctx, ops); err != nil {
+		return nil, err
+	}
+	byID := make(map[int64]domain.Operation, len(ops))
+	for _, op := range ops {
+		byID[op.ID] = op
+	}
+	return byID, nil
+}
+
+// ByPayees returns the operations with exactly one of payees, newest first, without
+// tags.
+func (r *Operations) ByPayees(ctx context.Context, userID int64, payees []string) ([]domain.Operation, error) {
+	if len(payees) == 0 {
+		return []domain.Operation{}, nil
+	}
+	nulls := make([]sql.NullString, len(payees))
+	for i, p := range payees {
+		nulls[i] = sql.NullString{String: p, Valid: true}
+	}
+	rows, err := r.q.ListOperationsByPayees(ctx, sqlc.ListOperationsByPayeesParams{UserID: userID, Payees: nulls})
+	if err != nil {
+		return nil, fmt.Errorf("list operations by payees: %w", err)
 	}
 	ops := make([]domain.Operation, len(rows))
 	for i, row := range rows {
@@ -301,8 +323,12 @@ func (r *Operations) Sum(ctx context.Context, userID int64, f domain.Filter) ([]
 	}
 	out := make([]domain.TypeSum, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		out[i] = domain.TypeSum{
-			Type: domain.OpType(s.Type), Currency: s.Currency, Total: money.FromMinor(s.Total, s.Currency),
+			Type: domain.OpType(s.Type), Currency: s.Currency, Total: total,
 		}
 	}
 	return out, nil
@@ -327,10 +353,14 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 		}
 		minor := make(map[string]int64)
 		for _, cur := range money.Currencies() {
+			var err error
 			if i == 0 {
-				minor[cur] = b.Amount.CeilMinor(cur)
+				minor[cur], err = b.Amount.CeilMinor(cur)
 			} else {
-				minor[cur] = b.Amount.FloorMinor(cur)
+				minor[cur], err = b.Amount.FloorMinor(cur)
+			}
+			if err != nil {
+				return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("amount bound: %w", err)
 			}
 		}
 		js, err := json.Marshal(minor)
@@ -408,8 +438,12 @@ func (r *Operations) SumByCategory(
 	}
 	out := make([]domain.CategorySum, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		out[i] = domain.CategorySum{
-			CategoryID: s.CategoryID, Currency: s.Currency, Total: money.FromMinor(s.Total, s.Currency),
+			CategoryID: s.CategoryID, Currency: s.Currency, Total: total,
 		}
 	}
 	return out, nil
@@ -428,13 +462,17 @@ func (r *Operations) SumByMonth(
 	}
 	out := make([]domain.MonthSum, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		month, err := timex.ParseMonth(s.Month)
 		if err != nil {
 			return nil, fmt.Errorf("month %q: %w", s.Month, err)
 		}
 		out[i] = domain.MonthSum{
 			Month: month, Type: domain.OpType(s.Type), Currency: s.Currency,
-			Total: money.FromMinor(s.Total, s.Currency),
+			Total: total,
 		}
 	}
 	return out, nil
@@ -453,13 +491,17 @@ func (r *Operations) SumByCategoryMonth(
 	}
 	out := make([]domain.CategoryMonthSum, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		month, err := timex.ParseMonth(s.Month)
 		if err != nil {
 			return nil, fmt.Errorf("month %q: %w", s.Month, err)
 		}
 		out[i] = domain.CategoryMonthSum{
 			CategoryID: s.CategoryID, Month: month, Currency: s.Currency,
-			Total: money.FromMinor(s.Total, s.Currency),
+			Total: total,
 		}
 	}
 	return out, nil
@@ -478,9 +520,13 @@ func (r *Operations) SumByPayee(
 	}
 	out := make([]domain.PayeeSum, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		out[i] = domain.PayeeSum{
 			Payee: s.Payee, Type: domain.OpType(s.Type), Currency: s.Currency,
-			Total: money.FromMinor(s.Total, s.Currency), Count: s.Ops,
+			Total: total, Count: s.Ops,
 		}
 	}
 	return out, nil
@@ -497,13 +543,17 @@ func (r *Operations) BalanceChanges(ctx context.Context, userID int64, to time.T
 	}
 	out := make([]domain.BalanceChange, len(rows))
 	for i, s := range rows {
+		total, err := money.FromMinor(s.Total, s.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("total: %w", err)
+		}
 		month, err := timex.ParseMonth(s.Month)
 		if err != nil {
 			return nil, fmt.Errorf("month %q: %w", s.Month, err)
 		}
 		out[i] = domain.BalanceChange{
 			Month: month, AccountID: s.AccountID, Currency: s.Currency,
-			Total: money.FromMinor(s.Total, s.Currency),
+			Total: total,
 		}
 	}
 	return out, nil
@@ -514,6 +564,10 @@ func operationFromRow(row sqlc.Operation, currency string) (domain.Operation, er
 	if err != nil {
 		return domain.Operation{}, fmt.Errorf("operation %d date %q: %w", row.ID, row.Date, err)
 	}
+	amount, err := money.FromMinor(row.Amount, currency)
+	if err != nil {
+		return domain.Operation{}, fmt.Errorf("operation %d amount: %w", row.ID, err)
+	}
 	op := domain.Operation{
 		ID:          row.ID,
 		Type:        domain.OpType(row.Type),
@@ -522,7 +576,7 @@ func operationFromRow(row sqlc.Operation, currency string) (domain.Operation, er
 		CategoryID:  row.CategoryID.Int64,
 		OriginID:    row.OriginID.Int64,
 		Currency:    currency,
-		Amount:      money.FromMinor(row.Amount, currency),
+		Amount:      amount,
 		Date:        date,
 		Time:        row.Time.String,
 		Payee:       row.Payee.String,

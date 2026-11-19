@@ -114,6 +114,7 @@ templ passwordCard(v kit.Page, oob bool) {
 				<input type="password" name="password" autocomplete="new-password" { kit.Invalid(e, "new-password-error")... }/>
 			}
 			@kit.SubmitColumn("col-3", "", kit.T(ctx, "Change password"))
+			<label data-field class="col-12"><input type="checkbox" role="switch" name="revoke_api_keys"/> { kit.T(ctx, "Revoke API keys") }</label>
 		</form>
 	</article>
 }
@@ -170,7 +171,7 @@ templ twoFactorCard(v kit.Page, d pageData, oob bool) {
 		switch  {
 			case d.TwoFactor.Enabled:
 				// both actions need a code and the password, so they share the inputs
-				<form id="form-2fa-manage" method="post" action="/settings/2fa/recovery-codes" class="row" hx-post="/settings/2fa/recovery-codes" hx-swap="none">
+				<form id="form-2fa-manage" method="post" action="/settings/2fa/manage" class="row" hx-post="/settings/2fa/manage" hx-swap="none">
 					@kit.FormError(v.Errors.Form("2fa-manage"), "col-12")
 					{{ e := v.Errors.Get("2fa-manage.password") }}
 					@kit.Field("col-3", kit.T(ctx, "Current password"), e, "2fa-manage-password-error", nil) {
@@ -183,8 +184,8 @@ templ twoFactorCard(v kit.Page, d pageData, oob bool) {
 					<div class="col-6 vstack gap-1">
 						<label aria-hidden="true">&nbsp;</label>
 						<div class="hstack">
-							<button type="submit">{ kit.T(ctx, "New recovery codes") }</button>
-							<button type="submit" data-variant="danger" formaction="/settings/2fa/disable" hx-post="/settings/2fa/disable">{ kit.T(ctx, "Turn off") }</button>
+							<button type="submit" name="action" value="recovery-codes">{ kit.T(ctx, "New recovery codes") }</button>
+							<button type="submit" name="action" value="disable" data-variant="danger">{ kit.T(ctx, "Turn off") }</button>
 						</div>
 					</div>
 				</form>
@@ -508,7 +509,7 @@ templ toasts(d pageData) {
 			@kit.Toast("danger", kit.T(ctx, "Some failed:")+" "+kit.ErrMsg(ctx, d.RatesSync.Err))
 		}
 	}
-	if d.Banks.SyncErr != "" {
-		@kit.Toast("danger", kit.T(ctx, "Last sync failed:")+" "+d.Banks.SyncErr)
+	if d.Banks.SyncFailed {
+		@kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later."))
 	}
 }

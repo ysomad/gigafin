@@ -661,7 +661,7 @@ func TestImportUpload(t *testing.T) {
 	assert.Contains(t, body, "Самокат")
 	assert.Contains(t, body, `id="skipped"`)
 	assert.Contains(t, body, "Яндекс Go")
-	assert.Contains(t, body, "status &#34;FAILED&#34;")
+	assert.Contains(t, body, "FAILED")
 	assert.Contains(t, body, "disabled", "import is disabled until mapped")
 
 	status, body = b.post("/imports/1/accounts", url.Values{

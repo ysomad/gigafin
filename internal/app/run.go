@@ -16,6 +16,11 @@ import (
 	"github.com/ysomad/gigafin/internal/logger"
 )
 
+// _shutdownTimeout is how long the server waits for requests on shutdown. It outlasts
+// the work requests finish after the client is gone, the 2-minute bank sync the
+// longest, so the database is not closed under them.
+const _shutdownTimeout = 3 * time.Minute
+
 // Run runs the HTTP server and the background jobs until SIGINT/SIGTERM arrives.
 func Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -78,7 +83,7 @@ func Run() error {
 
 	log.InfoContext(ctx, "shutting down")
 	start := time.Now()
-	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), _shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)

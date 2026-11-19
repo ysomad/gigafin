@@ -447,6 +447,15 @@ func (r *APIKeys) Revoke(ctx context.Context, userID, id int64, now time.Time) e
 	return affected(n, err, "revoke api key")
 }
 
+// RevokeAll revokes every live key of the user.
+func (r *APIKeys) RevokeAll(ctx context.Context, userID int64, now time.Time) error {
+	err := r.q.RevokeUserAPIKeys(ctx, sqlc.RevokeUserAPIKeysParams{RevokedAt: nullUnix(now), UserID: userID})
+	if err != nil {
+		return fmt.Errorf("revoke user api keys: %w", err)
+	}
+	return nil
+}
+
 // Touch records that the key was used at now.
 func (r *APIKeys) Touch(ctx context.Context, id int64, now time.Time) error {
 	if err := r.q.TouchAPIKey(ctx, sqlc.TouchAPIKeyParams{LastUsedAt: nullUnix(now), ID: id}); err != nil {

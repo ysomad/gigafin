@@ -7,14 +7,13 @@
 package service
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/repository"
+	"github.com/ysomad/gigafin/internal/secretbox"
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
@@ -63,12 +62,8 @@ func New(store *repository.Store, clock timex.Clock, log *slog.Logger, opts Opti
 	imports.categorizer = rules
 	auth := &Auth{store: store, clock: clock, log: log, session: opts.Session}
 	if len(opts.TOTPKey) > 0 {
-		block, err := aes.NewCipher(opts.TOTPKey)
-		if err != nil {
-			return nil, fmt.Errorf("totp secret key: %w", err)
-		}
-		if auth.aead, err = cipher.NewGCM(block); err != nil {
-			return nil, fmt.Errorf("totp secret key: %w", err)
+		if auth.box, err = secretbox.New(opts.TOTPKey); err != nil {
+			return nil, fmt.Errorf("totp %w", err)
 		}
 	}
 	accounts := &Accounts{store: store, clock: clock, log: log}

@@ -24,9 +24,15 @@ func (b Bank) Name() string {
 }
 
 // ImportSource returns the source of the imports the bank's syncs stage, which map
-// records to accounts and categories as CSV exports of the bank do.
+// records to accounts and categories as CSV exports of the bank do. A new bank needs
+// its source here; without one it is "", which maps nothing.
 func (b Bank) ImportSource() ImportSource {
-	return ImportSource(b)
+	switch b {
+	case BankTBank:
+		return ImportSourceTBank
+	default:
+		return ""
+	}
 }
 
 // ErrBankLoginRequired is a session the bank no longer accepts; the user must sign in

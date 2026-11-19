@@ -44,8 +44,7 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"POST /settings/2fa/setup":               h.setupTwoFactor,
 		"POST /settings/2fa/cancel":              h.cancelTwoFactorSetup,
 		"POST /settings/2fa/enable":              h.enableTwoFactor,
-		"POST /settings/2fa/disable":             h.disableTwoFactor,
-		"POST /settings/2fa/recovery-codes":      h.regenerateRecoveryCodes,
+		"POST /settings/2fa/manage":              h.manageTwoFactor,
 		"POST /settings/api-keys":                h.createAPIKey,
 		"POST /settings/delete-data":             h.deleteAllData,
 		"GET /settings/export":                   h.exportData,
@@ -57,76 +56,104 @@ func (h *Handler) Routes() map[string]kit.Handler {
 		"POST /settings/banks/{bank}/cancel":     h.bankCancel,
 		"POST /settings/banks/{bank}/link":       h.bankLink,
 		"POST /settings/banks/{bank}/disconnect": h.bankDisconnect,
-		"GET /settings/banks/autosync":           h.banksAutoSync,
+		"POST /settings/banks/autosync":          h.banksAutoSync,
 	}
 }
 
-// settingsCard is a set of cards of the settings page an htmx post swaps in.
-type settingsCard int
+// card is a card of the settings page: load sets its data in d, nil for a card of
+// none, and render draws it to be swapped in out of band. Its data is read here, not
+// taken from the request prefs, since a post may have just changed them.
+type card struct {
+	load   func(h *Handler, r *http.Request, user domain.User, d *pageData) error
+	render func(v kit.Page, d pageData) templ.Component
+}
 
-const (
-	_cardGeneral settingsCard = 1 << iota
-	_cardPassword
-	_cardRates
-	_cardAccess
-	_cardDelete
-	_cardBanks
-	_cardTwoFactor
-	_cardAll = _cardGeneral | _cardPassword | _cardRates | _cardAccess | _cardDelete | _cardBanks | _cardTwoFactor
+var (
+	_generalCard = card{
+		load:   (*Handler).loadGeneral,
+		render: func(v kit.Page, d pageData) templ.Component { return generalCard(v, d, true) },
+	}
+	_passwordCard = card{
+		render: func(v kit.Page, _ pageData) templ.Component { return passwordCard(v, true) },
+	}
+	_twoFactorCard = card{
+		load:   (*Handler).loadTwoFactor,
+		render: func(v kit.Page, d pageData) templ.Component { return twoFactorCard(v, d, true) },
+	}
+	_ratesCard = card{
+		load:   (*Handler).loadRates,
+		render: func(v kit.Page, d pageData) templ.Component { return ratesCard(v, d, true) },
+	}
+	_accessCard = card{
+		load:   (*Handler).loadAccess,
+		render: func(v kit.Page, d pageData) templ.Component { return accessCard(v, d, true) },
+	}
+	_banksCard = card{
+		load: func(h *Handler, r *http.Request, user domain.User, d *pageData) error {
+			return h.loadBanks(r, user, &d.Banks)
+		},
+		render: func(v kit.Page, d pageData) templ.Component { return banksCard(v, d.Banks, true) },
+	}
+	_deleteCard = card{
+		render: func(v kit.Page, _ pageData) templ.Component { return deleteCard(v, true) },
+	}
 )
 
-// loadSettings sets the data of cards in d. The settings are read here, not taken from
-// the request prefs, since a post may have just changed them.
-func (h *Handler) loadSettings(r *http.Request, user domain.User, d *pageData, cards settingsCard) error {
+func (h *Handler) loadGeneral(r *http.Request, user domain.User, d *pageData) error {
+	var err error
+	if d.Settings, err = h.app.Svc.Settings.Get(r.Context(), user.ID); err != nil {
+		return err
+	}
+	d.Currencies = money.Currencies()
+	d.Languages, d.RateSources, d.Themes = i18n.Languages(), domain.RateSources(), domain.Themes()
+	if d.General == nil {
+		s := d.Settings
+		d.General = &generalForm{
+			Timezone: user.Timezone, Language: s.Language, RateSource: string(s.RateSource),
+			PrimaryCurrency: s.PrimaryCurrency, ShowMinorUnits: s.ShowMinorUnits, AutoCategoryRules: s.AutoCategoryRules,
+			Theme: string(s.Theme),
+		}
+	}
+	return nil
+}
+
+func (h *Handler) loadTwoFactor(r *http.Request, user domain.User, d *pageData) error {
+	var err error
+	if d.TwoFactor, err = h.app.Svc.Auth.TwoFactor(r.Context(), user.ID); err != nil {
+		return err
+	}
+	if d.TwoFactor.PendingSecret != "" {
+		if d.TOTPSetup, err = newTOTPSetup(user.Login, d.TwoFactor.PendingSecret); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *Handler) loadRates(r *http.Request, user domain.User, d *pageData) error {
 	ctx := r.Context()
 	var err error
-	if cards&_cardAccess != 0 {
-		if d.Sessions, err = h.app.Svc.Auth.ListSessions(ctx, user.ID, h.app.SessionToken(r)); err != nil {
-			return err
-		}
-		if d.Keys, err = h.app.Svc.Auth.ListAPIKeys(ctx, user.ID); err != nil {
-			return err
-		}
+	if d.Settings, err = h.app.Svc.Settings.Get(ctx, user.ID); err != nil {
+		return err
 	}
-	if cards&_cardTwoFactor != 0 {
-		if d.TwoFactor, err = h.app.Svc.Auth.TwoFactor(ctx, user.ID); err != nil {
-			return err
-		}
-		if d.TwoFactor.PendingSecret != "" {
-			if d.TOTPSetup, err = newTOTPSetup(user.Login, d.TwoFactor.PendingSecret); err != nil {
-				return err
-			}
-		}
+	d.Currencies = money.Currencies()
+	if d.Rates, err = h.app.Svc.Rates.Latest(ctx, user.ID); err != nil {
+		return err
 	}
-	if cards&(_cardGeneral|_cardRates) != 0 {
-		if d.Settings, err = h.app.Svc.Settings.Get(ctx, user.ID); err != nil {
-			return err
-		}
-		d.Currencies = money.Currencies()
+	if d.RateCurrencies, err = h.app.Svc.Rates.Currencies(ctx, user.ID); err != nil {
+		return err
 	}
-	if cards&_cardGeneral != 0 {
-		d.Languages, d.RateSources, d.Themes = i18n.Languages(), domain.RateSources(), domain.Themes()
-		if d.General == nil {
-			s := d.Settings
-			d.General = &generalForm{
-				Timezone: user.Timezone, Language: s.Language, RateSource: string(s.RateSource),
-				PrimaryCurrency: s.PrimaryCurrency, ShowMinorUnits: s.ShowMinorUnits, AutoCategoryRules: s.AutoCategoryRules,
-				Theme: string(s.Theme),
-			}
-		}
+	return nil
+}
+
+func (h *Handler) loadAccess(r *http.Request, user domain.User, d *pageData) error {
+	ctx := r.Context()
+	var err error
+	if d.Sessions, err = h.app.Svc.Auth.ListSessions(ctx, user.ID, h.app.SessionToken(r)); err != nil {
+		return err
 	}
-	if cards&_cardRates != 0 {
-		if d.Rates, err = h.app.Svc.Rates.Latest(ctx, user.ID); err != nil {
-			return err
-		}
-		if d.RateCurrencies, err = h.app.Svc.Rates.Currencies(ctx, user.ID); err != nil {
-			return err
-		}
-	}
-	if cards&_cardBanks != 0 {
-		if err := h.loadBanks(r, user, &d.Banks); err != nil {
-			return err
-		}
+	if d.Keys, err = h.app.Svc.Auth.ListAPIKeys(ctx, user.ID); err != nil {
+		return err
 	}
 	return nil
 }
@@ -137,8 +164,10 @@ func (h *Handler) loadSettings(r *http.Request, user domain.User, d *pageData, c
 func (h *Handler) renderSettings(
 	w http.ResponseWriter, r *http.Request, user domain.User, status int, d pageData, fail kit.Failure,
 ) error {
-	if err := h.loadSettings(r, user, &d, _cardAll); err != nil {
-		return err
+	for _, c := range []card{_generalCard, _twoFactorCard, _ratesCard, _accessCard, _banksCard} {
+		if err := c.load(h, r, user, &d); err != nil {
+			return err
+		}
 	}
 	d.CanBackup = user.Can(domain.PermBackup)
 	return kit.Render(h.app, w, r, status, page, kit.Page{User: &user, Nav: "settings", Title: "Settings"}, d, fail)
@@ -149,7 +178,7 @@ func (h *Handler) renderSettings(
 // browser gets the page on failure or with a result shown once, a new API key token,
 // recovery codes or a rate sync, else is sent back to it.
 func (h *Handler) settingsReply(
-	w http.ResponseWriter, r *http.Request, user domain.User, cards settingsCard, d pageData, fail kit.Failure,
+	w http.ResponseWriter, r *http.Request, user domain.User, d pageData, fail kit.Failure, cards ...card,
 ) error {
 	status := http.StatusOK
 	if fail.Err != nil {
@@ -166,34 +195,21 @@ func (h *Handler) settingsReply(
 		kit.Redirect(w, r, "/settings")
 		return nil
 	}
-	if err := h.loadSettings(r, user, &d, cards); err != nil {
-		return err
+	for _, c := range cards {
+		if c.load == nil {
+			continue
+		}
+		if err := c.load(h, r, user, &d); err != nil {
+			return err
+		}
 	}
-	v := kit.Page{User: &user, Errors: h.app.FormErrors(w, r, fail)}
-	var cs []templ.Component
-	if cards&_cardGeneral != 0 {
-		cs = append(cs, generalCard(v, d, true))
-	}
-	if cards&_cardPassword != 0 {
-		cs = append(cs, passwordCard(v, true))
-	}
-	if cards&_cardTwoFactor != 0 {
-		cs = append(cs, twoFactorCard(v, d, true))
-	}
-	if cards&_cardRates != 0 {
-		cs = append(cs, ratesCard(v, d, true))
-	}
-	if cards&_cardAccess != 0 {
-		cs = append(cs, accessCard(v, d, true))
-	}
-	if cards&_cardBanks != 0 {
-		cs = append(cs, banksCard(v, d.Banks, true))
-	}
-	if cards&_cardDelete != 0 {
-		cs = append(cs, deleteCard(v, true))
-	}
-	cs = append(cs, kit.Toasts(v, true, toasts(d)))
-	return h.app.Fragment(w, r, status, templ.Join(cs...))
+	return kit.Render(h.app, w, r, status, func(v kit.Page, d pageData) templ.Component {
+		cs := make([]templ.Component, 0, len(cards)+1)
+		for _, c := range cards {
+			cs = append(cs, c.render(v, d))
+		}
+		return templ.Join(append(cs, kit.Toasts(v, true, toasts(d)))...)
+	}, kit.Page{User: &user}, d, fail)
 }
 
 func (h *Handler) settings(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -241,15 +257,15 @@ func (h *Handler) saveSettings(w http.ResponseWriter, r *http.Request, user doma
 	}
 	posted := pageData{General: &f}
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardGeneral, posted, kit.Failure{Err: errs, Form: "settings"})
+		return h.settingsReply(w, r, user, posted, kit.Failure{Err: errs, Form: "settings"}, _generalCard)
 	}
 	if err := h.app.Svc.Auth.SetTimezone(r.Context(), user.ID, f.Timezone); err != nil {
-		return h.settingsReply(w, r, user, _cardGeneral, posted, kit.Failure{Err: err, Form: "settings"})
+		return h.settingsReply(w, r, user, posted, kit.Failure{Err: err, Form: "settings"}, _generalCard)
 	}
 	// user is read before the change, and the cards show dates in its time zone
 	user.Timezone = f.Timezone
 	if err := h.app.Svc.Settings.Set(r.Context(), user.ID, s); err != nil {
-		return h.settingsReply(w, r, user, _cardGeneral, posted, kit.Failure{Err: err, Form: "settings"})
+		return h.settingsReply(w, r, user, posted, kit.Failure{Err: err, Form: "settings"}, _generalCard)
 	}
 	if prev := kit.PrefsFrom(r.Context()).Settings; s.Language != prev.Language || s.Theme != prev.Theme {
 		// the whole page changes, <html> included, which htmx does not swap, so the
@@ -262,17 +278,17 @@ func (h *Handler) saveSettings(w http.ResponseWriter, r *http.Request, user doma
 		kit.Redirect(w, r, "/settings")
 		return nil
 	}
-	return h.settingsReply(w, r, user, _cardGeneral|_cardRates|_cardAccess, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _generalCard, _ratesCard, _accessCard)
 }
 
 func (h *Handler) syncRates(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	n, err := h.app.Svc.Rates.Sync(r.Context())
+	n, err := h.app.Svc.Rates.SyncUser(r.Context(), user.ID)
 	// a failing source is not a fault of this server, so it is shown, not a 500
 	if err != nil {
 		h.app.Log.WarnContext(r.Context(), "sync exchange rates", slog.Any("error", err))
 	}
 	d := pageData{RatesSync: ratesSync{Done: true, Updated: n, Err: err}}
-	return h.settingsReply(w, r, user, _cardRates, d, kit.Failure{})
+	return h.settingsReply(w, r, user, d, kit.Failure{}, _ratesCard)
 }
 
 func (h *Handler) setRate(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -294,34 +310,31 @@ func (h *Handler) setRate(w http.ResponseWriter, r *http.Request, user domain.Us
 		errs["rate.rate"] = domain.NewError(errors.ErrInvalid, "must be positive")
 	}
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardRates, pageData{Rate: f}, kit.Failure{Err: errs, Form: "rate"})
+		return h.settingsReply(w, r, user, pageData{Rate: f}, kit.Failure{Err: errs, Form: "rate"}, _ratesCard)
 	}
 	if err := h.app.Svc.Rates.Set(r.Context(), user.ID, f.Currency, f.Date, f.Rate); err != nil {
-		return h.settingsReply(w, r, user, _cardRates, pageData{Rate: f}, kit.Failure{Err: err, Form: "rate"})
+		return h.settingsReply(w, r, user, pageData{Rate: f}, kit.Failure{Err: err, Form: "rate"}, _ratesCard)
 	}
-	return h.settingsReply(w, r, user, _cardRates, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _ratesCard)
 }
 
 func (h *Handler) resetRate(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
-	}
-	if err := h.app.Svc.Rates.Reset(
-		r.Context(),
-		user.ID,
-		r.PostFormValue("currency"),
-		r.PostFormValue("date"),
-	); err != nil {
+	var f rateForm
+	if err := h.app.DecodeForm(r, &f); err != nil {
 		return err
 	}
-	return h.settingsReply(w, r, user, _cardRates, pageData{}, kit.Failure{})
+	if err := h.app.Svc.Rates.Reset(r.Context(), user.ID, f.Currency, f.Date); err != nil {
+		return err
+	}
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _ratesCard)
 }
 
 func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
+	var f passwordForm
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		return err
 	}
-	current, pass := r.PostFormValue("current"), r.PostFormValue("password")
+	current, pass := f.Current, f.Password
 	errs := kit.FieldsError{}
 	if current == "" {
 		errs["password.current"] = domain.NewError(errors.ErrInvalid, "required")
@@ -332,47 +345,51 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request, user do
 		errs["password.password"] = domain.NewError(errors.ErrInvalid, "must differ from the current password")
 	}
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardPassword, pageData{}, kit.Failure{Err: errs, Form: "password"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: "password"}, _passwordCard)
 	}
-	token, err := h.app.Svc.Auth.ChangePassword(r.Context(), user.ID, current, pass, r.UserAgent())
+	token, err := h.app.Svc.Auth.ChangePassword(r.Context(), user.ID, current, pass, r.UserAgent(), f.RevokeAPIKeys)
 	if errors.Is(err, errors.ErrUnauthorized) {
 		errs["password.current"] = domain.NewError(errors.ErrInvalid, "wrong password")
-		return h.settingsReply(w, r, user, _cardPassword, pageData{}, kit.Failure{Err: errs, Form: "password"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: "password"}, _passwordCard)
 	}
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardPassword, pageData{}, kit.Failure{Err: err, Form: "password"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: "password"}, _passwordCard)
 	}
 	// all sessions end on a password change, this browser gets a new one
 	http.SetCookie(w, h.app.Cookie(kit.SessionCookie, token, int(h.app.SessionTTL.Seconds())))
 	p := kit.PrefsFrom(r.Context())
 	notice := h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out.")
+	if f.RevokeAPIKeys {
+		notice = h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out and API keys revoked.")
+	}
 	if !kit.IsHTMX(r) {
 		h.app.SetNotice(w, notice)
 	}
 	// the request still carries the old session cookie, so the sessions are listed
 	// without the current one marked
-	return h.settingsReply(w, r, user, _cardPassword|_cardAccess, pageData{Notice: notice}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{Notice: notice}, kit.Failure{}, _passwordCard, _accessCard)
 }
 
 func (h *Handler) setupTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if _, err := h.app.Svc.Auth.SetupTwoFactor(r.Context(), user.ID); err != nil {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: "2fa"}, _twoFactorCard)
 	}
-	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _twoFactorCard)
 }
 
 func (h *Handler) cancelTwoFactorSetup(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	if err := h.app.Svc.Auth.CancelTwoFactorSetup(r.Context(), user.ID); err != nil {
 		return err
 	}
-	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _twoFactorCard)
 }
 
 func (h *Handler) enableTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
+	var f twoFactorForm
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		return err
 	}
-	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
+	code, pass := f.Code, f.Password
 	errs := kit.FieldsError{}
 	if strings.TrimSpace(code) == "" {
 		errs["2fa.code"] = domain.NewError(errors.ErrInvalid, "required")
@@ -381,61 +398,51 @@ func (h *Handler) enableTwoFactor(w http.ResponseWriter, r *http.Request, user d
 		errs["2fa.password"] = domain.NewError(errors.ErrInvalid, "required")
 	}
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: "2fa"}, _twoFactorCard)
 	}
 	codes, token, err := h.app.Svc.Auth.EnableTwoFactor(r.Context(), user.ID, pass, code, r.UserAgent())
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: "2fa"}, _twoFactorCard)
 	}
 	// sessions started with the password alone end, this browser gets a new one
 	http.SetCookie(w, h.app.Cookie(kit.SessionCookie, token, int(h.app.SessionTTL.Seconds())))
 	p := kit.PrefsFrom(r.Context())
 	notice := h.app.Dicts.T(p.Lang, "Two-factor authentication is on. Other sessions are signed out.")
-	return h.settingsReply(w, r, user, _cardTwoFactor|_cardAccess, pageData{RecoveryCodes: codes, Notice: notice},
-		kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{RecoveryCodes: codes, Notice: notice},
+		kit.Failure{}, _twoFactorCard, _accessCard)
 }
 
-func (h *Handler) disableTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
+// manageTwoFactor makes new recovery codes or, for action "disable", turns two-factor
+// authentication off; both need a code and the password, so they share the form.
+func (h *Handler) manageTwoFactor(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	var f twoFactorForm
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		return err
 	}
-	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
 	errs := kit.FieldsError{}
-	if strings.TrimSpace(code) == "" {
+	if strings.TrimSpace(f.Code) == "" {
 		errs["2fa-manage.code"] = domain.NewError(errors.ErrInvalid, "required")
 	}
-	if pass == "" {
+	if f.Password == "" {
 		errs["2fa-manage.password"] = domain.NewError(errors.ErrInvalid, "required")
 	}
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa-manage"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: "2fa-manage"}, _twoFactorCard)
 	}
-	if err := h.app.Svc.Auth.DisableTwoFactor(r.Context(), user.ID, pass, code); err != nil {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa-manage"})
-	}
-	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{})
-}
-
-func (h *Handler) regenerateRecoveryCodes(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
+	var codes []string
+	var err error
+	switch f.Action {
+	case "disable":
+		err = h.app.Svc.Auth.DisableTwoFactor(r.Context(), user.ID, f.Password, f.Code)
+	case "recovery-codes":
+		codes, err = h.app.Svc.Auth.RegenerateRecoveryCodes(r.Context(), user.ID, f.Password, f.Code)
+	default:
 		return domain.NewError(errors.ErrInvalid, "invalid form")
 	}
-	code, pass := r.PostFormValue("code"), r.PostFormValue("password")
-	errs := kit.FieldsError{}
-	if strings.TrimSpace(code) == "" {
-		errs["2fa-manage.code"] = domain.NewError(errors.ErrInvalid, "required")
-	}
-	if pass == "" {
-		errs["2fa-manage.password"] = domain.NewError(errors.ErrInvalid, "required")
-	}
-	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: errs, Form: "2fa-manage"})
-	}
-	codes, err := h.app.Svc.Auth.RegenerateRecoveryCodes(r.Context(), user.ID, pass, code)
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardTwoFactor, pageData{}, kit.Failure{Err: err, Form: "2fa-manage"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: "2fa-manage"}, _twoFactorCard)
 	}
-	return h.settingsReply(w, r, user, _cardTwoFactor, pageData{RecoveryCodes: codes}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{RecoveryCodes: codes}, kit.Failure{}, _twoFactorCard)
 }
 
 func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -456,18 +463,20 @@ func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request, user doma
 	if _, err := domain.ParseKeyTTL(f.Expires); err != nil {
 		errs["apikey.expires"] = domain.NewError(errors.ErrInvalid, "choose from the list")
 	}
-	if r.PostFormValue("password") == "" {
+	if f.Password == "" {
 		errs["apikey.password"] = domain.NewError(errors.ErrInvalid, "required")
 	}
+	pass := f.Password
+	// the form is filled again on failure, but for the password
+	f.Password = ""
 	if len(errs) > 0 {
-		return h.settingsReply(w, r, user, _cardAccess, pageData{APIKey: f}, kit.Failure{Err: errs, Form: "apikey"})
+		return h.settingsReply(w, r, user, pageData{APIKey: f}, kit.Failure{Err: errs, Form: "apikey"}, _accessCard)
 	}
-	token, _, err := h.app.Svc.Auth.CreateAPIKey(r.Context(), user.ID, r.PostFormValue("password"),
-		f.Name, domain.Scope(f.Scope), f.Expires)
+	token, _, err := h.app.Svc.Auth.CreateAPIKey(r.Context(), user.ID, pass, f.Name, domain.Scope(f.Scope), f.Expires)
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardAccess, pageData{APIKey: f}, kit.Failure{Err: err, Form: "apikey"})
+		return h.settingsReply(w, r, user, pageData{APIKey: f}, kit.Failure{Err: err, Form: "apikey"}, _accessCard)
 	}
-	return h.settingsReply(w, r, user, _cardAccess, pageData{NewToken: token}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{NewToken: token}, kit.Failure{}, _accessCard)
 }
 
 func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -478,7 +487,7 @@ func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request, user doma
 	if err := h.app.Svc.Auth.RevokeAPIKey(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	return h.settingsReply(w, r, user, _cardAccess, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _accessCard)
 }
 
 func (h *Handler) revokeSession(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -489,7 +498,7 @@ func (h *Handler) revokeSession(w http.ResponseWriter, r *http.Request, user dom
 	if err := h.app.Svc.Auth.RevokeSession(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	return h.settingsReply(w, r, user, _cardAccess, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _accessCard)
 }
 
 func (h *Handler) exportData(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -517,10 +526,11 @@ func (h *Handler) exportData(w http.ResponseWriter, r *http.Request, user domain
 }
 
 func (h *Handler) backup(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
+	var form backupForm
+	if err := h.app.DecodeForm(r, &form); err != nil {
+		return err
 	}
-	pass, passphrase := r.PostFormValue("password"), r.PostFormValue("passphrase")
+	pass, passphrase := form.Password, form.Passphrase
 	// the form posts without htmx, for its file, so an error page is a full page load
 	errs := kit.FieldsError{}
 	if pass == "" {
@@ -568,18 +578,19 @@ func (h *Handler) backup(w http.ResponseWriter, r *http.Request, user domain.Use
 }
 
 func (h *Handler) deleteAllData(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	if err := r.ParseForm(); err != nil {
-		return domain.NewError(errors.ErrInvalid, "invalid form")
+	var f deleteForm
+	if err := h.app.DecodeForm(r, &f); err != nil {
+		return err
 	}
 	// finish even if the browser gives up waiting, so the result does not depend on it
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 	defer cancel()
-	if r.PostFormValue("password") == "" {
+	if f.Password == "" {
 		errs := kit.FieldsError{"delete.password": domain.NewError(errors.ErrInvalid, "required")}
-		return h.settingsReply(w, r, user, _cardDelete, pageData{}, kit.Failure{Err: errs, Form: "delete"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: "delete"}, _deleteCard)
 	}
-	if err := h.app.Svc.Data.DeleteAll(ctx, user.ID, r.PostFormValue("password")); err != nil {
-		return h.settingsReply(w, r, user, _cardDelete, pageData{}, kit.Failure{Err: err, Form: "delete"})
+	if err := h.app.Svc.Data.DeleteAll(ctx, user.ID, f.Password); err != nil {
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: "delete"}, _deleteCard)
 	}
 	kit.Redirect(w, r, "/accounts")
 	return nil

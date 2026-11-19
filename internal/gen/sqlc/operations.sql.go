@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const createOperation = `-- name: CreateOperation :one
@@ -299,42 +300,115 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 	return items, nil
 }
 
-const listOperationsByPayee = `-- name: ListOperationsByPayee :many
+const listOperationsByIDs = `-- name: ListOperationsByIDs :many
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
-WHERE
-    o.user_id = ?1 AND o.payee = ?2
-    AND o.date >= ?3 AND o.date <= ?4
-ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
+WHERE o.user_id = ?1 AND o.id IN (/*SLICE:ids*/?)
 `
 
-type ListOperationsByPayeeParams struct {
-	UserID   int64
-	Payee    sql.NullString
-	DateFrom string
-	DateTo   string
+type ListOperationsByIDsParams struct {
+	UserID int64
+	Ids    []int64
 }
 
-type ListOperationsByPayeeRow struct {
+type ListOperationsByIDsRow struct {
 	Operation Operation
 	Currency  string
 }
 
-func (q *Queries) ListOperationsByPayee(ctx context.Context, arg ListOperationsByPayeeParams) ([]ListOperationsByPayeeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listOperationsByPayee,
-		arg.UserID,
-		arg.Payee,
-		arg.DateFrom,
-		arg.DateTo,
-	)
+func (q *Queries) ListOperationsByIDs(ctx context.Context, arg ListOperationsByIDsParams) ([]ListOperationsByIDsRow, error) {
+	query := listOperationsByIDs
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListOperationsByPayeeRow
+	var items []ListOperationsByIDsRow
 	for rows.Next() {
-		var i ListOperationsByPayeeRow
+		var i ListOperationsByIDsRow
+		if err := rows.Scan(
+			&i.Operation.ID,
+			&i.Operation.UserID,
+			&i.Operation.Type,
+			&i.Operation.AccountID,
+			&i.Operation.ToAccountID,
+			&i.Operation.CategoryID,
+			&i.Operation.OriginID,
+			&i.Operation.Amount,
+			&i.Operation.Date,
+			&i.Operation.Time,
+			&i.Operation.Payee,
+			&i.Operation.SourcePayee,
+			&i.Operation.Note,
+			&i.Operation.MCC,
+			&i.Operation.ImportID,
+			&i.Operation.ImportHash,
+			&i.Operation.CreatedAt,
+			&i.Operation.UpdatedAt,
+			&i.Currency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOperationsByPayees = `-- name: ListOperationsByPayees :many
+SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
+FROM operations AS o
+JOIN accounts AS a ON a.id = o.account_id
+WHERE o.user_id = ?1 AND o.payee IN (/*SLICE:payees*/?)
+ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
+`
+
+type ListOperationsByPayeesParams struct {
+	UserID int64
+	Payees []sql.NullString
+}
+
+type ListOperationsByPayeesRow struct {
+	Operation Operation
+	Currency  string
+}
+
+func (q *Queries) ListOperationsByPayees(ctx context.Context, arg ListOperationsByPayeesParams) ([]ListOperationsByPayeesRow, error) {
+	query := listOperationsByPayees
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	if len(arg.Payees) > 0 {
+		for _, v := range arg.Payees {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:payees*/?", strings.Repeat(",?", len(arg.Payees))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:payees*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOperationsByPayeesRow
+	for rows.Next() {
+		var i ListOperationsByPayeesRow
 		if err := rows.Scan(
 			&i.Operation.ID,
 			&i.Operation.UserID,

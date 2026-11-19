@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -47,9 +48,11 @@ func New(a *service.Auth, apiHandler http.Handler, spec []byte, log *slog.Logger
 	if err != nil {
 		return nil, fmt.Errorf("parse openapi spec: %w", err)
 	}
-	defs, err := json.Marshal(s.Components.Schemas)
-	if err != nil {
-		return nil, fmt.Errorf("marshal schemas: %w", err)
+	defs := make(map[string]json.RawMessage, len(s.Components.Schemas))
+	for name, schema := range s.Components.Schemas {
+		if defs[name], err = json.Marshal(schema); err != nil {
+			return nil, fmt.Errorf("marshal schema %s: %w", name, err)
+		}
 	}
 
 	srv := sdkmcp.NewServer(&sdkmcp.Implementation{Name: "gigafin", Version: s.Info.Version}, nil)
@@ -110,6 +113,41 @@ func New(a *service.Auth, apiHandler http.Handler, spec []byte, log *slog.Logger
 	})(mcpHandler), nil
 }
 
+// _schemaRef matches a reference to a component schema, capturing its name.
+var _schemaRef = regexp.MustCompile(`"#/components/schemas/([^"]+)"`)
+
+// standalone returns schema as a document of its own: tool schemas cannot point into
+// the spec, so the component schemas it reaches, directly or through each other, move
+// to its $defs. Only those are carried, as clients load every tool schema.
+func standalone(schema map[string]any, defs map[string]json.RawMessage) (json.RawMessage, error) {
+	doc, err := json.Marshal(schema)
+	if err != nil {
+		return nil, err
+	}
+	used := make(map[string]json.RawMessage)
+	for queue := [][]byte{doc}; len(queue) > 0; queue = queue[1:] {
+		for _, m := range _schemaRef.FindAllSubmatch(queue[0], -1) {
+			name := string(m[1])
+			if _, ok := used[name]; ok {
+				continue
+			}
+			def, ok := defs[name]
+			if !ok {
+				return nil, fmt.Errorf("unknown schema %q", name)
+			}
+			used[name] = def
+			queue = append(queue, def)
+		}
+	}
+	if len(used) > 0 {
+		schema["$defs"] = used
+		if doc, err = json.Marshal(schema); err != nil {
+			return nil, err
+		}
+	}
+	return bytes.ReplaceAll(doc, []byte("#/components/schemas/"), []byte("#/$defs/")), nil
+}
+
 // operation is an API operation served as a tool.
 type operation struct {
 	api    http.Handler
@@ -121,9 +159,10 @@ type operation struct {
 }
 
 // newOperation returns the tool of op at method and path. Its arguments are the path and
-// query parameters and, under body, the request body; defs are the component schemas.
+// query parameters and, under body, the request body; defs are the component schemas
+// by name.
 func newOperation(
-	s *ogen.Spec, defs []byte, method, path string, item *ogen.PathItem, op *ogen.Operation,
+	s *ogen.Spec, defs map[string]json.RawMessage, method, path string, item *ogen.PathItem, op *ogen.Operation,
 ) (*sdkmcp.Tool, operation, error) {
 	o := operation{method: method, path: path}
 	props := map[string]any{}
@@ -154,12 +193,9 @@ func newOperation(
 			}
 		}
 	}
-	// tool schemas are standalone documents, so components move to $defs of each
-	in, err := json.Marshal(map[string]any{
-		"type": "object", "properties": props, "required": required, "$defs": json.RawMessage(defs),
-	})
+	in, err := standalone(map[string]any{"type": "object", "properties": props, "required": required}, defs)
 	if err != nil {
-		return nil, operation{}, fmt.Errorf("marshal input schema: %w", err)
+		return nil, operation{}, fmt.Errorf("input schema: %w", err)
 	}
 	// gigafin_ prefix and snake_case, so names stay apart from other servers' tools:
 	// listAccounts becomes gigafin_list_accounts
@@ -180,7 +216,7 @@ func newOperation(
 	t := &sdkmcp.Tool{
 		Name:        name.String(),
 		Description: strings.TrimSpace(op.Summary + ". " + op.Description),
-		InputSchema: json.RawMessage(bytes.ReplaceAll(in, []byte("#/components/schemas/"), []byte("#/$defs/"))),
+		InputSchema: in,
 		Annotations: &sdkmcp.ToolAnnotations{
 			ReadOnlyHint:    readOnly,
 			DestructiveHint: &destructive,
@@ -193,13 +229,9 @@ func newOperation(
 		if !strings.HasPrefix(code, "2") || !ok || m.Schema == nil {
 			continue
 		}
-		out, err := json.Marshal(map[string]any{
-			"type": "object", "allOf": []any{m.Schema}, "$defs": json.RawMessage(defs),
-		})
-		if err != nil {
-			return nil, operation{}, fmt.Errorf("marshal output schema: %w", err)
+		if t.OutputSchema, err = standalone(map[string]any{"type": "object", "allOf": []any{m.Schema}}, defs); err != nil {
+			return nil, operation{}, fmt.Errorf("output schema: %w", err)
 		}
-		t.OutputSchema = json.RawMessage(bytes.ReplaceAll(out, []byte("#/components/schemas/"), []byte("#/$defs/")))
 	}
 	return t, o, nil
 }

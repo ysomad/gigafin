@@ -111,6 +111,15 @@ func TestMCP(t *testing.T) {
 			assert.True(t, tool.Annotations.IdempotentHint)
 			assert.False(t, *tool.Annotations.OpenWorldHint)
 		}
+		if tool.Name == "gigafin_delete_operation" {
+			assert.NotContains(t, string(schema), `"$defs"`, "no schema reached, none carried")
+		}
+		if tool.Name == "gigafin_list_accounts" {
+			out, err := json.Marshal(tool.OutputSchema)
+			require.NoError(t, err)
+			assert.Contains(t, string(out), `"#/$defs/Account"`)
+			assert.NotContains(t, string(out), `"Operation":`, "schemas the tool does not reach are left out")
+		}
 		if tool.Name == "gigafin_list_operations" {
 			assert.True(t, tool.Annotations.ReadOnlyHint)
 			assert.False(t, *tool.Annotations.DestructiveHint)

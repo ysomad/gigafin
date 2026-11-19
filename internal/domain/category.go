@@ -93,7 +93,7 @@ func (c Category) Edit(name string, parent *Category) (Category, error) {
 		return Category{}, NewError(
 			errors.ErrInvalid,
 			"parent must be an %s category that is not inside another category",
-			c.Kind,
+			Msg(c.Kind),
 		)
 	}
 	c.ParentID = parent.ID

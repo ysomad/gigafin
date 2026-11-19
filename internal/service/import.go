@@ -230,8 +230,8 @@ func (s *Imports) Unpair(ctx context.Context, userID, importID, rowID int64) err
 
 // Commit creates operations for all new rows of a staged import. Dates and times are
 // converted to loc. Rules run on every row that is not a part of a split and override
-// the mapped category. When learning is on, rules are then learned from all the
-// operations, see domain.LearnCategories. It returns the number of operations created.
+// the mapped category. When learning is on, rules are then learned from the operations
+// of the payees of the import, see domain.LearnCategories. It returns the number of operations created.
 func (s *Imports) Commit(ctx context.Context, userID, importID int64, loc *time.Location) (int, error) {
 	return s.commit(ctx, userID, importID, loc, false /* noCategories */)
 }
@@ -239,8 +239,6 @@ func (s *Imports) Commit(ctx context.Context, userID, importID int64, loc *time.
 // commit is Commit; with noCategories set the mapped categories are ignored, every
 // expense and income comes without a category before rules run, and nothing is
 // learned, as the categories are the rules' own.
-//
-//nolint:cyclop,funlen // its read and write phases check the same state, so they stay together
 func (s *Imports) commit(
 	ctx context.Context, userID, importID int64, loc *time.Location, noCategories bool,
 ) (int, error) {
@@ -300,33 +298,8 @@ func (s *Imports) commit(
 		origins := make(map[string]int64)
 		now := s.clock.Now()
 		for _, c := range commits {
-			ref := domain.ImportRef{ImportID: importID, Hash: c.Row.Hash}
-			op, err := refs.newOperation(c.Op)
-			if err != nil {
-				return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
-			}
-			// parts after the first are stored with their origin; the first is its own
-			// origin, known once it is stored
-			origin, known := origins[c.Row.Row.Group]
-			if c.Split && known {
-				op.OriginID = origin
-			}
-			if op, err = r.Operations.Create(ctx, userID, op, ref, now); err != nil {
-				return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
-			}
-			if err := r.Imports.SetOperation(ctx, c.Row.ID, op.ID); err != nil {
+			if err := createCommitted(ctx, r, &refs, userID, importID, c, origins, now); err != nil {
 				return err
-			}
-			if c.Split && !known {
-				origins[c.Row.Row.Group] = op.ID
-				if err := r.Operations.SetOrigin(ctx, userID, op.ID, op.ID); err != nil {
-					return err
-				}
-			}
-			if c.Pair != nil {
-				if err := r.Imports.SetOperation(ctx, c.Pair.ID, op.ID); err != nil {
-					return err
-				}
 			}
 		}
 		created = len(commits)
@@ -334,11 +307,7 @@ func (s *Imports) commit(
 		if err := r.Imports.Update(ctx, userID, im); err != nil || noCategories {
 			return err
 		}
-		settings, err := r.Settings.Get(ctx, userID)
-		if err != nil || !settings.AutoCategoryRules {
-			return err
-		}
-		learned, err = learnHistory(ctx, r, userID, now)
+		learned, err = learnImport(ctx, r, userID, commits, now)
 		return err
 	})
 	if err != nil {
@@ -351,6 +320,68 @@ func (s *Imports) commit(
 			slog.Int("count", learned))
 	}
 	return created, nil
+}
+
+// learnImport learns rules from the operations of the payees of commits, the rows of a
+// committed import, when learning is on, see learnHistory: only those payees can teach
+// anything new. It returns how many rules it stored.
+func learnImport(
+	ctx context.Context, r repository.Repos, userID int64, commits []domain.RowCommit, now time.Time,
+) (int, error) {
+	settings, err := r.Settings.Get(ctx, userID)
+	if err != nil || !settings.AutoCategoryRules {
+		return 0, err
+	}
+	var payees []string
+	for _, c := range commits {
+		if c.Op.Payee != "" {
+			payees = append(payees, c.Op.Payee)
+		}
+	}
+	slices.Sort(payees)
+	history, err := r.Operations.ByPayees(ctx, userID, slices.Compact(payees))
+	if err != nil {
+		return 0, err
+	}
+	return learnHistory(ctx, r, userID, history, now)
+}
+
+// createCommitted creates the operation of c, a row of import importID, and points
+// the row, and the other side of a paired transfer, at it. origins hold the origin of
+// each split group of the import met before; the first part of a group is its origin.
+func createCommitted(
+	ctx context.Context, r repository.Repos, refs *opRefs, userID, importID int64, c domain.RowCommit,
+	origins map[string]int64, now time.Time,
+) error {
+	ref := domain.ImportRef{ImportID: importID, Hash: c.Row.Hash}
+	op, err := refs.newOperation(c.Op)
+	if err != nil {
+		return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
+	}
+	// parts after the first are stored with their origin; the first is its own
+	// origin, known once it is stored
+	origin, known := origins[c.Row.Row.Group]
+	if c.Split && known {
+		op.OriginID = origin
+	}
+	if op, err = r.Operations.Create(ctx, userID, op, ref, now); err != nil {
+		return fmt.Errorf("line %d: %w", c.Row.Row.Line, err)
+	}
+	if err := r.Imports.SetOperation(ctx, c.Row.ID, op.ID); err != nil {
+		return err
+	}
+	if c.Split && !known {
+		origins[c.Row.Row.Group] = op.ID
+		if err := r.Operations.SetOrigin(ctx, userID, op.ID, op.ID); err != nil {
+			return err
+		}
+	}
+	if c.Pair != nil {
+		if err := r.Imports.SetOperation(ctx, c.Pair.ID, op.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // categorize replaces the operations of commits that are not parts of splits with

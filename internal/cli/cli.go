@@ -3,7 +3,7 @@
 // Usage:
 //
 //	gigafin-cli user add -login alice [-role admin]
-//	gigafin-cli user passwd -login alice
+//	gigafin-cli user passwd -login alice [-revoke-keys]
 //	gigafin-cli user role -login alice -role user
 //	gigafin-cli user 2fa-off -login alice
 //
@@ -50,7 +50,7 @@ func Run(args []string) error {
 	default:
 		const usage errors.Error = `usage:
   gigafin-cli user add     -login LOGIN [-role user|admin] [-tz ZONE]
-  gigafin-cli user passwd  -login LOGIN
+  gigafin-cli user passwd  -login LOGIN [-revoke-keys]
   gigafin-cli user role    -login LOGIN -role user|admin
   gigafin-cli user 2fa-off -login LOGIN
 settings come from the environment: DB_PATH, LOGGER_LEVEL, ...`

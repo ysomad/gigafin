@@ -28,6 +28,19 @@ func (r *Categories) List(ctx context.Context, userID int64) ([]domain.Category,
 	return out, nil
 }
 
+// Map returns all categories of the user by id.
+func (r *Categories) Map(ctx context.Context, userID int64) (map[int64]domain.Category, error) {
+	rows, err := r.q.ListCategories(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list categories: %w", err)
+	}
+	out := make(map[int64]domain.Category, len(rows))
+	for _, c := range rows {
+		out[c.ID] = categoryFromRow(c)
+	}
+	return out, nil
+}
+
 // ByIDs returns the user's categories among ids, keyed by id. Missing ids are absent.
 func (r *Categories) ByIDs(ctx context.Context, userID int64, ids []int64) (map[int64]domain.Category, error) {
 	out := make(map[int64]domain.Category, len(ids))

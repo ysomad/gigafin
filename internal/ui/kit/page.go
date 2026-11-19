@@ -63,6 +63,8 @@ type FormErrors struct {
 	FormName string
 	Msg      string
 	Toast    string
+	// read are the fields Get was asked for, see Unread
+	read map[string]bool
 }
 
 // Get returns the message about the input named field, if any.
@@ -70,7 +72,26 @@ func (e *FormErrors) Get(field string) string {
 	if e == nil {
 		return ""
 	}
+	if e.read == nil {
+		e.read = make(map[string]bool)
+	}
+	e.read[field] = true
 	return e.Fields[field]
+}
+
+// Unread returns the messages of the fields a render never asked Get for, by field,
+// which no input showed.
+func (e *FormErrors) Unread() []string {
+	if e == nil {
+		return nil
+	}
+	var msgs []string
+	for _, k := range slices.Sorted(maps.Keys(e.Fields)) {
+		if !e.read[k] {
+			msgs = append(msgs, e.Fields[k])
+		}
+	}
+	return msgs
 }
 
 // Form returns the message about the form named name, if any.

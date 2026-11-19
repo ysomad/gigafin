@@ -101,11 +101,14 @@ func (c *CBR) Rates(ctx context.Context, currency string, from, to time.Time) ([
 	return rates, nil
 }
 
-// code returns the CBR code of currency, loading the currency list on first use.
+// code returns the CBR code of currency, loading the currency list on first use. The
+// list is fetched without the lock, so a slow fetch blocks no other caller; concurrent
+// first calls may each fetch it.
 func (c *CBR) code(ctx context.Context, currency string) (string, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.codes == nil {
+	codes := c.codes
+	c.mu.Unlock()
+	if codes == nil {
 		var resp struct {
 			Items []struct {
 				ID         string `xml:"ID,attr"`
@@ -116,7 +119,7 @@ func (c *CBR) code(ctx context.Context, currency string) (string, error) {
 		if err := c.get(ctx, "XML_valFull.asp", nil, &resp); err != nil {
 			return "", err
 		}
-		codes := make(map[string]string, len(resp.Items))
+		codes = make(map[string]string, len(resp.Items))
 		for _, it := range resp.Items {
 			iso := strings.TrimSpace(it.ISO)
 			if _, ok := codes[iso]; ok || iso == "" {
@@ -130,9 +133,11 @@ func (c *CBR) code(ctx context.Context, currency string) (string, error) {
 			}
 			codes[iso] = code
 		}
+		c.mu.Lock()
 		c.codes = codes
+		c.mu.Unlock()
 	}
-	code, ok := c.codes[currency]
+	code, ok := codes[currency]
 	if !ok {
 		return "", fmt.Errorf("cbr: no rates of %s", currency)
 	}

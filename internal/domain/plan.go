@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -33,7 +32,7 @@ func NewPlan(
 		return Plan{}, NewError(errors.ErrInvalid, "currency: unsupported currency %q", cur)
 	}
 	if _, err := amount.ToMinor(cur); err != nil {
-		return Plan{}, fmt.Errorf("amount: %w", err)
+		return Plan{}, NewError(errors.ErrInvalid, "amount: not a valid amount in %s", cur)
 	}
 	if amount.IsNegative() {
 		return Plan{}, NewError(errors.ErrInvalid, "amount: must not be negative")
@@ -99,7 +98,7 @@ func (r PlanRow) Left() money.Amount {
 
 // Percent returns spent as a share of plan, 0..100+, or 0 without a plan.
 func (r PlanRow) Percent() int64 {
-	if !r.HasPlan || r.Plan.IsZero() {
+	if !r.HasPlan {
 		return 0
 	}
 	return r.Spent.PercentOf(r.Plan)

@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countRules = `-- name: CountRules :one
+SELECT COUNT(*) FROM rules WHERE user_id = ?
+`
+
+func (q *Queries) CountRules(ctx context.Context, userID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRules, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createRule = `-- name: CreateRule :one
 INSERT INTO rules (user_id, stage, "match", conditions, actions, origin, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)

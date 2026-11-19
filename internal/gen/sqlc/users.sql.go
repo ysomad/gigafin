@@ -613,6 +613,20 @@ func (q *Queries) RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (int
 	return result.RowsAffected()
 }
 
+const revokeUserAPIKeys = `-- name: RevokeUserAPIKeys :exec
+UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL
+`
+
+type RevokeUserAPIKeysParams struct {
+	RevokedAt sql.NullInt64
+	UserID    int64
+}
+
+func (q *Queries) RevokeUserAPIKeys(ctx context.Context, arg RevokeUserAPIKeysParams) error {
+	_, err := q.db.ExecContext(ctx, revokeUserAPIKeys, arg.RevokedAt, arg.UserID)
+	return err
+}
+
 const setUserPendingTOTP = `-- name: SetUserPendingTOTP :execrows
 UPDATE users SET totp_pending_secret = ?, updated_at = ? WHERE id = ? AND totp_secret IS NULL
 `

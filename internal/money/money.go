@@ -104,14 +104,14 @@ func MustParse(s string) Amount {
 	return a
 }
 
-// FromMinor converts minor units of currency to an amount. Unknown currencies are
-// treated as having two decimal places.
-func FromMinor(v int64, currency string) Amount {
+// FromMinor converts minor units of currency to an amount. It fails with
+// errors.ErrInvalid if the currency is unknown.
+func FromMinor(v int64, currency string) (Amount, error) {
 	exp, err := Exponent(currency)
 	if err != nil {
-		exp = 2
+		return Amount{}, err
 	}
-	return Amount{d: decimal.New(v, -exp)}
+	return Amount{d: decimal.New(v, -exp)}, nil
 }
 
 // ToMinor converts a to minor units of currency. It fails with errors.ErrInvalid if
@@ -132,24 +132,24 @@ func (a Amount) ToMinor(currency string) (int64, error) {
 	return shifted.IntPart(), nil
 }
 
-// CeilMinor returns a in minor units of currency rounded up. Unknown currencies are
-// treated as having two decimal places.
-func (a Amount) CeilMinor(currency string) int64 {
+// CeilMinor returns a in minor units of currency rounded up. It fails with
+// errors.ErrInvalid if the currency is unknown.
+func (a Amount) CeilMinor(currency string) (int64, error) {
 	exp, err := Exponent(currency)
 	if err != nil {
-		exp = 2
+		return 0, err
 	}
-	return a.d.Shift(exp).Ceil().IntPart()
+	return a.d.Shift(exp).Ceil().IntPart(), nil
 }
 
-// FloorMinor returns a in minor units of currency rounded down. Unknown currencies are
-// treated as having two decimal places.
-func (a Amount) FloorMinor(currency string) int64 {
+// FloorMinor returns a in minor units of currency rounded down. It fails with
+// errors.ErrInvalid if the currency is unknown.
+func (a Amount) FloorMinor(currency string) (int64, error) {
 	exp, err := Exponent(currency)
 	if err != nil {
-		exp = 2
+		return 0, err
 	}
-	return a.d.Shift(exp).Floor().IntPart()
+	return a.d.Shift(exp).Floor().IntPart(), nil
 }
 
 // Add returns a + b.
@@ -167,9 +167,12 @@ func (a Amount) Abs() Amount { return Amount{d: a.d.Abs()} }
 // Div returns a divided by n.
 func (a Amount) Div(n int64) Amount { return Amount{d: a.d.Div(decimal.NewFromInt(n))} }
 
-// PercentOf returns a as a share of total in percent, truncated toward zero. total
-// must not be zero.
+// PercentOf returns a as a share of total in percent, truncated toward zero, or 0
+// when total is zero.
 func (a Amount) PercentOf(total Amount) int64 {
+	if total.d.IsZero() {
+		return 0
+	}
 	return a.d.Mul(decimal.NewFromInt(100)).Div(total.d).IntPart()
 }
 
@@ -197,7 +200,8 @@ func (a Amount) Float64() float64 { return a.d.InexactFloat64() }
 // String returns a as a plain decimal, e.g. "-1040.5".
 func (a Amount) String() string { return a.d.String() }
 
-// Fixed formats a with the currency's decimal places, e.g. "1040.50".
+// Fixed formats a with the currency's decimal places, e.g. "1040.50". It only formats
+// for display, so an unknown currency gets two decimal places.
 func (a Amount) Fixed(currency string) string {
 	exp, err := Exponent(currency)
 	if err != nil {

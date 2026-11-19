@@ -87,12 +87,12 @@ func (h *Handler) bankLogin(w http.ResponseWriter, r *http.Request, user domain.
 	phone, err := domain.NormalizePhone(posted.Banks.Posted.Phone)
 	if err != nil {
 		errs := kit.FieldsError{string(bank) + ".phone": err}
-		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: errs, Form: string(bank)})
+		return h.settingsReply(w, r, user, posted, kit.Failure{Err: errs, Form: string(bank)}, _banksCard)
 	}
 	if _, err := h.app.Svc.Banks.StartLogin(r.Context(), user.ID, bank, phone); err != nil {
-		return h.settingsReply(w, r, user, _cardBanks, posted, kit.Failure{Err: err, Form: string(bank)})
+		return h.settingsReply(w, r, user, posted, kit.Failure{Err: err, Form: string(bank)}, _banksCard)
 	}
-	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _banksCard)
 }
 
 func (h *Handler) bankConfirm(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -106,15 +106,15 @@ func (h *Handler) bankConfirm(w http.ResponseWriter, r *http.Request, user domai
 	value := strings.TrimSpace(r.PostFormValue("value"))
 	if value == "" {
 		errs := kit.FieldsError{string(bank) + ".value": domain.NewError(errors.ErrInvalid, "required")}
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: errs, Form: string(bank)})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: errs, Form: string(bank)}, _banksCard)
 	}
 	ctx := r.Context()
 	step, err := h.app.Svc.Banks.ConfirmLogin(ctx, user.ID, bank, value)
 	if err != nil {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: string(bank)})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: string(bank)}, _banksCard)
 	}
 	if step != "" {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _banksCard)
 	}
 	// signed in: the accounts are read, the linked ones catch up
 	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
@@ -131,7 +131,7 @@ func (h *Handler) bankCancel(w http.ResponseWriter, r *http.Request, user domain
 		return err
 	}
 	h.app.Svc.Banks.CancelLogin(user.ID, bank)
-	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _banksCard)
 }
 
 // bankLink syncs every bank account at the bank not synced yet with the account chosen
@@ -157,7 +157,7 @@ func (h *Handler) bankLink(w http.ResponseWriter, r *http.Request, user domain.U
 		res, err = h.app.Svc.Banks.Link(ctx, user.ID, bank, links, user.Location())
 	}
 	if kit.IsUserError(err) {
-		return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{Err: err, Form: string(bank) + "-link"})
+		return h.settingsReply(w, r, user, pageData{}, kit.Failure{Err: err, Form: string(bank) + "-link"}, _banksCard)
 	}
 	if err == nil && len(res.NeedsLogin) == 0 {
 		var synced domain.BankSync
@@ -173,12 +173,12 @@ func (h *Handler) syncReply(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		// a failing bank is not a fault of this server; the card shows it too
 		h.app.Log.WarnContext(r.Context(), "sync bank", slog.Any("error", err))
-		d.Notice, d.Banks.SyncErr = "", err.Error()
+		d.Notice, d.Banks.SyncFailed = "", true
 	}
 	if !kit.IsHTMX(r) && d.Notice != "" {
 		h.app.SetNotice(w, d.Notice)
 	}
-	return h.settingsReply(w, r, user, _cardBanks, d, kit.Failure{})
+	return h.settingsReply(w, r, user, d, kit.Failure{}, _banksCard)
 }
 
 // bankPicks returns the links of the accounts at bank not synced of the link form of
@@ -215,7 +215,7 @@ func (h *Handler) bankDisconnect(w http.ResponseWriter, r *http.Request, user do
 	if err := h.app.Svc.Banks.Disconnect(r.Context(), user.ID, bank); err != nil {
 		return err
 	}
-	return h.settingsReply(w, r, user, _cardBanks, pageData{}, kit.Failure{})
+	return h.settingsReply(w, r, user, pageData{}, kit.Failure{}, _banksCard)
 }
 
 // banksAutoSync syncs the banks when the user opens the app, at most once in the sync
@@ -238,7 +238,7 @@ func (h *Handler) banksAutoSync(w http.ResponseWriter, r *http.Request, user dom
 		w.Header().Set("HX-Refresh", "true")
 		return nil
 	case err != nil:
-		d := pageData{Banks: banksData{SyncErr: err.Error()}}
+		d := pageData{Banks: banksData{SyncFailed: true}}
 		return h.app.Fragment(w, r, http.StatusOK, kit.Toasts(kit.Page{User: &user}, true, toasts(d)))
 	}
 	// an empty answer removes the placeholder

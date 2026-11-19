@@ -209,7 +209,9 @@ func (r *Imports) Mapping(ctx context.Context, userID int64, src domain.ImportSo
 	}
 	for _, am := range accs {
 		key := domain.AccountKey(am.SourceName, am.MapCurrency)
-		m.Accounts[key] = accountFromRow(am.Account, 0 /* balance */)
+		if m.Accounts[key], err = accountFromRow(am.Account, 0 /* balance */); err != nil {
+			return domain.ImportMapping{}, err
+		}
 	}
 	for _, cm := range cats {
 		m.Categories[domain.CategoryKey(domain.Kind(cm.MapKind), cm.SourceName)] = categoryFromRow(cm.Category)

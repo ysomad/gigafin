@@ -142,7 +142,6 @@ func (a Account) BalanceAdjustment(target money.Amount, date time.Time) (Operati
 		AccountID: a.ID,
 		Amount:    delta,
 		Date:      date,
-		Note:      "Balance set to " + target.Fixed(a.Currency),
 	}, true, nil
 }
 

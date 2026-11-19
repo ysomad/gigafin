@@ -53,7 +53,7 @@ func TestGigaFinParse(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 10, 27, 21, 59, 38, 0, time.UTC), r.Time)
 
 	require.Len(t, res.Skipped, 1)
-	assert.Equal(t, "zero amount", res.Skipped[0].SkipReason)
+	assert.Equal(t, domain.SkipZeroAmount, res.Skipped[0].SkipReason)
 	assert.Equal(t, 6, res.Skipped[0].Line)
 }
 

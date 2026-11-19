@@ -66,10 +66,10 @@ func TestZenMoneyParse(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC), r.Time)
 
 	require.Len(t, res.Skipped, 3)
-	assert.Equal(t, "transfer between currencies", res.Skipped[0].SkipReason)
+	assert.Equal(t, domain.SkipTransferCurrencies, res.Skipped[0].SkipReason)
 	assert.Equal(t, 6, res.Skipped[0].Line)
-	assert.Equal(t, "transfer amounts differ", res.Skipped[1].SkipReason)
-	assert.Equal(t, "zero amount", res.Skipped[2].SkipReason)
+	assert.Equal(t, domain.SkipTransferAmounts, res.Skipped[1].SkipReason)
+	assert.Equal(t, domain.SkipZeroAmount, res.Skipped[2].SkipReason)
 }
 
 func TestZenMoneyParseErrors(t *testing.T) {
