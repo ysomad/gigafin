@@ -101,12 +101,12 @@ templ listPage(v kit.Page, d rulesData) {
 
 // learnedBadge marks a rule learned from the user's categories.
 templ learnedBadge() {
-	<span class="badge" data-variant="secondary">{ kit.T(ctx, "learned") }</span>
+	<span class="badge" data-variant="secondary">{ kit.T(ctx, "auto") }</span>
 }
 
 // filterDialog is the dialog of the filters of the rules of d, but the query.
 templ filterDialog(d rulesData) {
-	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } autofocus>
+	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } closedby="any" autofocus>
 		<div class="row">
 			@kit.Field("col-6", kit.T(ctx, "Runs"), "", "", nil) {
 				<select name="stage">
@@ -120,7 +120,7 @@ templ filterDialog(d rulesData) {
 				<select name="origin">
 					<option value="">{ kit.T(ctx, "All") }</option>
 					<option value={ string(domain.RuleOriginUser) } selected?={ d.Filter.Origin == domain.RuleOriginUser }>{ kit.T(ctx, "mine") }</option>
-					<option value={ string(domain.RuleOriginLearned) } selected?={ d.Filter.Origin == domain.RuleOriginLearned }>{ kit.T(ctx, "learned") }</option>
+					<option value={ string(domain.RuleOriginLearned) } selected?={ d.Filter.Origin == domain.RuleOriginLearned }>{ kit.T(ctx, "auto") }</option>
 				</select>
 			}
 			@kit.Field("col-6", kit.T(ctx, "Field"), "", "", nil) {

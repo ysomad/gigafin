@@ -43,9 +43,6 @@ templ listPage(v kit.Page, d opList) {
 									type="submit"
 									class="outline"
 									aria-label={ kit.T(ctx, "Sync") }
-									if !d.BankSyncAt.IsZero() {
-										title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
-									}
 								><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#refresh-cw"></use></svg></button>
 							</form>
 						</li>
@@ -107,7 +104,7 @@ templ listPage(v kit.Page, d opList) {
 
 // filterDialog is the dialog of the filters of the operations of d, but the query.
 templ filterDialog(d opList) {
-	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } autofocus>
+	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } closedby="any" autofocus>
 		<div class="row">
 			@kit.Field("col-6", kit.T(ctx, "Account"), "", "", nil) {
 				<select name="account">

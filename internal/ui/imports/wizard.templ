@@ -61,7 +61,7 @@ templ wizardPage(v kit.Page, d wizardData) {
 							</form>
 						case domain.ImportCommitted:
 							<form method="post" action={ base + "/undo" } hx-confirm={ kit.T(ctx, "Delete all operations created by this import?") }>
-								<button type="submit" class="outline" data-variant="secondary">{ kit.T(ctx, "Undo import") }</button>
+								<button type="submit" class="outline" data-variant="danger">{ kit.T(ctx, "Undo import") }</button>
 							</form>
 						default:
 							@discardButton(base, kit.T(ctx, "Delete from history"))
@@ -244,15 +244,15 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 						<td>
 							switch  {
 								case row.Status == domain.ImportRowDuplicate:
-									<span class="badge" data-variant="secondary">{ kit.T(ctx, "duplicate") }</span>
+									<svg class="text-light" width="16" height="16" role="img" aria-label={ kit.T(ctx, "duplicate") }><title>{ kit.T(ctx, "duplicate") }</title><use href="/static/icons.svg#copy"></use></svg>
 								case row.OperationID != 0:
-									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }>{ kit.T(ctx, "imported") }</a>
+									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }><svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "imported") }><title>{ kit.T(ctx, "imported") }</title><use href="/static/icons.svg#check"></use></svg></a>
 								case row.PairID != 0 && p.Import.Status == domain.ImportStaged:
 									<form method="post" action={ fmt.Sprintf("%s/unpair/%d", base, row.ID) }>
 										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Not a transfer") }</button>
 									</form>
 								default:
-									{ kit.T(ctx, "new") }
+									<svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "new") }><title>{ kit.T(ctx, "new") }</title><use href="/static/icons.svg#plus"></use></svg>
 							}
 						</td>
 					</tr>
