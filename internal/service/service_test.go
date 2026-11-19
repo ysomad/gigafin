@@ -179,7 +179,7 @@ func TestSplitOperation(t *testing.T) {
 	require.NoError(t, f.svc.Operations.Delete(ctx, f.userID, parts[0].ID))
 	assert.Equal(t, "-300.00", f.balance(t, f.card.ID))
 
-	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 1)
 	assert.True(t, ops[0].IsSplit())
@@ -215,7 +215,7 @@ func TestListOrder(t *testing.T) {
 	require.NoError(t, err)
 	want := []int64{night.ID, parts[1].ID, parts[0].ID, afternoon.ID, untimed.ID}
 
-	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	ids := make([]int64, len(ops))
 	for i, op := range ops {
@@ -226,7 +226,7 @@ func TestListOrder(t *testing.T) {
 	// pages of one item seek through the same order
 	var (
 		paged []int64
-		p     = pagination.Params{Limit: 1}
+		p     = pagination.NewParams(pagination.Cursor{}, 1)
 	)
 	for {
 		ops, next, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, p)
@@ -377,29 +377,31 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	require.NoError(t, err)
 
 	page, next, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{AccountID: f.card.ID},
-		pagination.Params{Limit: 4})
+		pagination.NewParams(pagination.Cursor{}, 4))
 	require.NoError(t, err)
 	require.Len(t, page, 4)
 	require.NotZero(t, next)
 	assert.Equal(t, domain.OpTransfer, page[0].Type, "incoming transfer matches the account filter")
 
 	page, next, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{AccountID: f.card.ID},
-		pagination.Params{Limit: 4, After: next})
+		pagination.NewParams(next, 4))
 	require.NoError(t, err)
 	require.Len(t, page, 2)
 	assert.Zero(t, next)
 	assert.Equal(t, day(t, "2026-10-01"), page[1].Date)
 
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ParentID}, pagination.Params{})
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ParentID},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 5, "cat1 filter matches its children")
 
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ID}, pagination.Params{})
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ID},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 2)
 
 	page, _, err = f.svc.Operations.List(ctx, f.userID,
-		domain.Filter{Query: "shop 3", DateFrom: day(t, "2026-10-02")}, pagination.Params{})
+		domain.Filter{Query: "shop 3", DateFrom: day(t, "2026-10-02")}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 1)
 
@@ -409,13 +411,15 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	})
 	require.NoError(t, err)
 	for _, q := range []string{"пятерочка", "пят мол", `"Пятёр`} {
-		page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: q}, pagination.Params{})
+		page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: q},
+			pagination.NewParams(pagination.Cursor{}, 0))
 		require.NoError(t, err, q)
 		require.Len(t, page, 1, q)
 		assert.Equal(t, op.ID, page[0].ID, q)
 	}
 	for _, q := range []string{"олоко", "пят хлеб", "50%", "AND", "*"} {
-		page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: q}, pagination.Params{})
+		page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: q},
+			pagination.NewParams(pagination.Cursor{}, 0))
 		require.NoError(t, err, q)
 		assert.Empty(t, page, q)
 	}
@@ -425,15 +429,17 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	}
 	_, err = f.svc.Operations.Update(ctx, f.userID, op.ID, in)
 	require.NoError(t, err)
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: "магнит"}, pagination.Params{})
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: "магнит"},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 1, "index follows updates")
 	require.NoError(t, f.svc.Operations.Delete(ctx, f.userID, op.ID))
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: "магнит"}, pagination.Params{})
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: "магнит"},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Empty(t, page, "and deletes")
 
-	_, next, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{Limit: 1})
+	_, next, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 1))
 	require.NoError(t, err)
 	require.NotZero(t, next)
 	assert.Equal(t, day(t, "2026-10-06"), next.Date)
@@ -662,7 +668,7 @@ func TestTags(t *testing.T) {
 	assert.Equal(t, []string{"Vacation 2026", "food"}, tags, "a case variant joins the tag")
 
 	vacation := domain.Filter{Tags: []string{"Vacation 2026"}}
-	ops, _, err := f.svc.Operations.List(ctx, f.userID, vacation, pagination.Params{})
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, vacation, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, ops, 2)
 	totals, err := f.svc.Operations.Totals(ctx, f.userID, vacation)
@@ -705,7 +711,7 @@ func TestListByAmount(t *testing.T) {
 	}
 	amounts := func(fl domain.Filter) []string {
 		t.Helper()
-		ops, _, err := f.svc.Operations.List(ctx, f.userID, fl, pagination.Params{})
+		ops, _, err := f.svc.Operations.List(ctx, f.userID, fl, pagination.NewParams(pagination.Cursor{}, 0))
 		require.NoError(t, err)
 		out := make([]string, len(ops))
 		for i, op := range ops {
@@ -726,7 +732,7 @@ func TestListByAmount(t *testing.T) {
 	_, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{
 		AmountMin: money.NullAmount{Amount: dec("5"), Valid: true},
 		AmountMax: money.NullAmount{Amount: dec("1"), Valid: true},
-	}, pagination.Params{})
+	}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.ErrorIs(t, err, errors.ErrInvalid)
 }
 
@@ -831,7 +837,7 @@ func TestUserIsolation(t *testing.T) {
 	})
 	require.ErrorIs(t, err, errors.ErrInvalid, "cannot use another user's category")
 
-	ops, _, err := svc.Operations.List(ctx, bob, domain.Filter{}, pagination.Params{})
+	ops, _, err := svc.Operations.List(ctx, bob, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Empty(t, ops)
 }
@@ -894,7 +900,7 @@ func TestDeleteAllData(t *testing.T) {
 	cats, err := svc.Categories.Tree(ctx, alice)
 	require.NoError(t, err)
 	assert.Empty(t, cats)
-	ops, _, err := svc.Operations.List(ctx, alice, domain.Filter{}, pagination.Params{})
+	ops, _, err := svc.Operations.List(ctx, alice, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Empty(t, ops)
 	plans, err := svc.Plans.List(ctx, alice, month(t, "2026-10"))
@@ -907,7 +913,7 @@ func TestDeleteAllData(t *testing.T) {
 	accounts, err = svc.Accounts.List(ctx, bob)
 	require.NoError(t, err)
 	assert.Len(t, accounts, 2, "other users keep their data")
-	ops, _, err = svc.Operations.List(ctx, bob, domain.Filter{}, pagination.Params{})
+	ops, _, err = svc.Operations.List(ctx, bob, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, ops, 4, "2 split parts, a transfer and an import")
 	imports, err = imp.List(ctx, bob)

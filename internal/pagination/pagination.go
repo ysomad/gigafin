@@ -57,31 +57,32 @@ func ParseCursor(s string) (Cursor, error) {
 }
 
 // Params selects a page: the items after After, zero for the first page, and at most
-// Limit of them.
+// PageSize of them. Make it with NewParams.
 type Params struct {
-	After Cursor
-	Limit int
+	After    Cursor
+	PageSize int
 }
 
-// PageLimit returns Limit clamped to a sane range.
-func (p Params) PageLimit() int {
+// NewParams returns the page of at most pageSize items after after, with pageSize
+// clamped to a sane range: zero or less is the default size.
+func NewParams(after Cursor, pageSize int) Params {
 	const (
-		defaultLimit = 50
-		maxLimit     = 500
+		defaultSize = 50
+		maxSize     = 500
 	)
-	if p.Limit <= 0 {
-		return defaultLimit
+	if pageSize <= 0 {
+		pageSize = defaultSize
 	}
-	return min(p.Limit, maxLimit)
+	return Params{After: after, PageSize: min(pageSize, maxSize)}
 }
 
-// Cut cuts items, fetched with one extra item beyond limit, to limit and returns the
-// cursor of the next page, zero on the last page. cursor returns the position of an
+// Cut cuts items, fetched with one extra item beyond pageSize, to pageSize and returns
+// the cursor of the next page, zero on the last page. cursor returns the position of an
 // item.
-func Cut[T any](items []T, limit int, cursor func(T) Cursor) ([]T, Cursor) {
-	if len(items) <= limit {
+func Cut[T any](items []T, pageSize int, cursor func(T) Cursor) ([]T, Cursor) {
+	if len(items) <= pageSize {
 		return items, Cursor{}
 	}
-	items = items[:limit]
+	items = items[:pageSize]
 	return items, cursor(items[len(items)-1])
 }

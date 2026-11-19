@@ -47,14 +47,13 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	if err != nil {
 		return err
 	}
-	var p pagination.Params
+	var after pagination.Cursor
 	if c := q.Get("cursor"); c != "" {
-		cur, err := pagination.ParseCursor(c)
-		if err != nil {
+		if after, err = pagination.ParseCursor(c); err != nil {
 			return domain.NewError(errors.ErrInvalid, "invalid page link")
 		}
-		p.After = cur
 	}
+	p := pagination.NewParams(after, 0)
 	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, f, p)
 	if err != nil {
 		return err

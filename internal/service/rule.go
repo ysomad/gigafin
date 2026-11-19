@@ -96,6 +96,19 @@ func (s *Rules) List(ctx context.Context, userID int64, f domain.RuleFilter) ([]
 	return out, nil
 }
 
+// Page returns a page of the user's rules, oldest first, and the cursor of the next
+// page. Rules are ordered by id alone, so the cursors carry only an id.
+func (s *Rules) Page(ctx context.Context, userID int64, p pagination.Params) ([]domain.Rule, pagination.Cursor, error) {
+	rules, err := s.store.Read().Rules.ListAfter(ctx, userID, p.After.ID, p.PageSize+1)
+	if err != nil {
+		return nil, pagination.Cursor{}, err
+	}
+	rules, next := pagination.Cut(rules, p.PageSize, func(r domain.Rule) pagination.Cursor {
+		return pagination.Cursor{ID: r.ID}
+	})
+	return rules, next, nil
+}
+
 // Get returns one rule.
 func (s *Rules) Get(ctx context.Context, userID, id int64) (domain.Rule, error) {
 	return s.store.Read().Rules.Get(ctx, userID, id)

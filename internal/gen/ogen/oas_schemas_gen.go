@@ -20,7 +20,7 @@ type Account struct {
 	Currency    Currency    `json:"currency"`
 	Kind        AccountKind `json:"kind"`
 	CreditLimit OptAmount   `json:"credit_limit"`
-	Archived    bool        `json:"archived"`
+	IsArchived  bool        `json:"is_archived"`
 	// Signed for every kind, a credit card owing 500 has balance "-500".
 	Balance Amount `json:"balance"`
 }
@@ -50,9 +50,9 @@ func (s *Account) GetCreditLimit() OptAmount {
 	return s.CreditLimit
 }
 
-// GetArchived returns the value of Archived.
-func (s *Account) GetArchived() bool {
-	return s.Archived
+// GetIsArchived returns the value of IsArchived.
+func (s *Account) GetIsArchived() bool {
+	return s.IsArchived
 }
 
 // GetBalance returns the value of Balance.
@@ -85,9 +85,9 @@ func (s *Account) SetCreditLimit(val OptAmount) {
 	s.CreditLimit = val
 }
 
-// SetArchived sets the value of Archived.
-func (s *Account) SetArchived(val bool) {
-	s.Archived = val
+// SetIsArchived sets the value of IsArchived.
+func (s *Account) SetIsArchived(val bool) {
+	s.IsArchived = val
 }
 
 // SetBalance sets the value of Balance.
@@ -253,12 +253,12 @@ func (s *BearerAuth) SetRoles(val []string) {
 
 // Ref: #/components/schemas/Category
 type Category struct {
-	ID       int64        `json:"id"`
-	ParentID OptInt64     `json:"parent_id"`
-	Kind     CategoryKind `json:"kind"`
-	Name     string       `json:"name"`
-	Archived bool         `json:"archived"`
-	Children []Category   `json:"children"`
+	ID         int64        `json:"id"`
+	ParentID   OptInt64     `json:"parent_id"`
+	Kind       CategoryKind `json:"kind"`
+	Name       string       `json:"name"`
+	IsArchived bool         `json:"is_archived"`
+	Children   []Category   `json:"children"`
 }
 
 // GetID returns the value of ID.
@@ -281,9 +281,9 @@ func (s *Category) GetName() string {
 	return s.Name
 }
 
-// GetArchived returns the value of Archived.
-func (s *Category) GetArchived() bool {
-	return s.Archived
+// GetIsArchived returns the value of IsArchived.
+func (s *Category) GetIsArchived() bool {
+	return s.IsArchived
 }
 
 // GetChildren returns the value of Children.
@@ -311,9 +311,9 @@ func (s *Category) SetName(val string) {
 	s.Name = val
 }
 
-// SetArchived sets the value of Archived.
-func (s *Category) SetArchived(val bool) {
-	s.Archived = val
+// SetIsArchived sets the value of IsArchived.
+func (s *Category) SetIsArchived(val bool) {
+	s.IsArchived = val
 }
 
 // SetChildren sets the value of Children.
@@ -872,8 +872,8 @@ func (s *OperationInput) SetTags(val []string) {
 
 // Ref: #/components/schemas/OperationList
 type OperationList struct {
-	Items      []Operation `json:"items"`
-	NextCursor OptString   `json:"next_cursor"`
+	Items          []Operation `json:"items"`
+	NextPageCursor OptString   `json:"next_page_cursor"`
 }
 
 // GetItems returns the value of Items.
@@ -881,9 +881,9 @@ func (s *OperationList) GetItems() []Operation {
 	return s.Items
 }
 
-// GetNextCursor returns the value of NextCursor.
-func (s *OperationList) GetNextCursor() OptString {
-	return s.NextCursor
+// GetNextPageCursor returns the value of NextPageCursor.
+func (s *OperationList) GetNextPageCursor() OptString {
+	return s.NextPageCursor
 }
 
 // SetItems sets the value of Items.
@@ -891,9 +891,9 @@ func (s *OperationList) SetItems(val []Operation) {
 	s.Items = val
 }
 
-// SetNextCursor sets the value of NextCursor.
-func (s *OperationList) SetNextCursor(val OptString) {
-	s.NextCursor = val
+// SetNextPageCursor sets the value of NextPageCursor.
+func (s *OperationList) SetNextPageCursor(val OptString) {
+	s.NextPageCursor = val
 }
 
 // Ref: #/components/schemas/OperationQuery
@@ -902,10 +902,10 @@ type OperationQuery struct {
 	// A root category also matches its nested categories.
 	CategoryID OptInt64 `json:"category_id"`
 	// Only expenses and income without a category; not with category_id.
-	Uncategorized OptBool          `json:"uncategorized"`
-	Type          OptOperationType `json:"type"`
-	DateFrom      OptDate          `json:"date_from"`
-	DateTo        OptDate          `json:"date_to"`
+	IsUncategorized OptBool          `json:"is_uncategorized"`
+	Type            OptOperationType `json:"type"`
+	DateFrom        OptDate          `json:"date_from"`
+	DateTo          OptDate          `json:"date_to"`
 	// Substring of payee or note.
 	Query OptString `json:"query"`
 	// Tag name, matched exactly.
@@ -914,9 +914,9 @@ type OperationQuery struct {
 	AmountMin OptAmount `json:"amount_min"`
 	// Greatest absolute amount, inclusive, in the currency of each operation.
 	AmountMax OptAmount `json:"amount_max"`
-	// Next_cursor of the previous page.
-	Cursor   OptString `json:"cursor"`
-	PageSize OptInt    `json:"page_size"`
+	// Next_page_cursor of the previous page.
+	PageCursor OptString `json:"page_cursor"`
+	PageSize   OptInt    `json:"page_size"`
 }
 
 // GetAccountID returns the value of AccountID.
@@ -929,9 +929,9 @@ func (s *OperationQuery) GetCategoryID() OptInt64 {
 	return s.CategoryID
 }
 
-// GetUncategorized returns the value of Uncategorized.
-func (s *OperationQuery) GetUncategorized() OptBool {
-	return s.Uncategorized
+// GetIsUncategorized returns the value of IsUncategorized.
+func (s *OperationQuery) GetIsUncategorized() OptBool {
+	return s.IsUncategorized
 }
 
 // GetType returns the value of Type.
@@ -969,9 +969,9 @@ func (s *OperationQuery) GetAmountMax() OptAmount {
 	return s.AmountMax
 }
 
-// GetCursor returns the value of Cursor.
-func (s *OperationQuery) GetCursor() OptString {
-	return s.Cursor
+// GetPageCursor returns the value of PageCursor.
+func (s *OperationQuery) GetPageCursor() OptString {
+	return s.PageCursor
 }
 
 // GetPageSize returns the value of PageSize.
@@ -989,9 +989,9 @@ func (s *OperationQuery) SetCategoryID(val OptInt64) {
 	s.CategoryID = val
 }
 
-// SetUncategorized sets the value of Uncategorized.
-func (s *OperationQuery) SetUncategorized(val OptBool) {
-	s.Uncategorized = val
+// SetIsUncategorized sets the value of IsUncategorized.
+func (s *OperationQuery) SetIsUncategorized(val OptBool) {
+	s.IsUncategorized = val
 }
 
 // SetType sets the value of Type.
@@ -1029,9 +1029,9 @@ func (s *OperationQuery) SetAmountMax(val OptAmount) {
 	s.AmountMax = val
 }
 
-// SetCursor sets the value of Cursor.
-func (s *OperationQuery) SetCursor(val OptString) {
-	s.Cursor = val
+// SetPageCursor sets the value of PageCursor.
+func (s *OperationQuery) SetPageCursor(val OptString) {
+	s.PageCursor = val
 }
 
 // SetPageSize sets the value of PageSize.
@@ -1654,7 +1654,7 @@ type Plan struct {
 	Currency   Currency `json:"currency"`
 	Amount     Amount   `json:"amount"`
 	// Copy the plan into following months.
-	Repeating OptBool `json:"repeating"`
+	IsRepeating OptBool `json:"is_repeating"`
 }
 
 // GetCategoryID returns the value of CategoryID.
@@ -1677,9 +1677,9 @@ func (s *Plan) GetAmount() Amount {
 	return s.Amount
 }
 
-// GetRepeating returns the value of Repeating.
-func (s *Plan) GetRepeating() OptBool {
-	return s.Repeating
+// GetIsRepeating returns the value of IsRepeating.
+func (s *Plan) GetIsRepeating() OptBool {
+	return s.IsRepeating
 }
 
 // SetCategoryID sets the value of CategoryID.
@@ -1702,9 +1702,9 @@ func (s *Plan) SetAmount(val Amount) {
 	s.Amount = val
 }
 
-// SetRepeating sets the value of Repeating.
-func (s *Plan) SetRepeating(val OptBool) {
-	s.Repeating = val
+// SetIsRepeating sets the value of IsRepeating.
+func (s *Plan) SetIsRepeating(val OptBool) {
+	s.IsRepeating = val
 }
 
 // Ref: #/components/schemas/PlanList
@@ -2135,7 +2135,8 @@ func (s *RuleInputMatch) UnmarshalText(data []byte) error {
 
 // Ref: #/components/schemas/RuleList
 type RuleList struct {
-	Items []Rule `json:"items"`
+	Items          []Rule    `json:"items"`
+	NextPageCursor OptString `json:"next_page_cursor"`
 }
 
 // GetItems returns the value of Items.
@@ -2143,9 +2144,19 @@ func (s *RuleList) GetItems() []Rule {
 	return s.Items
 }
 
+// GetNextPageCursor returns the value of NextPageCursor.
+func (s *RuleList) GetNextPageCursor() OptString {
+	return s.NextPageCursor
+}
+
 // SetItems sets the value of Items.
 func (s *RuleList) SetItems(val []Rule) {
 	s.Items = val
+}
+
+// SetNextPageCursor sets the value of NextPageCursor.
+func (s *RuleList) SetNextPageCursor(val OptString) {
+	s.NextPageCursor = val
 }
 
 type RuleMatch string
@@ -2353,17 +2364,17 @@ func (s *RuleOrigin) UnmarshalText(data []byte) error {
 // Ref: #/components/schemas/RuleSettings
 type RuleSettings struct {
 	// Changing the category of a payee's operations by hand creates or updates a rule for the payee.
-	Learning bool `json:"learning"`
+	IsLearning bool `json:"is_learning"`
 }
 
-// GetLearning returns the value of Learning.
-func (s *RuleSettings) GetLearning() bool {
-	return s.Learning
+// GetIsLearning returns the value of IsLearning.
+func (s *RuleSettings) GetIsLearning() bool {
+	return s.IsLearning
 }
 
-// SetLearning sets the value of Learning.
-func (s *RuleSettings) SetLearning(val bool) {
-	s.Learning = val
+// SetIsLearning sets the value of IsLearning.
+func (s *RuleSettings) SetIsLearning(val bool) {
+	s.IsLearning = val
 }
 
 // Pre rules run first, then default, then post; within a stage the most specific rules run last and

@@ -114,6 +114,13 @@ func TestMCP(t *testing.T) {
 		if tool.Name == "gigafin_delete_operation" {
 			assert.NotContains(t, string(schema), `"$defs"`, "no schema reached, none carried")
 		}
+		if tool.Name == "gigafin_apply_rule" {
+			assert.True(t, *tool.Annotations.DestructiveHint, "x-destructive")
+			assert.False(t, tool.Annotations.IdempotentHint)
+		}
+		if tool.Name == "gigafin_create_rule" {
+			assert.False(t, *tool.Annotations.DestructiveHint)
+		}
 		if tool.Name == "gigafin_list_accounts" {
 			out, err := json.Marshal(tool.OutputSchema)
 			require.NoError(t, err)
@@ -154,9 +161,13 @@ func TestMCP(t *testing.T) {
 	}})
 	require.Empty(t, errText)
 	assert.Equal(t, "user", rule["origin"])
+	rules, errText := call(read, "gigafin_list_rules", map[string]any{"page_size": 1})
+	require.Empty(t, errText)
+	assert.Len(t, rules["items"], 1)
+	assert.NotContains(t, rules, "next_page_cursor", "last page")
 	settings, errText := call(read, "gigafin_get_rule_settings", map[string]any{})
 	require.Empty(t, errText)
-	assert.Equal(t, true, settings["learning"])
+	assert.Equal(t, true, settings["is_learning"])
 
 	food, errText := call(write, "gigafin_create_category",
 		map[string]any{"body": map[string]any{"name": "Food", "kind": "expense"}})
@@ -197,6 +208,8 @@ func TestMCP(t *testing.T) {
 	plans, errText := call(read, "gigafin_list_plans", map[string]any{"month": "2026-10"})
 	require.Empty(t, errText)
 	assert.Len(t, plans["items"], 1)
+	_, errText = call(read, "gigafin_list_plans", map[string]any{"month": "bad"})
+	assert.Equal(t, `month: string: no regex match: ^\d{4}-\d{2}$`, errText)
 
 	_, errText = call(write, "gigafin_delete_operation", map[string]any{"id": op["id"]})
 	require.Empty(t, errText)

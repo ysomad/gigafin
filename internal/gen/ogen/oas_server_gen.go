@@ -53,7 +53,7 @@ type Handler interface {
 	DeleteRule(ctx context.Context, params DeleteRuleParams) error
 	// GetAccount implements getAccount operation.
 	//
-	// Get an account with its balance.
+	// Get an account.
 	//
 	// GET /accounts/{id}
 	GetAccount(ctx context.Context, params GetAccountParams) (*Account, error)
@@ -79,50 +79,50 @@ type Handler interface {
 	//
 	// Each payee whose category is the same in 3 of its 5 latest expenses and income gets a learned rule
 	// "payee is X → set category", or its learned rule is pointed at that category. Runs even when
-	// learning is off.
+	// is_learning is off.
 	//
 	// POST /rules/learn
 	LearnRules(ctx context.Context) (*RulesLearnResult, error)
 	// ListAccounts implements listAccounts operation.
 	//
-	// List accounts with balances.
+	// List accounts.
 	//
 	// GET /accounts
 	ListAccounts(ctx context.Context) (*AccountList, error)
 	// ListCategories implements listCategories operation.
 	//
-	// List the category tree.
+	// List categories.
 	//
 	// GET /categories
 	ListCategories(ctx context.Context) (*CategoryList, error)
 	// ListOperations implements listOperations operation.
 	//
-	// List operations, newest first.
+	// List operations.
 	//
 	// QUERY /operations
 	ListOperations(ctx context.Context, req *OperationQuery) (*OperationList, error)
 	// ListPlans implements listPlans operation.
 	//
-	// List plans of a month.
+	// List plans.
 	//
 	// GET /plans
 	ListPlans(ctx context.Context, params ListPlansParams) (*PlanList, error)
 	// ListRules implements listRules operation.
 	//
-	// List rules, oldest first.
+	// List rules.
 	//
 	// GET /rules
-	ListRules(ctx context.Context) (*RuleList, error)
+	ListRules(ctx context.Context, params ListRulesParams) (*RuleList, error)
 	// RunRules implements runRules operation.
 	//
-	// Parts of splits are left alone. cursor and page_size of the filter are ignored.
+	// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
 	//
 	// POST /rules/run
 	RunRules(ctx context.Context, req *OperationQuery) (*RulesRunResult, error)
 	// SetPlan implements setPlan operation.
 	//
 	// The latest repeating plan before a month is copied into it when the month starts. Amount "0" with
-	// repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+	// is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
 	//
 	// PUT /plans
 	SetPlan(ctx context.Context, req *Plan) error
@@ -134,9 +134,9 @@ type Handler interface {
 	SetRuleSettings(ctx context.Context, req *RuleSettings) error
 	// SplitOperation implements splitOperation operation.
 	//
-	// Divides the operation between categories. The parts add up to its amount; the first one replaces the
-	// operation, the others become new operations. All parts share origin_id and are independent
-	// operations afterwards.
+	// Divides an expense or income between categories. The parts add up to its amount; the first one
+	// replaces the operation, the others become new operations. All parts share origin_id and are
+	// independent operations afterwards.
 	//
 	// POST /operations/{id}/split
 	SplitOperation(ctx context.Context, req *SplitInput, params SplitOperationParams) (*SplitResult, error)

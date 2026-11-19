@@ -185,7 +185,7 @@ func (h *Handler) renderAccount(
 	}
 	// the first page of the operations; the operations list serves the next ones
 	f := domain.Filter{AccountID: a.ID}
-	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.Params{Limit: 20})
+	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.NewParams(pagination.Cursor{}, 20))
 	if err != nil {
 		return err
 	}

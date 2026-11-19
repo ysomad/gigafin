@@ -282,7 +282,8 @@ func TestPagesAndFlows(t *testing.T) {
 		assert.Contains(t, body, e, "every invalid input is shown at once")
 	}
 
-	ops, _, err := f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})
+	ops, _, err := f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 1)
 	opPath := "/operations/" + strconv.FormatInt(ops[0].ID, 10)
@@ -319,7 +320,8 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(t, body, `aria-label="Part of a split"`)
 	assert.Contains(t, body, "coffee")
 
-	ops, _, err = f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense}, pagination.Params{})
+	ops, _, err = f.Operations.List(t.Context(), userID, domain.Filter{Type: domain.OpExpense},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 2)
 	status, body = b.get(opPath + "/split")

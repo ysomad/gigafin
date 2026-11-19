@@ -208,32 +208,51 @@ func newOperation(
 		}
 		name.WriteRune(r)
 	}
-	// hints follow HTTP semantics: GET and QUERY read, PUT and DELETE overwrite or remove
-	// what is there, POST adds; no tool reaches beyond the user's own data
-	readOnly := method == http.MethodGet || method == "QUERY"
-	destructive := !readOnly && method != http.MethodPost
-	openWorld := false
+	hints, err := annotations(method, op)
+	if err != nil {
+		return nil, operation{}, err
+	}
 	t := &sdkmcp.Tool{
 		Name:        name.String(),
 		Description: strings.TrimSpace(op.Summary + ". " + op.Description),
 		InputSchema: in,
-		Annotations: &sdkmcp.ToolAnnotations{
-			ReadOnlyHint:    readOnly,
-			DestructiveHint: &destructive,
-			IdempotentHint:  method != http.MethodPost && method != http.MethodPatch,
-			OpenWorldHint:   &openWorld,
-		},
+		Annotations: hints,
 	}
-	for code, resp := range op.Responses {
-		m, ok := resp.Content["application/json"]
+	// the output is the body of the first success response with one, in code order, so
+	// the schema does not depend on map order
+	for _, code := range slices.Sorted(maps.Keys(op.Responses)) {
+		m, ok := op.Responses[code].Content["application/json"]
 		if !strings.HasPrefix(code, "2") || !ok || m.Schema == nil {
 			continue
 		}
 		if t.OutputSchema, err = standalone(map[string]any{"type": "object", "allOf": []any{m.Schema}}, defs); err != nil {
 			return nil, operation{}, fmt.Errorf("output schema: %w", err)
 		}
+		break
 	}
 	return t, o, nil
+}
+
+// annotations returns the hints of the tool of op at method. They follow HTTP semantics:
+// GET and QUERY read, PUT and DELETE overwrite or remove what is there, POST adds, unless
+// the spec marks it x-destructive as it changes what is there too. No tool reaches
+// beyond the user's own data.
+func annotations(method string, op *ogen.Operation) (*sdkmcp.ToolAnnotations, error) {
+	readOnly := method == http.MethodGet || method == "QUERY"
+	destructive := !readOnly && method != http.MethodPost
+	if ext, ok := op.Common.Extensions["x-destructive"]; ok {
+		var err error
+		if destructive, err = strconv.ParseBool(ext.Value); err != nil {
+			return nil, fmt.Errorf("x-destructive: %w", err)
+		}
+	}
+	openWorld := false
+	return &sdkmcp.ToolAnnotations{
+		ReadOnlyHint:    readOnly,
+		DestructiveHint: &destructive,
+		IdempotentHint:  method != http.MethodPost && method != http.MethodPatch,
+		OpenWorldHint:   &openWorld,
+	}, nil
 }
 
 // call serves a tool call with an in-process request to the API as the verified key.

@@ -109,7 +109,7 @@ func (s *Server) handleApplyRuleRequest(args [1]string, argsEscaped bool, w http
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ApplyRuleOperation,
-			OperationSummary: "Apply a rule to all operations it matches",
+			OperationSummary: "Apply a rule",
 			OperationID:      "applyRule",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1018,7 +1018,7 @@ func (s *Server) handleDeleteRuleRequest(args [1]string, argsEscaped bool, w htt
 
 // handleGetAccountRequest handles getAccount operation.
 //
-// Get an account with its balance.
+// Get an account.
 //
 // GET /accounts/{id}
 func (s *Server) handleGetAccountRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1097,7 +1097,7 @@ func (s *Server) handleGetAccountRequest(args [1]string, argsEscaped bool, w htt
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    GetAccountOperation,
-			OperationSummary: "Get an account with its balance",
+			OperationSummary: "Get an account",
 			OperationID:      "getAccount",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1569,7 +1569,7 @@ func (s *Server) handleGetRuleSettingsRequest(args [0]string, argsEscaped bool, 
 //
 // Each payee whose category is the same in 3 of its 5 latest expenses and income gets a learned rule
 // "payee is X → set category", or its learned rule is pointed at that category. Runs even when
-// learning is off.
+// is_learning is off.
 //
 // POST /rules/learn
 func (s *Server) handleLearnRulesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1638,7 +1638,7 @@ func (s *Server) handleLearnRulesRequest(args [0]string, argsEscaped bool, w htt
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    LearnRulesOperation,
-			OperationSummary: "Learn rules from all operations",
+			OperationSummary: "Learn rules",
 			OperationID:      "learnRules",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1695,7 +1695,7 @@ func (s *Server) handleLearnRulesRequest(args [0]string, argsEscaped bool, w htt
 
 // handleListAccountsRequest handles listAccounts operation.
 //
-// List accounts with balances.
+// List accounts.
 //
 // GET /accounts
 func (s *Server) handleListAccountsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1764,7 +1764,7 @@ func (s *Server) handleListAccountsRequest(args [0]string, argsEscaped bool, w h
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ListAccountsOperation,
-			OperationSummary: "List accounts with balances",
+			OperationSummary: "List accounts",
 			OperationID:      "listAccounts",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1821,7 +1821,7 @@ func (s *Server) handleListAccountsRequest(args [0]string, argsEscaped bool, w h
 
 // handleListCategoriesRequest handles listCategories operation.
 //
-// List the category tree.
+// List categories.
 //
 // GET /categories
 func (s *Server) handleListCategoriesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1890,7 +1890,7 @@ func (s *Server) handleListCategoriesRequest(args [0]string, argsEscaped bool, w
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ListCategoriesOperation,
-			OperationSummary: "List the category tree",
+			OperationSummary: "List categories",
 			OperationID:      "listCategories",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -1947,7 +1947,7 @@ func (s *Server) handleListCategoriesRequest(args [0]string, argsEscaped bool, w
 
 // handleListOperationsRequest handles listOperations operation.
 //
-// List operations, newest first.
+// List operations.
 //
 // QUERY /operations
 func (s *Server) handleListOperationsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2031,7 +2031,7 @@ func (s *Server) handleListOperationsRequest(args [0]string, argsEscaped bool, w
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ListOperationsOperation,
-			OperationSummary: "List operations, newest first",
+			OperationSummary: "List operations",
 			OperationID:      "listOperations",
 			Body:             request,
 			RawBody:          rawBody,
@@ -2088,7 +2088,7 @@ func (s *Server) handleListOperationsRequest(args [0]string, argsEscaped bool, w
 
 // handleListPlansRequest handles listPlans operation.
 //
-// List plans of a month.
+// List plans.
 //
 // GET /plans
 func (s *Server) handleListPlansRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2167,7 +2167,7 @@ func (s *Server) handleListPlansRequest(args [0]string, argsEscaped bool, w http
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ListPlansOperation,
-			OperationSummary: "List plans of a month",
+			OperationSummary: "List plans",
 			OperationID:      "listPlans",
 			Body:             nil,
 			RawBody:          rawBody,
@@ -2229,7 +2229,7 @@ func (s *Server) handleListPlansRequest(args [0]string, argsEscaped bool, w http
 
 // handleListRulesRequest handles listRules operation.
 //
-// List rules, oldest first.
+// List rules.
 //
 // GET /rules
 func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2290,6 +2290,16 @@ func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http
 			return
 		}
 	}
+	params, err := decodeListRulesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -2298,17 +2308,26 @@ func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    ListRulesOperation,
-			OperationSummary: "List rules, oldest first",
+			OperationSummary: "List rules",
 			OperationID:      "listRules",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "page_cursor",
+					In:   "query",
+				}: params.PageCursor,
+				{
+					Name: "page_size",
+					In:   "query",
+				}: params.PageSize,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = ListRulesParams
 			Response = *RuleList
 		)
 		response, err = middleware.HookMiddleware[
@@ -2318,14 +2337,14 @@ func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http
 		](
 			m,
 			mreq,
-			nil,
+			unpackListRulesParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListRules(ctx)
+				response, err = s.h.ListRules(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.ListRules(ctx)
+		response, err = s.h.ListRules(ctx, params)
 	}
 	if err != nil {
 		if errRes, ok := errors.Into[*ErrorStatusCode](err); ok {
@@ -2355,7 +2374,7 @@ func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http
 
 // handleRunRulesRequest handles runRules operation.
 //
-// Parts of splits are left alone. cursor and page_size of the filter are ignored.
+// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
 //
 // POST /rules/run
 func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2439,7 +2458,7 @@ func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    RunRulesOperation,
-			OperationSummary: "Run all rules on the operations matching a filter",
+			OperationSummary: "Run rules",
 			OperationID:      "runRules",
 			Body:             request,
 			RawBody:          rawBody,
@@ -2497,7 +2516,7 @@ func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.
 // handleSetPlanRequest handles setPlan operation.
 //
 // The latest repeating plan before a month is copied into it when the month starts. Amount "0" with
-// repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+// is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
 //
 // PUT /plans
 func (s *Server) handleSetPlanRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2581,7 +2600,7 @@ func (s *Server) handleSetPlanRequest(args [0]string, argsEscaped bool, w http.R
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    SetPlanOperation,
-			OperationSummary: "Set a plan of a category for a month",
+			OperationSummary: "Set a plan",
 			OperationID:      "setPlan",
 			Body:             request,
 			RawBody:          rawBody,
@@ -2779,9 +2798,9 @@ func (s *Server) handleSetRuleSettingsRequest(args [0]string, argsEscaped bool, 
 
 // handleSplitOperationRequest handles splitOperation operation.
 //
-// Divides the operation between categories. The parts add up to its amount; the first one replaces the
-// operation, the others become new operations. All parts share origin_id and are independent
-// operations afterwards.
+// Divides an expense or income between categories. The parts add up to its amount; the first one
+// replaces the operation, the others become new operations. All parts share origin_id and are
+// independent operations afterwards.
 //
 // POST /operations/{id}/split
 func (s *Server) handleSplitOperationRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2875,7 +2894,7 @@ func (s *Server) handleSplitOperationRequest(args [1]string, argsEscaped bool, w
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    SplitOperationOperation,
-			OperationSummary: "Split an expense or income into parts",
+			OperationSummary: "Split an operation",
 			OperationID:      "splitOperation",
 			Body:             request,
 			RawBody:          rawBody,

@@ -30,11 +30,11 @@ func TestCursorRoundTrip(t *testing.T) {
 	}
 }
 
-func TestParamsPageLimit(t *testing.T) {
+func TestNewParams(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, 50, pagination.Params{}.PageLimit())
-	assert.Equal(t, 10, pagination.Params{Limit: 10}.PageLimit())
-	assert.Equal(t, 500, pagination.Params{Limit: 1000}.PageLimit())
+	assert.Equal(t, 50, pagination.NewParams(pagination.Cursor{}, 0).PageSize)
+	assert.Equal(t, 10, pagination.NewParams(pagination.Cursor{}, 10).PageSize)
+	assert.Equal(t, 500, pagination.NewParams(pagination.Cursor{}, 1000).PageSize)
 }
 
 func TestCut(t *testing.T) {

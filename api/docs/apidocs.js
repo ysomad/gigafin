@@ -4,6 +4,8 @@ Scalar.createApiReference('#app', {
   telemetry: false,
   agent: { disabled: true },
   mcp: { disabled: true },
+  showDeveloperTools: 'never',
+  defaultOpenAllTags: true,
   expandAllModelSections: true,
   expandAllResponses: true,
   expandAllSchemaProperties: true,

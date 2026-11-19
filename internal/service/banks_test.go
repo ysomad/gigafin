@@ -201,7 +201,8 @@ func (f bankFixture) sync(t *testing.T, force bool) domain.BankSync {
 // ops returns the operations of account id, newest first.
 func (f bankFixture) ops(t *testing.T, id int64) []domain.Operation {
 	t.Helper()
-	ops, _, err := f.svc.Operations.List(t.Context(), f.userID, domain.Filter{AccountID: id}, pagination.Params{})
+	ops, _, err := f.svc.Operations.List(t.Context(), f.userID, domain.Filter{AccountID: id},
+		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	return ops
 }

@@ -45,8 +45,8 @@ func (s *Account) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		e.FieldStart("archived")
-		e.Bool(s.Archived)
+		e.FieldStart("is_archived")
+		e.Bool(s.IsArchived)
 	}
 	{
 		e.FieldStart("balance")
@@ -60,7 +60,7 @@ var jsonFieldsNameOfAccount = [7]string{
 	2: "currency",
 	3: "kind",
 	4: "credit_limit",
-	5: "archived",
+	5: "is_archived",
 	6: "balance",
 }
 
@@ -127,17 +127,17 @@ func (s *Account) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"credit_limit\"")
 			}
-		case "archived":
+		case "is_archived":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				v, err := d.Bool()
-				s.Archived = bool(v)
+				s.IsArchived = bool(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"archived\"")
+				return errors.Wrap(err, "decode field \"is_archived\"")
 			}
 		case "balance":
 			requiredBitSet[0] |= 1 << 6
@@ -570,8 +570,8 @@ func (s *Category) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("archived")
-		e.Bool(s.Archived)
+		e.FieldStart("is_archived")
+		e.Bool(s.IsArchived)
 	}
 	{
 		if s.Children != nil {
@@ -590,7 +590,7 @@ var jsonFieldsNameOfCategory = [6]string{
 	1: "parent_id",
 	2: "kind",
 	3: "name",
-	4: "archived",
+	4: "is_archived",
 	5: "children",
 }
 
@@ -647,17 +647,17 @@ func (s *Category) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "archived":
+		case "is_archived":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := d.Bool()
-				s.Archived = bool(v)
+				s.IsArchived = bool(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"archived\"")
+				return errors.Wrap(err, "decode field \"is_archived\"")
 			}
 		case "children":
 			if err := func() error {
@@ -1877,16 +1877,16 @@ func (s *OperationList) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
-		if s.NextCursor.Set {
-			e.FieldStart("next_cursor")
-			s.NextCursor.Encode(e)
+		if s.NextPageCursor.Set {
+			e.FieldStart("next_page_cursor")
+			s.NextPageCursor.Encode(e)
 		}
 	}
 }
 
 var jsonFieldsNameOfOperationList = [2]string{
 	0: "items",
-	1: "next_cursor",
+	1: "next_page_cursor",
 }
 
 // Decode decodes OperationList from json.
@@ -1916,15 +1916,15 @@ func (s *OperationList) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"items\"")
 			}
-		case "next_cursor":
+		case "next_page_cursor":
 			if err := func() error {
-				s.NextCursor.Reset()
-				if err := s.NextCursor.Decode(d); err != nil {
+				s.NextPageCursor.Reset()
+				if err := s.NextPageCursor.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"next_cursor\"")
+				return errors.Wrap(err, "decode field \"next_page_cursor\"")
 			}
 		default:
 			return d.Skip()
@@ -2004,9 +2004,9 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Uncategorized.Set {
-			e.FieldStart("uncategorized")
-			s.Uncategorized.Encode(e)
+		if s.IsUncategorized.Set {
+			e.FieldStart("is_uncategorized")
+			s.IsUncategorized.Encode(e)
 		}
 	}
 	{
@@ -2052,9 +2052,9 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Cursor.Set {
-			e.FieldStart("cursor")
-			s.Cursor.Encode(e)
+		if s.PageCursor.Set {
+			e.FieldStart("page_cursor")
+			s.PageCursor.Encode(e)
 		}
 	}
 	{
@@ -2068,7 +2068,7 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfOperationQuery = [12]string{
 	0:  "account_id",
 	1:  "category_id",
-	2:  "uncategorized",
+	2:  "is_uncategorized",
 	3:  "type",
 	4:  "date_from",
 	5:  "date_to",
@@ -2076,7 +2076,7 @@ var jsonFieldsNameOfOperationQuery = [12]string{
 	7:  "tag",
 	8:  "amount_min",
 	9:  "amount_max",
-	10: "cursor",
+	10: "page_cursor",
 	11: "page_size",
 }
 
@@ -2109,15 +2109,15 @@ func (s *OperationQuery) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"category_id\"")
 			}
-		case "uncategorized":
+		case "is_uncategorized":
 			if err := func() error {
-				s.Uncategorized.Reset()
-				if err := s.Uncategorized.Decode(d); err != nil {
+				s.IsUncategorized.Reset()
+				if err := s.IsUncategorized.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"uncategorized\"")
+				return errors.Wrap(err, "decode field \"is_uncategorized\"")
 			}
 		case "type":
 			if err := func() error {
@@ -2189,15 +2189,15 @@ func (s *OperationQuery) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"amount_max\"")
 			}
-		case "cursor":
+		case "page_cursor":
 			if err := func() error {
-				s.Cursor.Reset()
-				if err := s.Cursor.Decode(d); err != nil {
+				s.PageCursor.Reset()
+				if err := s.PageCursor.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"cursor\"")
+				return errors.Wrap(err, "decode field \"page_cursor\"")
 			}
 		case "page_size":
 			if err := func() error {
@@ -2711,9 +2711,9 @@ func (s *Plan) encodeFields(e *jx.Encoder) {
 		s.Amount.Encode(e)
 	}
 	{
-		if s.Repeating.Set {
-			e.FieldStart("repeating")
-			s.Repeating.Encode(e)
+		if s.IsRepeating.Set {
+			e.FieldStart("is_repeating")
+			s.IsRepeating.Encode(e)
 		}
 	}
 }
@@ -2723,7 +2723,7 @@ var jsonFieldsNameOfPlan = [5]string{
 	1: "month",
 	2: "currency",
 	3: "amount",
-	4: "repeating",
+	4: "is_repeating",
 }
 
 // Decode decodes Plan from json.
@@ -2780,15 +2780,15 @@ func (s *Plan) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"amount\"")
 			}
-		case "repeating":
+		case "is_repeating":
 			if err := func() error {
-				s.Repeating.Reset()
-				if err := s.Repeating.Decode(d); err != nil {
+				s.IsRepeating.Reset()
+				if err := s.IsRepeating.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"repeating\"")
+				return errors.Wrap(err, "decode field \"is_repeating\"")
 			}
 		default:
 			return d.Skip()
@@ -3754,10 +3754,17 @@ func (s *RuleList) encodeFields(e *jx.Encoder) {
 		}
 		e.ArrEnd()
 	}
+	{
+		if s.NextPageCursor.Set {
+			e.FieldStart("next_page_cursor")
+			s.NextPageCursor.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfRuleList = [1]string{
+var jsonFieldsNameOfRuleList = [2]string{
 	0: "items",
+	1: "next_page_cursor",
 }
 
 // Decode decodes RuleList from json.
@@ -3786,6 +3793,16 @@ func (s *RuleList) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"items\"")
+			}
+		case "next_page_cursor":
+			if err := func() error {
+				s.NextPageCursor.Reset()
+				if err := s.NextPageCursor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_cursor\"")
 			}
 		default:
 			return d.Skip()
@@ -3995,13 +4012,13 @@ func (s *RuleSettings) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *RuleSettings) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("learning")
-		e.Bool(s.Learning)
+		e.FieldStart("is_learning")
+		e.Bool(s.IsLearning)
 	}
 }
 
 var jsonFieldsNameOfRuleSettings = [1]string{
-	0: "learning",
+	0: "is_learning",
 }
 
 // Decode decodes RuleSettings from json.
@@ -4013,17 +4030,17 @@ func (s *RuleSettings) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "learning":
+		case "is_learning":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Bool()
-				s.Learning = bool(v)
+				s.IsLearning = bool(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"learning\"")
+				return errors.Wrap(err, "decode field \"is_learning\"")
 			}
 		default:
 			return d.Skip()

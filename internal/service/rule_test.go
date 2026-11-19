@@ -142,7 +142,7 @@ func TestRulesOnImport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, n)
 
-	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 2)
 	assert.Equal(t, "Shokoladnica", ops[0].Payee)
@@ -242,7 +242,7 @@ func TestRulesLearn(t *testing.T) {
 		in("2026-10-01", f.groceries.ID), in("2026-10-02", f.groceries.ID), {Type: domain.OpExpense},
 	})
 	require.ErrorIs(t, err, errors.ErrNotFound, "the third has no account")
-	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Empty(t, ops, "all or none")
 

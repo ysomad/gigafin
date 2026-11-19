@@ -79,7 +79,7 @@ func (UnimplementedHandler) DeleteRule(ctx context.Context, params DeleteRulePar
 
 // GetAccount implements getAccount operation.
 //
-// Get an account with its balance.
+// Get an account.
 //
 // GET /accounts/{id}
 func (UnimplementedHandler) GetAccount(ctx context.Context, params GetAccountParams) (r *Account, _ error) {
@@ -117,7 +117,7 @@ func (UnimplementedHandler) GetRuleSettings(ctx context.Context) (r *RuleSetting
 //
 // Each payee whose category is the same in 3 of its 5 latest expenses and income gets a learned rule
 // "payee is X → set category", or its learned rule is pointed at that category. Runs even when
-// learning is off.
+// is_learning is off.
 //
 // POST /rules/learn
 func (UnimplementedHandler) LearnRules(ctx context.Context) (r *RulesLearnResult, _ error) {
@@ -126,7 +126,7 @@ func (UnimplementedHandler) LearnRules(ctx context.Context) (r *RulesLearnResult
 
 // ListAccounts implements listAccounts operation.
 //
-// List accounts with balances.
+// List accounts.
 //
 // GET /accounts
 func (UnimplementedHandler) ListAccounts(ctx context.Context) (r *AccountList, _ error) {
@@ -135,7 +135,7 @@ func (UnimplementedHandler) ListAccounts(ctx context.Context) (r *AccountList, _
 
 // ListCategories implements listCategories operation.
 //
-// List the category tree.
+// List categories.
 //
 // GET /categories
 func (UnimplementedHandler) ListCategories(ctx context.Context) (r *CategoryList, _ error) {
@@ -144,7 +144,7 @@ func (UnimplementedHandler) ListCategories(ctx context.Context) (r *CategoryList
 
 // ListOperations implements listOperations operation.
 //
-// List operations, newest first.
+// List operations.
 //
 // QUERY /operations
 func (UnimplementedHandler) ListOperations(ctx context.Context, req *OperationQuery) (r *OperationList, _ error) {
@@ -153,7 +153,7 @@ func (UnimplementedHandler) ListOperations(ctx context.Context, req *OperationQu
 
 // ListPlans implements listPlans operation.
 //
-// List plans of a month.
+// List plans.
 //
 // GET /plans
 func (UnimplementedHandler) ListPlans(ctx context.Context, params ListPlansParams) (r *PlanList, _ error) {
@@ -162,16 +162,16 @@ func (UnimplementedHandler) ListPlans(ctx context.Context, params ListPlansParam
 
 // ListRules implements listRules operation.
 //
-// List rules, oldest first.
+// List rules.
 //
 // GET /rules
-func (UnimplementedHandler) ListRules(ctx context.Context) (r *RuleList, _ error) {
+func (UnimplementedHandler) ListRules(ctx context.Context, params ListRulesParams) (r *RuleList, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
 // RunRules implements runRules operation.
 //
-// Parts of splits are left alone. cursor and page_size of the filter are ignored.
+// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
 //
 // POST /rules/run
 func (UnimplementedHandler) RunRules(ctx context.Context, req *OperationQuery) (r *RulesRunResult, _ error) {
@@ -181,7 +181,7 @@ func (UnimplementedHandler) RunRules(ctx context.Context, req *OperationQuery) (
 // SetPlan implements setPlan operation.
 //
 // The latest repeating plan before a month is copied into it when the month starts. Amount "0" with
-// repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+// is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
 //
 // PUT /plans
 func (UnimplementedHandler) SetPlan(ctx context.Context, req *Plan) error {
@@ -199,9 +199,9 @@ func (UnimplementedHandler) SetRuleSettings(ctx context.Context, req *RuleSettin
 
 // SplitOperation implements splitOperation operation.
 //
-// Divides the operation between categories. The parts add up to its amount; the first one replaces the
-// operation, the others become new operations. All parts share origin_id and are independent
-// operations afterwards.
+// Divides an expense or income between categories. The parts add up to its amount; the first one
+// replaces the operation, the others become new operations. All parts share origin_id and are
+// independent operations afterwards.
 //
 // POST /operations/{id}/split
 func (UnimplementedHandler) SplitOperation(ctx context.Context, req *SplitInput, params SplitOperationParams) (r *SplitResult, _ error) {

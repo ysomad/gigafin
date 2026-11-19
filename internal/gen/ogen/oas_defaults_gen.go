@@ -14,6 +14,6 @@ func (s *OperationQuery) setDefaults() {
 func (s *Plan) setDefaults() {
 	{
 		val := bool(false)
-		s.Repeating.SetTo(val)
+		s.IsRepeating.SetTo(val)
 	}
 }

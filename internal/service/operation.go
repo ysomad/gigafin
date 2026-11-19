@@ -277,12 +277,11 @@ func (s *Operations) List(
 	if err := f.Validate(); err != nil {
 		return nil, pagination.Cursor{}, err
 	}
-	limit := p.PageLimit()
-	ops, err := s.store.Read().Operations.List(ctx, userID, f, p.After, limit+1)
+	ops, err := s.store.Read().Operations.List(ctx, userID, f, p.After, p.PageSize+1)
 	if err != nil {
 		return nil, pagination.Cursor{}, err
 	}
-	ops, next := pagination.Cut(ops, limit, func(op domain.Operation) pagination.Cursor {
+	ops, next := pagination.Cut(ops, p.PageSize, func(op domain.Operation) pagination.Cursor {
 		return pagination.Cursor{Date: op.Date, Time: op.Time, Group: cmp.Or(op.OriginID, op.ID), ID: op.ID}
 	})
 	return ops, next, nil

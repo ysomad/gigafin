@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/validate"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -118,9 +120,22 @@ func (h *Handler) NewError(ctx context.Context, err error) *ogen.ErrorStatusCode
 
 // errorHandler answers request decoding errors, which bypass NewError.
 func (h *Handler) errorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
-	status, code, msg := http.StatusBadRequest, ogen.ErrorCodeBadRequest, err.Error()
-	var ogenErr ogenerrors.Error
-	if !errors.As(err, &ogenErr) {
+	status, code := http.StatusBadRequest, ogen.ErrorCodeBadRequest
+	var msg string
+	if ogenErr, ok := errors.AsType[ogenerrors.Error](err); ok {
+		// ogen prefixes the cause with the operation and the decoding step, which mean
+		// nothing to the caller; answer with the cause and the parameter it is about
+		msg = ogenErr.Unwrap().Error()
+		if p, ok := errors.AsType[*ogenerrors.DecodeParamError](err); ok {
+			msg = p.Name + ": " + p.Err.Error()
+		}
+		if b, ok := errors.AsType[*ogenerrors.DecodeBodyError](err); ok {
+			msg = b.Err.Error()
+		}
+		if v, ok := errors.AsType[*validate.Error](err); ok {
+			msg = v.Error()
+		}
+	} else {
 		status, code, msg = classify(err)
 	}
 	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -261,15 +276,13 @@ func (h *Handler) ListOperations(ctx context.Context, req *ogen.OperationQuery) 
 	if err != nil {
 		return nil, err
 	}
-	p := pagination.Params{Limit: req.PageSize.Or(0)}
-	if c, ok := req.Cursor.Get(); ok {
-		cur, err := pagination.ParseCursor(c)
-		if err != nil {
-			return nil, err
+	var after pagination.Cursor
+	if c, ok := req.PageCursor.Get(); ok {
+		if after, err = pagination.ParseCursor(c); err != nil {
+			return nil, fmt.Errorf("page_cursor: malformed: %w", errors.ErrInvalid)
 		}
-		p.After = cur
 	}
-	ops, next, err := h.svc.Operations.List(ctx, key.UserID, f, p)
+	ops, next, err := h.svc.Operations.List(ctx, key.UserID, f, pagination.NewParams(after, req.PageSize.Or(0)))
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +291,7 @@ func (h *Handler) ListOperations(ctx context.Context, req *ogen.OperationQuery) 
 		out.Items[i] = toOperation(op)
 	}
 	if !next.IsZero() {
-		out.NextCursor = ogen.NewOptString(next.String())
+		out.NextPageCursor = ogen.NewOptString(next.String())
 	}
 	return out, nil
 }
@@ -394,11 +407,11 @@ func (h *Handler) ListPlans(ctx context.Context, params ogen.ListPlansParams) (*
 	out := &ogen.PlanList{Items: make([]ogen.Plan, len(plans))}
 	for i, b := range plans {
 		out.Items[i] = ogen.Plan{
-			CategoryID: b.CategoryID,
-			Month:      b.Month.String(),
-			Currency:   ogen.Currency(b.Currency),
-			Amount:     ogen.Amount(b.Amount.Fixed(b.Currency)),
-			Repeating:  ogen.NewOptBool(b.Repeating),
+			CategoryID:  b.CategoryID,
+			Month:       b.Month.String(),
+			Currency:    ogen.Currency(b.Currency),
+			Amount:      ogen.Amount(b.Amount.Fixed(b.Currency)),
+			IsRepeating: ogen.NewOptBool(b.Repeating),
 		}
 	}
 	return out, nil
@@ -419,23 +432,35 @@ func (h *Handler) SetPlan(ctx context.Context, req *ogen.Plan) error {
 	if err != nil {
 		return fmt.Errorf("amount: invalid decimal: %w", errors.ErrInvalid)
 	}
-	return h.svc.Plans.Set(ctx, key.UserID, req.CategoryID, month, string(req.Currency), d, req.Repeating.Or(false))
+	return h.svc.Plans.Set(ctx, key.UserID, req.CategoryID, month, string(req.Currency), d, req.IsRepeating.Or(false))
 }
 
 // ListRules implements ogen.Handler.
-func (h *Handler) ListRules(ctx context.Context) (*ogen.RuleList, error) {
+func (h *Handler) ListRules(ctx context.Context, params ogen.ListRulesParams) (*ogen.RuleList, error) {
 	// every operation requires a key, so a missing one is a wiring bug; fail closed
 	key, ok := ctx.Value(keyCtx{}).(domain.APIKey)
 	if !ok {
 		return nil, errors.ErrUnauthorized
 	}
-	rules, err := h.svc.Rules.List(ctx, key.UserID, domain.RuleFilter{})
+	// a rule cursor is the id of the last rule of a page
+	var after pagination.Cursor
+	if c, ok := params.PageCursor.Get(); ok {
+		id, err := strconv.ParseInt(c, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("page_cursor: malformed: %w", errors.ErrInvalid)
+		}
+		after.ID = id
+	}
+	rules, next, err := h.svc.Rules.Page(ctx, key.UserID, pagination.NewParams(after, params.PageSize.Or(0)))
 	if err != nil {
 		return nil, err
 	}
 	out := &ogen.RuleList{Items: make([]ogen.Rule, len(rules))}
 	for i, r := range rules {
 		out.Items[i] = toRule(r)
+	}
+	if !next.IsZero() {
+		out.NextPageCursor = ogen.NewOptString(strconv.FormatInt(next.ID, 10))
 	}
 	return out, nil
 }
@@ -554,7 +579,7 @@ func (h *Handler) GetRuleSettings(ctx context.Context) (*ogen.RuleSettings, erro
 	if err != nil {
 		return nil, err
 	}
-	return &ogen.RuleSettings{Learning: s.AutoCategoryRules}, nil
+	return &ogen.RuleSettings{IsLearning: s.AutoCategoryRules}, nil
 }
 
 // SetRuleSettings implements ogen.Handler.
@@ -568,7 +593,7 @@ func (h *Handler) SetRuleSettings(ctx context.Context, req *ogen.RuleSettings) e
 	if err != nil {
 		return err
 	}
-	s.AutoCategoryRules = req.Learning
+	s.AutoCategoryRules = req.IsLearning
 	return h.svc.Settings.Set(ctx, key.UserID, s)
 }
 
@@ -596,12 +621,12 @@ func classify(err error) (int, ogen.ErrorCode, string) {
 
 func toAccount(a domain.Account) ogen.Account {
 	out := ogen.Account{
-		ID:       a.ID,
-		Name:     a.Name,
-		Currency: ogen.Currency(a.Currency),
-		Kind:     ogen.AccountKind(a.Kind),
-		Archived: a.Archived,
-		Balance:  ogen.Amount(a.Balance.Fixed(a.Currency)),
+		ID:         a.ID,
+		Name:       a.Name,
+		Currency:   ogen.Currency(a.Currency),
+		Kind:       ogen.AccountKind(a.Kind),
+		IsArchived: a.Archived,
+		Balance:    ogen.Amount(a.Balance.Fixed(a.Currency)),
 	}
 	if !a.CreditLimit.IsZero() {
 		out.CreditLimit = ogen.NewOptAmount(ogen.Amount(a.CreditLimit.Fixed(a.Currency)))
@@ -611,10 +636,10 @@ func toAccount(a domain.Account) ogen.Account {
 
 func toCategory(c domain.Category) ogen.Category {
 	out := ogen.Category{
-		ID:       c.ID,
-		Kind:     ogen.CategoryKind(c.Kind),
-		Name:     c.Name,
-		Archived: c.Archived,
+		ID:         c.ID,
+		Kind:       ogen.CategoryKind(c.Kind),
+		Name:       c.Name,
+		IsArchived: c.Archived,
 	}
 	if c.ParentID != 0 {
 		out.ParentID = ogen.NewOptInt64(c.ParentID)
@@ -692,7 +717,7 @@ func fromOperationQuery(req *ogen.OperationQuery) (domain.Filter, error) {
 	f := domain.Filter{
 		AccountID:     req.AccountID.Or(0),
 		CategoryID:    req.CategoryID.Or(0),
-		Uncategorized: req.Uncategorized.Or(false),
+		Uncategorized: req.IsUncategorized.Or(false),
 		Type:          domain.OpType(req.Type.Or("")),
 		DateFrom:      req.DateFrom.Or(time.Time{}),
 		DateTo:        req.DateTo.Or(time.Time{}),

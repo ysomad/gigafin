@@ -3,14 +3,13 @@ info:
   title: gigafin API
   version: 1.0.0
   description: |
-    Personal finance API. Authenticate with an API key created in the web UI:
-    `Authorization: Bearer gf_...`. Read-scoped keys may only call GET and QUERY endpoints.
-    Amounts are decimal strings in the account currency, e.g. "1040.50".
+    Personal finance API. Authenticate with `Authorization: Bearer gf_...`, using an API key from the web UI.
+    Read keys may only call GET and QUERY endpoints.
 servers:
   - url: /api
 tags:
   - name: Accounts
-    description: Accounts and their balances
+    description: Accounts
   - name: Categories
     description: Income and expense categories
   - name: Operations
@@ -19,7 +18,7 @@ tags:
     description: Monthly category plans
   - name: Rules
     description: >-
-      Rules that categorize operations. They run on import and fill empty fields of new operations; changing the category of a payee's operations by hand teaches rules when learning is on.
+      Rules that categorize operations. They run on import and fill empty fields of new operations; changing the category of a payee's operations by hand teaches rules when is_learning is on.
 security:
   - bearerAuth: []
 paths:
@@ -27,7 +26,7 @@ paths:
     get:
       operationId: listAccounts
       tags: [Accounts]
-      summary: List accounts with balances
+      summary: List accounts
       responses:
         "200":
           description: Accounts
@@ -60,7 +59,7 @@ paths:
     get:
       operationId: getAccount
       tags: [Accounts]
-      summary: Get an account with its balance
+      summary: Get an account
       parameters:
         - $ref: "#/components/parameters/ID"
       responses:
@@ -76,7 +75,7 @@ paths:
     get:
       operationId: listCategories
       tags: [Categories]
-      summary: List the category tree
+      summary: List categories
       responses:
         "200":
           description: Root categories with their nested categories
@@ -110,7 +109,7 @@ paths:
     query:
       operationId: listOperations
       tags: [Operations]
-      summary: List operations, newest first
+      summary: List operations
       requestBody:
         required: true
         content:
@@ -195,10 +194,11 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: splitOperation
+      x-destructive: true
       tags: [Operations]
-      summary: Split an expense or income into parts
+      summary: Split an operation
       description: >
-        Divides the operation between categories. The parts add up to its amount; the first one replaces the operation, the others become new operations. All parts share origin_id and are independent operations afterwards.
+        Divides an expense or income between categories. The parts add up to its amount; the first one replaces the operation, the others become new operations. All parts share origin_id and are independent operations afterwards.
 
       requestBody:
         required: true
@@ -219,7 +219,7 @@ paths:
     get:
       operationId: listPlans
       tags: [Plans]
-      summary: List plans of a month
+      summary: List plans
       parameters:
         - $ref: "#/components/parameters/Month"
       responses:
@@ -234,9 +234,9 @@ paths:
     put:
       operationId: setPlan
       tags: [Plans]
-      summary: Set a plan of a category for a month
+      summary: Set a plan
       description: >-
-        The latest repeating plan before a month is copied into it when the month starts. Amount "0" with repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+        The latest repeating plan before a month is copied into it when the month starts. Amount "0" with is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
       requestBody:
         required: true
         content:
@@ -252,7 +252,15 @@ paths:
     get:
       operationId: listRules
       tags: [Rules]
-      summary: List rules, oldest first
+      summary: List rules
+      parameters:
+        - name: page_cursor
+          in: query
+          description: next_page_cursor of the previous page.
+          schema: {type: string, maxLength: 64}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 500, default: 50}
       responses:
         "200":
           description: Rules
@@ -331,8 +339,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: applyRule
+      x-destructive: true
       tags: [Rules]
-      summary: Apply a rule to all operations it matches
+      summary: Apply a rule
       description: Parts of splits are left alone.
       responses:
         "200":
@@ -346,9 +355,10 @@ paths:
   /rules/run:
     post:
       operationId: runRules
+      x-destructive: true
       tags: [Rules]
-      summary: Run all rules on the operations matching a filter
-      description: Parts of splits are left alone. cursor and page_size of the filter are ignored.
+      summary: Run rules
+      description: Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
       requestBody:
         required: true
         content:
@@ -367,12 +377,13 @@ paths:
   /rules/learn:
     post:
       operationId: learnRules
+      x-destructive: true
       tags: [Rules]
-      summary: Learn rules from all operations
+      summary: Learn rules
       description: >-
         Each payee whose category is the same in 3 of its 5 latest expenses and income gets a
         learned rule "payee is X → set category", or its learned rule is pointed at that category.
-        Runs even when learning is off.
+        Runs even when is_learning is off.
       responses:
         "200":
           description: Number of rules created or changed
@@ -458,14 +469,14 @@ components:
       enum: [cash, debit, savings, credit, loan]
     Account:
       type: object
-      required: [id, name, currency, kind, archived, balance]
+      required: [id, name, currency, kind, is_archived, balance]
       properties:
         id: {type: integer, format: int64}
         name: {type: string}
         currency: {$ref: "#/components/schemas/Currency"}
         kind: {$ref: "#/components/schemas/AccountKind"}
         credit_limit: {$ref: "#/components/schemas/Amount"}
-        archived: {type: boolean}
+        is_archived: {type: boolean}
         balance:
           $ref: "#/components/schemas/Amount"
           description: Signed for every kind, a credit card owing 500 has balance "-500".
@@ -493,13 +504,13 @@ components:
       enum: [expense, income]
     Category:
       type: object
-      required: [id, kind, name, archived]
+      required: [id, kind, name, is_archived]
       properties:
         id: {type: integer, format: int64}
         parent_id: {type: integer, format: int64}
         kind: {$ref: "#/components/schemas/CategoryKind"}
         name: {type: string}
-        archived: {type: boolean}
+        is_archived: {type: boolean}
         children:
           type: array
           items: {$ref: "#/components/schemas/Category"}
@@ -621,7 +632,7 @@ components:
           type: integer
           format: int64
           description: A root category also matches its nested categories.
-        uncategorized:
+        is_uncategorized:
           type: boolean
           description: Only expenses and income without a category; not with category_id.
         type: {$ref: "#/components/schemas/OperationType"}
@@ -641,10 +652,10 @@ components:
         amount_max:
           allOf: [{$ref: "#/components/schemas/Amount"}]
           description: Greatest absolute amount, inclusive, in the currency of each operation.
-        cursor:
+        page_cursor:
           type: string
           maxLength: 64
-          description: next_cursor of the previous page.
+          description: next_page_cursor of the previous page.
         page_size: {type: integer, minimum: 1, maximum: 500, default: 50}
     OperationList:
       type: object
@@ -653,7 +664,7 @@ components:
         items:
           type: array
           items: {$ref: "#/components/schemas/Operation"}
-        next_cursor: {type: string}
+        next_page_cursor: {type: string}
     Plan:
       type: object
       required: [category_id, month, currency, amount]
@@ -662,7 +673,7 @@ components:
         month: {type: string, pattern: '^\d{4}-\d{2}$', example: "2026-10"}
         currency: {$ref: "#/components/schemas/Currency"}
         amount: {$ref: "#/components/schemas/Amount"}
-        repeating:
+        is_repeating:
           type: boolean
           default: false
           description: Copy the plan into following months.
@@ -760,11 +771,12 @@ components:
         items:
           type: array
           items: {$ref: "#/components/schemas/Rule"}
+        next_page_cursor: {type: string}
     RuleSettings:
       type: object
-      required: [learning]
+      required: [is_learning]
       properties:
-        learning:
+        is_learning:
           type: boolean
           description: Changing the category of a payee's operations by hand creates or updates a rule for the payee.
     RulesRunResult:

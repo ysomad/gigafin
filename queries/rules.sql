@@ -15,6 +15,9 @@ SELECT * FROM rules WHERE id = ? AND user_id = ?;
 -- name: ListRules :many
 SELECT * FROM rules WHERE user_id = ? ORDER BY id;
 
+-- name: ListRulesAfter :many
+SELECT * FROM rules WHERE user_id = ? AND id > ? ORDER BY id LIMIT ?;
+
 -- name: CountRules :one
 SELECT COUNT(*) FROM rules WHERE user_id = ?;
 

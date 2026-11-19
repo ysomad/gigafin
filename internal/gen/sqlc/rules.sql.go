@@ -151,6 +151,49 @@ func (q *Queries) ListRules(ctx context.Context, userID int64) ([]Rule, error) {
 	return items, nil
 }
 
+const listRulesAfter = `-- name: ListRulesAfter :many
+SELECT id, user_id, stage, "match", conditions, actions, origin, created_at, updated_at FROM rules WHERE user_id = ? AND id > ? ORDER BY id LIMIT ?
+`
+
+type ListRulesAfterParams struct {
+	UserID int64
+	ID     int64
+	Limit  int64
+}
+
+func (q *Queries) ListRulesAfter(ctx context.Context, arg ListRulesAfterParams) ([]Rule, error) {
+	rows, err := q.db.QueryContext(ctx, listRulesAfter, arg.UserID, arg.ID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Rule
+	for rows.Next() {
+		var i Rule
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Stage,
+			&i.Match,
+			&i.Conditions,
+			&i.Actions,
+			&i.Origin,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateRule = `-- name: UpdateRule :one
 UPDATE rules
 SET stage = ?, "match" = ?, conditions = ?, actions = ?, origin = ?, updated_at = ?

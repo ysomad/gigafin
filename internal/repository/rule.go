@@ -32,6 +32,22 @@ func (r *Rules) List(ctx context.Context, userID int64) ([]domain.Rule, error) {
 	return rules, nil
 }
 
+// ListAfter returns at most limit of the user's rules after the rule afterID, oldest
+// first.
+func (r *Rules) ListAfter(ctx context.Context, userID, afterID int64, limit int) ([]domain.Rule, error) {
+	rows, err := r.q.ListRulesAfter(ctx, sqlc.ListRulesAfterParams{UserID: userID, ID: afterID, Limit: int64(limit)})
+	if err != nil {
+		return nil, fmt.Errorf("list rules after: %w", err)
+	}
+	rules := make([]domain.Rule, len(rows))
+	for i, row := range rows {
+		if rules[i], err = ruleFromRow(row); err != nil {
+			return nil, err
+		}
+	}
+	return rules, nil
+}
+
 // Count returns how many rules the user has.
 func (r *Rules) Count(ctx context.Context, userID int64) (int64, error) {
 	n, err := r.q.CountRules(ctx, userID)

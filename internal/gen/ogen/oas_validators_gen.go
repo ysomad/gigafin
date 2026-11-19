@@ -857,7 +857,7 @@ func (s *OperationQuery) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Cursor.Get(); ok {
+		if value, ok := s.PageCursor.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
 					MinLength:     0,
@@ -882,7 +882,7 @@ func (s *OperationQuery) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "cursor",
+			Name:  "page_cursor",
 			Error: err,
 		})
 	}

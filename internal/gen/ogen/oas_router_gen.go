@@ -628,7 +628,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					switch method {
 					case "GET":
 						r.name = ListAccountsOperation
-						r.summary = "List accounts with balances"
+						r.summary = "List accounts"
 						r.operationID = "listAccounts"
 						r.operationGroup = ""
 						r.pathPattern = "/accounts"
@@ -671,7 +671,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						switch method {
 						case "GET":
 							r.name = GetAccountOperation
-							r.summary = "Get an account with its balance"
+							r.summary = "Get an account"
 							r.operationID = "getAccount"
 							r.operationGroup = ""
 							r.pathPattern = "/accounts/{id}"
@@ -698,7 +698,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					switch method {
 					case "GET":
 						r.name = ListCategoriesOperation
-						r.summary = "List the category tree"
+						r.summary = "List categories"
 						r.operationID = "listCategories"
 						r.operationGroup = ""
 						r.pathPattern = "/categories"
@@ -740,7 +740,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						return r, true
 					case "QUERY":
 						r.name = ListOperationsOperation
-						r.summary = "List operations, newest first"
+						r.summary = "List operations"
 						r.operationID = "listOperations"
 						r.operationGroup = ""
 						r.pathPattern = "/operations"
@@ -816,7 +816,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = SplitOperationOperation
-								r.summary = "Split an expense or income into parts"
+								r.summary = "Split an operation"
 								r.operationID = "splitOperation"
 								r.operationGroup = ""
 								r.pathPattern = "/operations/{id}/split"
@@ -845,7 +845,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					switch method {
 					case "GET":
 						r.name = ListPlansOperation
-						r.summary = "List plans of a month"
+						r.summary = "List plans"
 						r.operationID = "listPlans"
 						r.operationGroup = ""
 						r.pathPattern = "/plans"
@@ -854,7 +854,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						return r, true
 					case "PUT":
 						r.name = SetPlanOperation
-						r.summary = "Set a plan of a category for a month"
+						r.summary = "Set a plan"
 						r.operationID = "setPlan"
 						r.operationGroup = ""
 						r.pathPattern = "/plans"
@@ -878,7 +878,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					switch method {
 					case "GET":
 						r.name = ListRulesOperation
-						r.summary = "List rules, oldest first"
+						r.summary = "List rules"
 						r.operationID = "listRules"
 						r.operationGroup = ""
 						r.pathPattern = "/rules"
@@ -924,7 +924,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = LearnRulesOperation
-								r.summary = "Learn rules from all operations"
+								r.summary = "Learn rules"
 								r.operationID = "learnRules"
 								r.operationGroup = ""
 								r.pathPattern = "/rules/learn"
@@ -950,7 +950,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = RunRulesOperation
-								r.summary = "Run all rules on the operations matching a filter"
+								r.summary = "Run rules"
 								r.operationID = "runRules"
 								r.operationGroup = ""
 								r.pathPattern = "/rules/run"
@@ -1055,7 +1055,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = ApplyRuleOperation
-								r.summary = "Apply a rule to all operations it matches"
+								r.summary = "Apply a rule"
 								r.operationID = "applyRule"
 								r.operationGroup = ""
 								r.pathPattern = "/rules/{id}/apply"

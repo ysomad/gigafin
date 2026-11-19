@@ -189,6 +189,9 @@ func TestAPI(t *testing.T) {
 	status, plans := c.do(http.MethodGet, "/plans?month=2026-10", readKey, "")
 	require.Equal(t, http.StatusOK, status)
 	assert.Len(t, plans["items"], 1)
+	status, body = c.do(http.MethodGet, "/plans?month=bad", readKey, "")
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, `month: string: no regex match: ^\d{4}-\d{2}$`, body["message"], "no ogen prefix")
 
 	status, _ = c.do(http.MethodDelete, "/operations/"+num(t, op["id"]), writeKey, "")
 	assert.Equal(t, http.StatusNoContent, status)
@@ -232,8 +235,8 @@ func TestAPIRules(t *testing.T) {
 
 	status, settings := c.do(http.MethodGet, "/rules/settings", readKey, "")
 	require.Equal(t, http.StatusOK, status, settings)
-	assert.Equal(t, true, settings["learning"])
-	status, _ = c.do(http.MethodPut, "/rules/settings", key, `{"learning":false}`)
+	assert.Equal(t, true, settings["is_learning"])
+	status, _ = c.do(http.MethodPut, "/rules/settings", key, `{"is_learning":false}`)
 	require.Equal(t, http.StatusNoContent, status)
 
 	status, body := c.do(http.MethodPost, "/rules", key,
@@ -257,6 +260,30 @@ func TestAPIRules(t *testing.T) {
 	status, list := c.do(http.MethodGet, "/rules", readKey, "")
 	require.Equal(t, http.StatusOK, status, list)
 	assert.Len(t, list["items"], 1)
+	assert.NotContains(t, list, "next_page_cursor", "last page")
+
+	status, second := c.do(http.MethodPost, "/rules", key,
+		`{"conditions":[{"field":"payee","op":"is","values":["tea"]}],"actions":[{"type":"add_tag","value":"tea"}]}`)
+	require.Equal(t, http.StatusCreated, status, second)
+	status, list = c.do(http.MethodGet, "/rules?page_size=1", readKey, "")
+	require.Equal(t, http.StatusOK, status, list)
+	require.Len(t, list["items"], 1)
+	assert.Equal(t, id, list["next_page_cursor"])
+	cursor, ok := list["next_page_cursor"].(string)
+	require.True(t, ok)
+	status, list = c.do(http.MethodGet, "/rules?page_size=1&page_cursor="+cursor, readKey, "")
+	require.Equal(t, http.StatusOK, status, list)
+	require.Len(t, list["items"], 1)
+	page, ok := list["items"].([]any)
+	require.True(t, ok)
+	last, ok := page[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, second["id"], last["id"])
+	assert.NotContains(t, list, "next_page_cursor", "last page")
+	status, body = c.do(http.MethodGet, "/rules?page_cursor=x", readKey, "")
+	assert.Equal(t, http.StatusBadRequest, status, body)
+	status, _ = c.do(http.MethodDelete, "/rules/"+num(t, second["id"]), key, "")
+	require.Equal(t, http.StatusNoContent, status)
 
 	status, rule = c.do(http.MethodPut, "/rules/"+id, key,
 		`{"stage":"post","match":"any","conditions":[{"field":"amount","op":"gt","values":["1"]}],`+

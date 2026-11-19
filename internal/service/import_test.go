@@ -106,7 +106,7 @@ func TestImportFlow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 4, n, "2 expenses, 1 transfer, 1 income")
 
-	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 4)
 	assert.Equal(t, domain.OpIncome, ops[0].Type)
@@ -160,7 +160,7 @@ func TestImportFlow(t *testing.T) {
 	require.NoError(t, e.imp.Discard(ctx, e.userID, again.ID))
 
 	// a deleted imported operation stays imported, so it does not come back
-	ops, _, err = e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err = e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.NoError(t, e.fin.Operations.Delete(ctx, e.userID, ops[0].ID))
 	fourth, err := e.imp.Upload(ctx, e.userID, domain.ImportSourceTBank, "tbank.csv", file(_rows...), time.UTC)
@@ -276,7 +276,7 @@ func TestImportZenMoney(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, n)
 
-	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 2)
 	assert.Equal(t, domain.OpExpense, ops[0].Type)
@@ -318,7 +318,7 @@ func TestImportMCC(t *testing.T) {
 	_, err = e.imp.Commit(ctx, e.userID, im.ID, time.UTC)
 	require.NoError(t, err)
 
-	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 1)
 	op := ops[0]
@@ -358,7 +358,7 @@ func TestImportSplits(t *testing.T) {
 	_, err = e.imp.Commit(ctx, e.userID, im.ID, time.UTC)
 	require.NoError(t, err)
 
-	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.Params{})
+	ops, _, err := e.fin.Operations.List(ctx, e.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	require.Len(t, ops, 3, "every split part is an operation, newest first")
 	assert.Zero(t, ops[0].OriginID, "a group of one is not a split")
