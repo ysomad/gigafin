@@ -73,6 +73,9 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	if len(days) > 0 && !p.After.IsZero() && days[0].Date.Equal(p.After.Date) {
 		days[0].Continued = true
 	}
+	if err := h.app.WholeLastDay(r.Context(), user.ID, f, days, next); err != nil {
+		return err
+	}
 	d := opList{
 		Days:        days,
 		Filter:      f,
@@ -148,6 +151,9 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request, user domain.Use
 	d.Days = kit.GroupByDay(ops)
 	if len(d.Days) > 0 && !p.After.IsZero() && d.Days[0].Date.Equal(p.After.Date) {
 		d.Days[0].Continued = true
+	}
+	if err := h.app.WholeLastDay(r.Context(), user.ID, domain.Filter{Query: d.Query}, d.Days, next); err != nil {
+		return err
 	}
 	d.AccByID = domain.AccountsByID(accounts)
 	d.CatNames = domain.CategoryShortNames(tree)

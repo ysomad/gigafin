@@ -130,12 +130,25 @@ templ NoOperations() {
 	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>
 }
 
-// OpRows are the list items of operations by day, followed by the loader of moreURL,
-// the next page, if any.
+// OpRows are the list items of operations by day, each titled with its net income,
+// followed by the loader of moreURL, the next page, if any.
 templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domain.Account, moreURL string) {
 	for _, day := range days {
 		if !day.Continued {
-			<li class="day text-light mt-4">{ DayTitle(ctx, day.Date) }</li>
+			<li class="day text-light mt-4 hstack justify-between">
+				<span>{ DayTitle(ctx, day.Date) }</span>
+				<span class="hstack gap-2">
+					for _, fl := range day.Flows {
+						{{
+							net := Money(ctx, fl.Net(), fl.Currency)
+							if fl.Net().IsPositive() {
+								net = "+" + net
+							}
+						}}
+						<span>{ net } { money.CurrencySymbol(fl.Currency) }</span>
+					}
+				</span>
+			</li>
 		}
 		for _, op := range day.Ops {
 			<li class="card compact hstack justify-between">

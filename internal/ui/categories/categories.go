@@ -187,6 +187,9 @@ func (h *Handler) renderCategory(
 		return err
 	}
 	d.Days, d.CatNames, d.AccByID = kit.GroupByDay(ops), domain.CategoryShortNames(tree), domain.AccountsByID(accounts)
+	if err := h.app.WholeLastDay(ctx, user.ID, filter, d.Days, next); err != nil {
+		return err
+	}
 	if !next.IsZero() {
 		d.MoreURL = fmt.Sprintf("/operations?category=%d&cursor=%s", c.ID, url.QueryEscape(next.String()))
 	}

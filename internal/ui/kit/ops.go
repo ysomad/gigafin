@@ -1,6 +1,7 @@
 package kit
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/money"
+	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/timex"
 )
 
@@ -15,6 +17,8 @@ import (
 type DayGroup struct {
 	Date time.Time
 	Ops  []domain.Operation
+	// Flows are the income and expense of the day per currency, shown by its title.
+	Flows []domain.CashFlow
 	// Continued is set on a day the previous page ended in, so its title is not repeated.
 	Continued bool
 }
@@ -28,7 +32,32 @@ func GroupByDay(ops []domain.Operation) []DayGroup {
 		}
 		days[len(days)-1].Ops = append(days[len(days)-1].Ops, op)
 	}
+	for i, day := range days {
+		sums := make([]domain.TypeSum, len(day.Ops))
+		for j, op := range day.Ops {
+			sums[j] = domain.TypeSum{Type: op.Type, Currency: op.Currency, Total: op.Amount}
+		}
+		days[i].Flows = domain.CashFlows(sums)
+	}
 	return days
+}
+
+// WholeLastDay sets the flows of the last of days, a page of the operations of f, to
+// those of the whole day when the next page from next may go on with it.
+func (a *App) WholeLastDay(
+	ctx context.Context, userID int64, f domain.Filter, days []DayGroup, next pagination.Cursor,
+) error {
+	if len(days) == 0 || next.IsZero() {
+		return nil
+	}
+	last := &days[len(days)-1]
+	f.DateFrom, f.DateTo = last.Date, last.Date
+	flows, err := a.Svc.Operations.Totals(ctx, userID, f)
+	if err != nil {
+		return err
+	}
+	last.Flows = flows
+	return nil
 }
 
 // NoCategory is the category filter value of expenses and income without a category.
