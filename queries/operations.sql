@@ -63,8 +63,9 @@ WHERE
         o.account_id = sqlc.narg(account_id) OR o.to_account_id = sqlc.narg(account_id) OR sqlc.narg(account_id) IS NULL
     )
     AND (o.type = sqlc.narg(type) OR sqlc.narg(type) IS NULL)
-    AND (o.date >= sqlc.narg(date_from) OR sqlc.narg(date_from) IS NULL)
-    AND (o.date <= sqlc.narg(date_to) OR sqlc.narg(date_to) IS NULL)
+    -- unset bounds are the least and greatest dates, so the index serves the range
+    AND o.date >= coalesce(sqlc.narg(date_from), '')
+    AND o.date <= coalesce(sqlc.narg(date_to), '9999-12-31')
     -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
     -- their nested categories, or no category when uncategorized is set
     AND (
@@ -153,8 +154,9 @@ WHERE
         o.account_id = sqlc.narg(account_id) OR o.to_account_id = sqlc.narg(account_id) OR sqlc.narg(account_id) IS NULL
     )
     AND (o.type = sqlc.narg(type) OR sqlc.narg(type) IS NULL)
-    AND (o.date >= sqlc.narg(date_from) OR sqlc.narg(date_from) IS NULL)
-    AND (o.date <= sqlc.narg(date_to) OR sqlc.narg(date_to) IS NULL)
+    -- unset bounds are the least and greatest dates, so the index serves the range
+    AND o.date >= coalesce(sqlc.narg(date_from), '')
+    AND o.date <= coalesce(sqlc.narg(date_to), '9999-12-31')
     -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
     -- their nested categories, or no category when uncategorized is set
     AND (

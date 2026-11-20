@@ -49,12 +49,14 @@ templ splitPage(v kit.Page, d opSplit) {
 					{ kit.T(ctx, "Part of a split. Splitting it again adds parts to the same split.") }
 				}
 			</p>
-			<div id="splits" class="vstack">
-				for i, p := range d.Parts {
-					@splitRow(d.Categories, p, i == 0, i, v.Errors)
-				}
-			</div>
-			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Op.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
+			<article class="card mb-4">
+				<div id="splits">
+					for i, p := range d.Parts {
+						@splitRow(d.Categories, p, i == 0, i, v.Errors)
+					}
+				</div>
+				<button type="button" class="outline small" hx-get={ "/operations/split?type=" + string(d.Op.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
+			</article>
 			<div class="hstack justify-end">
 				<button type="submit">{ kit.T(ctx, "Split") }</button>
 			</div>
@@ -72,54 +74,28 @@ templ splitRow(categories []domain.Category, s splitPart, first bool, index int,
 		amountErr := errs.Get(fmt.Sprintf("split_amount[%d]", index))
 		noteErr := errs.Get(fmt.Sprintf("split_note[%d]", index))
 	}}
-	<div class="split row">
-		<div class="hstack justify-between col-12">
-			<small class="text-light">
-				if first {
-					{ kit.T(ctx, "This operation") }
-				} else {
-					{ kit.T(ctx, "New part") }
-				}
-			</small>
-			if !first {
-				<button type="button" class="outline small" data-split-remove data-variant="danger" aria-label={ kit.T(ctx, "Remove part") } title={ kit.T(ctx, "Remove part") }>✕</button>
-			}
-		</div>
-		{{
-			catAttrs := templ.Attributes{"aria-label": kit.T(ctx, "Category"), "placeholder": kit.T(ctx, "Category")}
-			if catErr != "" {
-				catAttrs["aria-invalid"] = "true"
-			}
-		}}
-		@kit.Field("col-6", "", catErr, "", nil) {
-			@kit.CategorySelect("split_category", categories, s.CategoryID, nil, false, catAttrs)
+	<div class="split row mb-4">
+		@kit.Field("col-5", kit.T(ctx, "Category"), catErr, "", nil) {
+			@kit.CategorySelect("split_category", categories, s.CategoryID, nil, false, nil)
 		}
-		<div
-			data-field
-			class="col-6"
-			if amountErr != "" || noteErr != "" {
-				aria-invalid="true"
-			}
-		>
-			<fieldset class="group">
-				<input
-					name="split_amount"
-					inputmode="decimal"
-					autocomplete="off"
-					value={ kit.AmountInput(ctx, s.Amount) }
-					placeholder={ kit.T(ctx, "Amount") }
-					aria-label={ kit.T(ctx, "Amount") }
-					if first {
-						readonly
-						aria-disabled="true"
-						tabindex="-1"
-					}
-					{ kit.Invalid(amountErr, "")... }
-				/>
-				<input name="split_note" value={ s.Note } placeholder={ kit.T(ctx, "Note") } aria-label={ kit.T(ctx, "Note") } { kit.Invalid(noteErr, "")... }/>
-			</fieldset>
-			@kit.FieldError(amountErr, "")
-			@kit.FieldError(noteErr, "")
-		</div>
+		@kit.Field("col-3", kit.T(ctx, "Amount"), amountErr, "", nil) {
+			<input
+				name="split_amount"
+				inputmode="decimal"
+				autocomplete="off"
+				value={ kit.AmountInput(ctx, s.Amount) }
+				if first {
+					readonly
+					aria-disabled="true"
+					tabindex="-1"
+				}
+			/>
+		}
+		@kit.Field("col-3", kit.T(ctx, "Note"), noteErr, "", nil) {
+			<input name="split_note" value={ s.Note } autocomplete="off"/>
+		}
+		if !first {
+			@kit.RemoveColumn(kit.T(ctx, "Remove part"), templ.Attributes{"data-split-remove": true})
+		}
 	</div>
 }

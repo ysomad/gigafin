@@ -136,7 +136,7 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 					<input name="cond_value" value={ r.Value } autocomplete="off" placeholder={ kit.T(ctx, "Several values:") + " a " + _ruleValueSep + " b" }/>
 			}
 		}
-		@removeColumn(".cond", kit.T(ctx, "Remove condition"))
+		@kit.RemoveColumn(kit.T(ctx, "Remove condition"), templ.Attributes{"hx-get": "/noop", "hx-target": "closest .cond", "hx-swap": "delete"})
 	</div>
 }
 
@@ -163,16 +163,7 @@ templ actionFields(r actionRow, categories []domain.Category, index int, errs *k
 				<input name="act_value" value={ r.Value } autocomplete="off"/>
 			}
 		}
-		@removeColumn(".act", kit.T(ctx, "Remove action"))
-	</div>
-}
-
-// removeColumn is the button removing the closest row of selector, labeled label, in
-// the last column of the row under an empty caption, so it lines up with the inputs.
-templ removeColumn(selector, label string) {
-	<div class="col-1 vstack gap-1">
-		<label aria-hidden="true">&nbsp;</label>
-		<div><button type="button" class="outline" hx-get="/noop" hx-target={ "closest " + selector } hx-swap="delete" aria-label={ label } title={ label } data-variant="secondary">✕</button></div>
+		@kit.RemoveColumn(kit.T(ctx, "Remove action"), templ.Attributes{"hx-get": "/noop", "hx-target": "closest .act", "hx-swap": "delete"})
 	</div>
 }
 

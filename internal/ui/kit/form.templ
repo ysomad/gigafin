@@ -61,6 +61,16 @@ templ SubmitColumn(class, variant, label string) {
 	</div>
 }
 
+// RemoveColumn is the button labeled label removing a row of a form, in the last column
+// of the row under an empty caption, so it lines up with the inputs. attrs make it
+// remove the row.
+templ RemoveColumn(label string, attrs templ.Attributes) {
+	<div class="col-1 vstack gap-1">
+		<label aria-hidden="true">&nbsp;</label>
+		<div><button type="button" class="outline" aria-label={ label } title={ label } data-variant="secondary" { attrs... }>✕</button></div>
+	</div>
+}
+
 // LinkButton is a link that looks like an outline button of variant.
 templ LinkButton(href, variant, label string) {
 	<a class="button outline" href={ href } data-variant={ variant }>{ label }</a>

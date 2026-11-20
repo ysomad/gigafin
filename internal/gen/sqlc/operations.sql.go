@@ -185,8 +185,9 @@ WHERE
         o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL
     )
     AND (o.type = ?3 OR ?3 IS NULL)
-    AND (o.date >= ?4 OR ?4 IS NULL)
-    AND (o.date <= ?5 OR ?5 IS NULL)
+    -- unset bounds are the least and greatest dates, so the index serves the range
+    AND o.date >= coalesce(?4, '')
+    AND o.date <= coalesce(?5, '9999-12-31')
     -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
     -- their nested categories, or no category when uncategorized is set
     AND (
@@ -671,8 +672,9 @@ WHERE
         o.account_id = ?2 OR o.to_account_id = ?2 OR ?2 IS NULL
     )
     AND (o.type = ?3 OR ?3 IS NULL)
-    AND (o.date >= ?4 OR ?4 IS NULL)
-    AND (o.date <= ?5 OR ?5 IS NULL)
+    -- unset bounds are the least and greatest dates, so the index serves the range
+    AND o.date >= coalesce(?4, '')
+    AND o.date <= coalesce(?5, '9999-12-31')
     -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
     -- their nested categories, or no category when uncategorized is set
     AND (
