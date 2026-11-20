@@ -151,9 +151,6 @@ templ formPage(v kit.Page, d opForm) {
 					if editing && (d.Type == domain.OpExpense || d.Type == domain.OpIncome) {
 						@kit.LinkButton(fmt.Sprintf("/operations/%d/split", d.ID), "secondary", kit.T(ctx, "Split"))
 					}
-					if editing {
-						@kit.LinkButton(d.Back, "secondary", kit.T(ctx, "Cancel"))
-					}
 				</div>
 				if editing {
 					<button type="submit" form="op-delete" class="outline" data-variant="danger">{ kit.T(ctx, "Delete") }</button>

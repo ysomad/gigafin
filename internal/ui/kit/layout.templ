@@ -1,6 +1,9 @@
 package kit
 
-import "github.com/ysomad/gigafin/internal/domain"
+import (
+	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/web"
+)
 
 // Layout is the page of v around children: toTop adds the scroll-to-top button, toasts
 // more toasts after those of v. A theme set by the user overrides the color-scheme of
@@ -38,17 +41,13 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<link rel="icon" href="/static/icon-192.png"/>
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
 			<title>{ v.Title } · gigafin</title>
-			<link rel="stylesheet" href="/static/lib/oat.min.css"/>
-			<link rel="stylesheet" href="/static/lib/uplot.min.css"/>
-			<link rel="stylesheet" href="/static/app.css"/>
-			<script src="/static/lib/htmx.min.js" defer></script>
-			<script src="/static/lib/hx-history-cache.min.js" defer></script>
-			<script src="/static/lib/uplot.min.js" defer></script>
-			<script src="/static/lib/oat.min.js" defer></script>
-			<script src="/static/operation-tags.js" defer></script>
-			<script src="/static/category-select.js" defer></script>
-			<script src="/static/analytics.js" defer></script>
-			<script src="/static/app.js" defer></script>
+			// ?v= makes browsers load the files anew once they change, see web.Version
+			<link rel="stylesheet" href={ "/static/app.min.css?v=" + web.Version }/>
+			<script src={ "/static/lib/htmx.min.js?v=" + web.Version } defer></script>
+			<script src={ "/static/lib/hx-history-cache.min.js?v=" + web.Version } defer></script>
+			<script src={ "/static/lib/uplot.min.js?v=" + web.Version } defer></script>
+			<script src={ "/static/lib/oat.min.js?v=" + web.Version } defer></script>
+			<script src={ "/static/app.min.js?v=" + web.Version } defer></script>
 		</head>
 		<body id="top" hx-boost:inherited="true">
 			<header data-topnav>

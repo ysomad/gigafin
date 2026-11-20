@@ -120,7 +120,6 @@ templ newPlanPage(v kit.Page, d planFormData) {
 			</fieldset>
 			<div class="hstack">
 				<button type="submit">{ kit.T(ctx, "Create") }</button>
-				@kit.LinkButton("/plans?month="+d.Month.String(), "secondary", kit.T(ctx, "Cancel"))
 			</div>
 		</form>
 	}

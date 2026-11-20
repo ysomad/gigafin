@@ -77,7 +77,6 @@ templ formPage(v kit.Page, d ruleForm) {
 					if d.ID != 0 {
 						<button type="submit" form="rule-apply" class="outline" data-variant="secondary">{ kit.T(ctx, "Apply to matching operations") }</button>
 					}
-					@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Cancel"))
 				</div>
 				if d.ID != 0 {
 					<button type="submit" form="rule-delete" class="outline" data-variant="danger">{ kit.T(ctx, "Delete") }</button>

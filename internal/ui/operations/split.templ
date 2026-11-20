@@ -31,7 +31,6 @@ templ splitPage(v kit.Page, d opSplit) {
 			</div>
 			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
 			<div class="hstack justify-end">
-				@kit.LinkButton(fmt.Sprintf("/operations/%d/edit", d.ID), "secondary", kit.T(ctx, "Cancel"))
 				<button type="submit">{ kit.T(ctx, "Split") }</button>
 			</div>
 		</form>

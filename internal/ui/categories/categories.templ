@@ -119,7 +119,6 @@ templ categoryPage(v kit.Page, d categoryData) {
 			<div class="hstack justify-between">
 				<div class="hstack">
 					<button type="submit">{ kit.T(ctx, "Save") }</button>
-					@kit.LinkButton(fmt.Sprintf("/categories?kind=%s", c.Kind), "secondary", kit.T(ctx, "Cancel"))
 				</div>
 				@kit.ArchiveDelete("category", c.Archived)
 			</div>
@@ -166,7 +165,6 @@ templ newCategoryPage(v kit.Page, d categoriesData) {
 			</fieldset>
 			<div class="hstack">
 				<button type="submit">{ kit.T(ctx, "Create") }</button>
-				@kit.LinkButton(fmt.Sprintf("/categories?kind=%s", d.Kind), "secondary", kit.T(ctx, "Cancel"))
 			</div>
 		</form>
 	}

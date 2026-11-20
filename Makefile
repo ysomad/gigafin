@@ -16,6 +16,7 @@ generate:
 	$(TOOL) sqlc generate -f .sqlc.yaml
 	$(TOOL) ogen --config .ogen.yaml --target internal/gen/ogen --package ogen --clean api/openapi.yaml
 	$(TOOL) templ generate -path internal/ui
+	$(TOOL) esbuild web/js/main.js web/css/main.css --bundle --minify --outdir=web/static --entry-names=app.min
 
 build: build-app build-cli
 

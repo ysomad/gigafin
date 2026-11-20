@@ -24,7 +24,6 @@ templ formPage(v kit.Page, d formData) {
 					</div>
 				</fieldset>
 				<div class="hstack mb-4">
-					@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
 					<button type="submit">{ kit.T(ctx, "Next") }</button>
 				</div>
 			</form>
@@ -213,10 +212,9 @@ templ pasteField(header, content, err string) {
 	}
 }
 
-// uploadButtons cancel, go back to the source step or upload.
+// uploadButtons go back to the source step or upload.
 templ uploadButtons() {
 	<div class="hstack mb-4">
-		@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
 		@kit.LinkButton("/imports/new", "secondary", kit.T(ctx, "Back"))
 		<button type="submit">{ kit.T(ctx, "Upload") }</button>
 	</div>

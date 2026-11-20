@@ -19,7 +19,6 @@ templ ratesPage(v kit.Page, d ratesData) {
 			@steps("preview", true, nil)
 			<p>{ kit.T(ctx, "%d daily rates", len(d.Changes)) } · { kit.T(ctx, "%d new", d.New) } · { kit.T(ctx, "%d change a stored rate", d.Changed) }</p>
 			<div class="hstack mb-4">
-				@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Cancel"))
 				@kit.LinkButton("/imports/new?source=rates", "secondary", kit.T(ctx, "Back"))
 				<form method="post" action="/imports/rates/commit" hx-disable="find button">
 					<textarea name="content" hidden>{ d.Content }</textarea>
