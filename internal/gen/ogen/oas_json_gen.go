@@ -1601,6 +1601,222 @@ func (s *Operation) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *OperationFilter) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *OperationFilter) encodeFields(e *jx.Encoder) {
+	{
+		if s.AccountID.Set {
+			e.FieldStart("account_id")
+			s.AccountID.Encode(e)
+		}
+	}
+	{
+		if s.CategoryID.Set {
+			e.FieldStart("category_id")
+			s.CategoryID.Encode(e)
+		}
+	}
+	{
+		if s.IsUncategorized.Set {
+			e.FieldStart("is_uncategorized")
+			s.IsUncategorized.Encode(e)
+		}
+	}
+	{
+		if s.Type.Set {
+			e.FieldStart("type")
+			s.Type.Encode(e)
+		}
+	}
+	{
+		if s.DateFrom.Set {
+			e.FieldStart("date_from")
+			s.DateFrom.Encode(e, json.EncodeDate)
+		}
+	}
+	{
+		if s.DateTo.Set {
+			e.FieldStart("date_to")
+			s.DateTo.Encode(e, json.EncodeDate)
+		}
+	}
+	{
+		if s.Query.Set {
+			e.FieldStart("query")
+			s.Query.Encode(e)
+		}
+	}
+	{
+		if s.Tag.Set {
+			e.FieldStart("tag")
+			s.Tag.Encode(e)
+		}
+	}
+	{
+		if s.AmountMin.Set {
+			e.FieldStart("amount_min")
+			s.AmountMin.Encode(e)
+		}
+	}
+	{
+		if s.AmountMax.Set {
+			e.FieldStart("amount_max")
+			s.AmountMax.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfOperationFilter = [10]string{
+	0: "account_id",
+	1: "category_id",
+	2: "is_uncategorized",
+	3: "type",
+	4: "date_from",
+	5: "date_to",
+	6: "query",
+	7: "tag",
+	8: "amount_min",
+	9: "amount_max",
+}
+
+// Decode decodes OperationFilter from json.
+func (s *OperationFilter) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OperationFilter to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "account_id":
+			if err := func() error {
+				s.AccountID.Reset()
+				if err := s.AccountID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"account_id\"")
+			}
+		case "category_id":
+			if err := func() error {
+				s.CategoryID.Reset()
+				if err := s.CategoryID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category_id\"")
+			}
+		case "is_uncategorized":
+			if err := func() error {
+				s.IsUncategorized.Reset()
+				if err := s.IsUncategorized.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"is_uncategorized\"")
+			}
+		case "type":
+			if err := func() error {
+				s.Type.Reset()
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "date_from":
+			if err := func() error {
+				s.DateFrom.Reset()
+				if err := s.DateFrom.Decode(d, json.DecodeDate); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"date_from\"")
+			}
+		case "date_to":
+			if err := func() error {
+				s.DateTo.Reset()
+				if err := s.DateTo.Decode(d, json.DecodeDate); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"date_to\"")
+			}
+		case "query":
+			if err := func() error {
+				s.Query.Reset()
+				if err := s.Query.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"query\"")
+			}
+		case "tag":
+			if err := func() error {
+				s.Tag.Reset()
+				if err := s.Tag.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"tag\"")
+			}
+		case "amount_min":
+			if err := func() error {
+				s.AmountMin.Reset()
+				if err := s.AmountMin.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"amount_min\"")
+			}
+		case "amount_max":
+			if err := func() error {
+				s.AmountMax.Reset()
+				if err := s.AmountMax.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"amount_max\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode OperationFilter")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *OperationFilter) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OperationFilter) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *OperationInput) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -1992,63 +2208,15 @@ func (s *OperationQuery) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 	{
-		if s.AccountID.Set {
-			e.FieldStart("account_id")
-			s.AccountID.Encode(e)
+		if s.Filter.Set {
+			e.FieldStart("filter")
+			s.Filter.Encode(e)
 		}
 	}
 	{
-		if s.CategoryID.Set {
-			e.FieldStart("category_id")
-			s.CategoryID.Encode(e)
-		}
-	}
-	{
-		if s.IsUncategorized.Set {
-			e.FieldStart("is_uncategorized")
-			s.IsUncategorized.Encode(e)
-		}
-	}
-	{
-		if s.Type.Set {
-			e.FieldStart("type")
-			s.Type.Encode(e)
-		}
-	}
-	{
-		if s.DateFrom.Set {
-			e.FieldStart("date_from")
-			s.DateFrom.Encode(e, json.EncodeDate)
-		}
-	}
-	{
-		if s.DateTo.Set {
-			e.FieldStart("date_to")
-			s.DateTo.Encode(e, json.EncodeDate)
-		}
-	}
-	{
-		if s.Query.Set {
-			e.FieldStart("query")
-			s.Query.Encode(e)
-		}
-	}
-	{
-		if s.Tag.Set {
-			e.FieldStart("tag")
-			s.Tag.Encode(e)
-		}
-	}
-	{
-		if s.AmountMin.Set {
-			e.FieldStart("amount_min")
-			s.AmountMin.Encode(e)
-		}
-	}
-	{
-		if s.AmountMax.Set {
-			e.FieldStart("amount_max")
-			s.AmountMax.Encode(e)
+		if s.Sort.Set {
+			e.FieldStart("sort")
+			s.Sort.Encode(e)
 		}
 	}
 	{
@@ -2065,19 +2233,11 @@ func (s *OperationQuery) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOperationQuery = [12]string{
-	0:  "account_id",
-	1:  "category_id",
-	2:  "is_uncategorized",
-	3:  "type",
-	4:  "date_from",
-	5:  "date_to",
-	6:  "query",
-	7:  "tag",
-	8:  "amount_min",
-	9:  "amount_max",
-	10: "page_cursor",
-	11: "page_size",
+var jsonFieldsNameOfOperationQuery = [4]string{
+	0: "filter",
+	1: "sort",
+	2: "page_cursor",
+	3: "page_size",
 }
 
 // Decode decodes OperationQuery from json.
@@ -2089,105 +2249,25 @@ func (s *OperationQuery) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "account_id":
+		case "filter":
 			if err := func() error {
-				s.AccountID.Reset()
-				if err := s.AccountID.Decode(d); err != nil {
+				s.Filter.Reset()
+				if err := s.Filter.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"account_id\"")
+				return errors.Wrap(err, "decode field \"filter\"")
 			}
-		case "category_id":
+		case "sort":
 			if err := func() error {
-				s.CategoryID.Reset()
-				if err := s.CategoryID.Decode(d); err != nil {
+				s.Sort.Reset()
+				if err := s.Sort.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"category_id\"")
-			}
-		case "is_uncategorized":
-			if err := func() error {
-				s.IsUncategorized.Reset()
-				if err := s.IsUncategorized.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"is_uncategorized\"")
-			}
-		case "type":
-			if err := func() error {
-				s.Type.Reset()
-				if err := s.Type.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"type\"")
-			}
-		case "date_from":
-			if err := func() error {
-				s.DateFrom.Reset()
-				if err := s.DateFrom.Decode(d, json.DecodeDate); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"date_from\"")
-			}
-		case "date_to":
-			if err := func() error {
-				s.DateTo.Reset()
-				if err := s.DateTo.Decode(d, json.DecodeDate); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"date_to\"")
-			}
-		case "query":
-			if err := func() error {
-				s.Query.Reset()
-				if err := s.Query.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"query\"")
-			}
-		case "tag":
-			if err := func() error {
-				s.Tag.Reset()
-				if err := s.Tag.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"tag\"")
-			}
-		case "amount_min":
-			if err := func() error {
-				s.AmountMin.Reset()
-				if err := s.AmountMin.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"amount_min\"")
-			}
-		case "amount_max":
-			if err := func() error {
-				s.AmountMax.Reset()
-				if err := s.AmountMax.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"amount_max\"")
+				return errors.Wrap(err, "decode field \"sort\"")
 			}
 		case "page_cursor":
 			if err := func() error {
@@ -2229,6 +2309,50 @@ func (s *OperationQuery) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OperationQuery) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes OperationQuerySort as json.
+func (s OperationQuerySort) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes OperationQuerySort from json.
+func (s *OperationQuerySort) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OperationQuerySort to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch OperationQuerySort(v) {
+	case OperationQuerySortNewestFirst:
+		*s = OperationQuerySortNewestFirst
+	case OperationQuerySortOldestFirst:
+		*s = OperationQuerySortOldestFirst
+	case OperationQuerySortLargestFirst:
+		*s = OperationQuerySortLargestFirst
+	case OperationQuerySortSmallestFirst:
+		*s = OperationQuerySortSmallestFirst
+	default:
+		*s = OperationQuerySort(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OperationQuerySort) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OperationQuerySort) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -2547,6 +2671,72 @@ func (s OptInt64) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInt64) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes OperationFilter as json.
+func (o OptOperationFilter) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes OperationFilter from json.
+func (o *OptOperationFilter) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptOperationFilter to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptOperationFilter) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptOperationFilter) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes OperationQuerySort as json.
+func (o OptOperationQuerySort) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes OperationQuerySort from json.
+func (o *OptOperationQuerySort) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptOperationQuerySort to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptOperationQuerySort) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptOperationQuerySort) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

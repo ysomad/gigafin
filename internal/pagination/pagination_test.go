@@ -18,15 +18,19 @@ func TestCursorRoundTrip(t *testing.T) {
 	for _, c := range []pagination.Cursor{
 		{Date: date, Time: "18:05", Group: 40, ID: 42},
 		{Date: date, Group: 42, ID: 42},
+		{Amount: 123456, Date: date, Group: 42, ID: 42},
 	} {
 		got, err := pagination.ParseCursor(c.String())
 		require.NoError(t, err)
 		assert.Equal(t, c, got)
 	}
-	assert.Equal(t, "MjAyNi0xMC0wNl8xODowNV80MF80Mg",
+	assert.Equal(t, "MjAyNi0xMC0wNl8xODowNV80MF80Ml8w",
 		pagination.Cursor{Date: date, Time: "18:05", Group: 40, ID: 42}.String())
 
-	for _, s := range []string{"", "2026-10-06", "2026-10-06_42", "bad__42_42", "2026-10-06__x_42", "2026-10-06__42_x"} {
+	for _, s := range []string{
+		"", "2026-10-06", "2026-10-06_42", "2026-10-06__42_42", "bad__42_42_0", "2026-10-06__x_42_0",
+		"2026-10-06__42_x_0", "2026-10-06__42_42_x",
+	} {
 		_, err := pagination.ParseCursor(base64.RawURLEncoding.EncodeToString([]byte(s)))
 		require.ErrorIs(t, err, errors.ErrInvalid, s)
 	}

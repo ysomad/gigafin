@@ -196,7 +196,7 @@ func TestMCP(t *testing.T) {
 	assert.Equal(t, "Shop", op["payee"])
 
 	ops, errText := call(read, "gigafin_list_operations", map[string]any{"body": map[string]any{
-		"date_from": "2026-10-01", "page_size": 10,
+		"filter": map[string]any{"date_from": "2026-10-01"}, "page_size": 10, "sort": "largest_first",
 	}})
 	require.Empty(t, errText)
 	assert.Len(t, ops["items"], 1)

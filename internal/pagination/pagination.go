@@ -17,14 +17,16 @@ import (
 // cursorSep separates the fields of an encoded cursor.
 const cursorSep = "_"
 
-// Cursor points at the last item of a page, ordered descending by date, time (empty
-// last), group and id. Group keeps the parts of a split together: the origin id of a
-// part, the id of any other item.
+// Cursor points at the last item of a page, ordered by amount, date, time (empty as the
+// least), group and id, all descending or all ascending. Amount is the absolute amount
+// in minor units in an order by amount, zero in any other. Group keeps the parts of a
+// split together: the origin id of a part, the id of any other item.
 type Cursor struct {
-	Date  time.Time
-	Time  string
-	Group int64
-	ID    int64
+	Amount int64
+	Date   time.Time
+	Time   string
+	Group  int64
+	ID     int64
 }
 
 // IsZero reports whether the cursor is unset. Ids start at 1, so a zero id never points
@@ -37,7 +39,8 @@ func (c Cursor) IsZero() bool {
 // format can change.
 func (c Cursor) String() string {
 	return base64.RawURLEncoding.EncodeToString([]byte(timex.FormatDate(c.Date) + cursorSep + c.Time + cursorSep +
-		strconv.FormatInt(c.Group, 10) + cursorSep + strconv.FormatInt(c.ID, 10)))
+		strconv.FormatInt(c.Group, 10) + cursorSep + strconv.FormatInt(c.ID, 10) + cursorSep +
+		strconv.FormatInt(c.Amount, 10)))
 }
 
 // ParseCursor decodes a cursor produced by Cursor.String.
@@ -47,7 +50,7 @@ func ParseCursor(s string) (Cursor, error) {
 		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
 	}
 	parts := strings.Split(string(b), cursorSep)
-	if len(parts) != 4 {
+	if len(parts) != 5 {
 		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
 	}
 	d, err := timex.ParseDate(parts[0])
@@ -62,7 +65,11 @@ func ParseCursor(s string) (Cursor, error) {
 	if err != nil {
 		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
 	}
-	return Cursor{Date: d, Time: parts[1], Group: group, ID: id}, nil
+	amount, err := strconv.ParseInt(parts[4], 10, 64)
+	if err != nil {
+		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
+	}
+	return Cursor{Amount: amount, Date: d, Time: parts[1], Group: group, ID: id}, nil
 }
 
 // Params selects a page: the items after After, zero for the first page, and at most

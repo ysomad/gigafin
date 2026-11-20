@@ -118,7 +118,7 @@ func (h *Handler) bankConfirm(w http.ResponseWriter, r *http.Request, user domai
 	}
 	// signed in: the accounts are read, the linked ones catch up
 	res, err := h.app.Svc.Banks.Sync(ctx, user.ID, bank, user.Location(), true /* force */)
-	d := pageData{Notice: kit.T(ctx, "%s connected.", kit.T(ctx, bank.Name()))}
+	d := pageData{Notice: kit.T(ctx, "%s connected", kit.T(ctx, bank.Name()))}
 	if res.Operations > 0 {
 		d.Notice = kit.SyncNotice(ctx, res)
 	}

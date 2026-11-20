@@ -71,48 +71,86 @@ templ ArchiveDeleteForms(prefix, base string, archived bool, confirm string) {
 	<form id={ prefix + "-delete" } method="post" action={ base + "/delete" } hx-confirm={ confirm }></form>
 }
 
-// Filter is the filter form of a list, getting action: a button opening its dialog,
-// showing how many of count filters and the search query are set, and a link to
-// reset, the unfiltered list, if any. The dialog has the search input of query, then
-// the fields of children.
-templ Filter(action, query string, count int, reset string) {
-	{{
-		if query != "" {
-			count++
-		}
-	}}
+// Filter is the toolbar of a list getting action: buttons opening the search of query,
+// hinted by placeholder, and the dialog of the filter form, showing how many filters,
+// count, are set, and a link to reset, the unfiltered list, if any. The dialog has the
+// fields of children. The search swaps in the results of the list, list-results.
+templ Filter(action, query, placeholder string, count int, reset string) {
 	<div>
 		<div class="hstack">
-			@FilterButton(count)
-			if reset != "" {
-				<a class="button ghost" href={ reset }>{ T(ctx, "Reset") }</a>
-			}
+			<menu class="buttons">
+				<li>
+					@SearchButton()
+				</li>
+				<li>
+					@FilterButton(count)
+				</li>
+			</menu>
+			@ResetButton(reset)
 		</div>
 		// outside the hstack, which zeroes the margins that center a dialog
+		@SearchDialog(action, query, placeholder)
 		@FilterDialog(action) {
-			@Field("col-12", T(ctx, "Search"), "", "", nil) {
-				<input type="search" name="q" value={ query } autocomplete="off"/>
-			}
 			{ children... }
 		}
 	</div>
 }
 
+// SearchButton opens the dialog of SearchDialog.
+templ SearchButton() {
+	<button type="button" class="outline" commandfor="search" command="toggle-popover" aria-label={ T(ctx, "Search") }>
+		<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#search"></use></svg>
+	</button>
+}
+
+// SearchDialog is the dialog of the search input of query, hinted by placeholder, of a
+// list getting action. The input belongs to the filter form, so every way of getting
+// the list keeps it; typing swaps in the results and the elements of oob, as ListGet,
+// Enter loads the page.
+templ SearchDialog(action, query, placeholder string, oob ...string) {
+	<dialog id="search" popover role="search" class="p-4" aria-label={ T(ctx, "Search") }>
+		<input
+			type="search"
+			name="q"
+			form="filter-form"
+			value={ query }
+			if placeholder != "" {
+				placeholder={ placeholder }
+			}
+			aria-label={ T(ctx, "Search") }
+			autocomplete="off"
+			autofocus
+			hx-trigger="input changed delay:300ms, search"
+			{ ListGet(action, oob...)... }
+		/>
+	</dialog>
+}
+
+// ResetButton links to reset, the unfiltered list, if any. It is list-reset, swapped in
+// with the results of the list.
+templ ResetButton(reset string) {
+	<span id="list-reset">
+		if reset != "" {
+			<a class="button ghost" href={ reset } aria-label={ T(ctx, "Reset") } title={ T(ctx, "Reset") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#x"></use></svg></a>
+		}
+	</span>
+}
+
 // FilterButton opens the dialog of FilterDialog, showing how many filters, count, are
-// set.
+// set when any is.
 templ FilterButton(count int) {
 	<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
 		<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg>
 		if count > 0 {
-			<span class="badge">{ count }</span>
+			<span class="filter-count">{ count }</span>
 		}
 	</button>
 }
 
-// FilterDialog is the dialog of the filter form of a list, getting action, with the
-// fields of children. FilterButton opens it.
+// FilterDialog is the dialog of the filter form, filter-form, of a list, getting
+// action, with the fields of children. FilterButton opens it.
 templ FilterDialog(action string) {
-	<form method="get" action={ action }>
+	<form id="filter-form" method="get" action={ action }>
 		<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ T(ctx, "Filter") } closedby="any" autofocus>
 			<div class="row">
 				{ children... }
@@ -130,11 +168,12 @@ templ NoOperations() {
 	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>
 }
 
-// OpRows are the list items of operations by day, each titled with its net income,
-// followed by the loader of moreURL, the next page, if any.
+// OpRows are the list items of operations by day, each titled with its net income, or
+// each with its date in a day of zero date, followed by the loader of moreURL, the
+// next page, if any.
 templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domain.Account, moreURL string) {
 	for _, day := range days {
-		if !day.Continued {
+		if !day.Continued && !day.Date.IsZero() {
 			<li class="day text-light mt-4 hstack justify-between">
 				<span>{ DayTitle(ctx, day.Date) }</span>
 				<span class="hstack gap-2">
@@ -178,7 +217,12 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 						}
 					</small>
 				</a>
-				<div class="align-right">{ OpAmount(ctx, op) } <span class="text-light">{ money.CurrencySymbol(op.Currency) }</span></div>
+				<div class="align-right">
+					{ OpAmount(ctx, op) } <span class="text-light">{ money.CurrencySymbol(op.Currency) }</span>
+					if day.Date.IsZero() {
+						<div><small class="text-light">{ DayTitle(ctx, op.Date) }</small></div>
+					}
+				</div>
 			</li>
 		}
 	}

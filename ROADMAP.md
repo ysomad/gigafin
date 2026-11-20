@@ -50,6 +50,7 @@
 - [x] better categories ui/ux (icons, selectors)
 - [x] better operations search
 - [x] infinite scroll navigation
+- [ ] operations sorting
 - [ ] unsplit
 - [ ] mobile first ui
 - [ ] sber sync

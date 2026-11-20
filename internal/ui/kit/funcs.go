@@ -127,6 +127,21 @@ func Invalid(err, errID string) templ.Attributes {
 	}
 }
 
+// ListGet returns the attributes of a field of the filter form of a list getting
+// action: a change of it swaps in the results, list-results, and the parts of the page
+// depending on them, list-reset and the elements of oob, and replaces the URL.
+func ListGet(action string, oob ...string) templ.Attributes {
+	return templ.Attributes{
+		"hx-get":         action,
+		"hx-include":     "#filter-form, [form=filter-form]",
+		"hx-target":      "#list-results",
+		"hx-select":      "#list-results",
+		"hx-select-oob":  strings.Join(append([]string{"#list-reset"}, oob...), ", "),
+		"hx-swap":        "outerHTML",
+		"hx-replace-url": "true",
+	}
+}
+
 // ErrText returns the message of err translated to lang by d: the format and
 // domain.Msg args of domain.Error translated, the error kinds ending them dropped,
 // other errors as is.
@@ -205,10 +220,10 @@ func SyncNotice(ctx context.Context, res domain.BankSync) string {
 		for i, b := range res.NeedsLogin {
 			names[i] = T(ctx, b.Name())
 		}
-		return T(ctx, "%s asks to sign in again to keep syncing.", strings.Join(names, ", "))
+		return T(ctx, "%s asks to sign in again to keep syncing", strings.Join(names, ", "))
 	case res.Operations > 0:
-		return T(ctx, "Synced operations: %d.", res.Operations)
+		return T(ctx, "Synced operations: %d", res.Operations)
 	default:
-		return T(ctx, "No new operations.")
+		return T(ctx, "No new operations")
 	}
 }

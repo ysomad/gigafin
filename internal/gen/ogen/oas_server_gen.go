@@ -115,10 +115,10 @@ type Handler interface {
 	ListRules(ctx context.Context, params ListRulesParams) (*RuleList, error)
 	// RunRules implements runRules operation.
 	//
-	// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
+	// Runs on the operations the filter selects. Parts of splits are left alone.
 	//
 	// POST /rules/run
-	RunRules(ctx context.Context, req *OperationQuery) (*RulesRunResult, error)
+	RunRules(ctx context.Context, req *OperationFilter) (*RulesRunResult, error)
 	// SetPlan implements setPlan operation.
 	//
 	// The latest repeating plan before a month is copied into it when the month starts. Amount "0" with

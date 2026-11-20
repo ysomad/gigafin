@@ -15,6 +15,8 @@ import (
 
 // DayGroup are the operations of a day, listed by OpRows.
 type DayGroup struct {
+	// Date is zero for operations not ordered by date, listed without a day title and
+	// each with its date.
 	Date time.Time
 	Ops  []domain.Operation
 	// Flows are the income and expense of the day per currency, shown by its title.
@@ -47,7 +49,7 @@ func GroupByDay(ops []domain.Operation) []DayGroup {
 func (a *App) WholeLastDay(
 	ctx context.Context, userID int64, f domain.Filter, days []DayGroup, next pagination.Cursor,
 ) error {
-	if len(days) == 0 || next.IsZero() {
+	if len(days) == 0 || next.IsZero() || days[len(days)-1].Date.IsZero() {
 		return nil
 	}
 	last := &days[len(days)-1]
@@ -75,11 +77,12 @@ func (a *App) FilterFromQuery(q url.Values) (domain.Filter, error) {
 		Min      string `form:"min"`
 		Max      string `form:"max"`
 		Tags     string `form:"tags"` // comma-separated
+		Sort     string `form:"sort"` // empty is the default
 	}
 	if err := a.Decoder.Decode(&in, q); err != nil {
 		return domain.Filter{}, domain.NewError(errors.ErrInvalid, "invalid filter")
 	}
-	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category}
+	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category, Sort: domain.OpSort(in.Sort)}
 	if in.Category == NoCategory {
 		f.CategoryID, f.Uncategorized = 0, true
 	}

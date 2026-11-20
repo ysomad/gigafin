@@ -291,6 +291,84 @@ func TestListOrder(t *testing.T) {
 	assert.Equal(t, want, paged)
 }
 
+func TestListSort(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	ctx := t.Context()
+
+	create := func(in domain.OperationInput) int64 {
+		op, err := f.svc.Operations.Create(ctx, f.userID, in)
+		require.NoError(t, err)
+		return op.ID
+	}
+	// absolute amounts in minor units: 1000, 5000, 550, 3000, 1000
+	a := create(domain.OperationInput{
+		Type: domain.OpExpense, AccountID: f.card.ID, CategoryID: f.groceries.ID, Amount: dec("10"),
+		Date: day(t, "2026-10-01"),
+	})
+	b := create(domain.OperationInput{
+		Type: domain.OpIncome, AccountID: f.card.ID, CategoryID: f.salary.ID, Amount: dec("50"),
+		Date: day(t, "2026-10-02"),
+	})
+	c := create(domain.OperationInput{
+		Type: domain.OpExpense, AccountID: f.usd.ID, CategoryID: f.cafe.ID, Amount: dec("5.5"),
+		Date: day(t, "2026-10-03"),
+	})
+	d := create(domain.OperationInput{
+		Type: domain.OpAdjustment, AccountID: f.card.ID, Amount: dec("-30"), Date: day(t, "2026-10-04"),
+	})
+	e := create(domain.OperationInput{
+		Type: domain.OpExpense, AccountID: f.card.ID, CategoryID: f.groceries.ID, Amount: dec("10"),
+		Date: day(t, "2026-10-05"),
+	})
+
+	tests := []struct {
+		sort domain.OpSort
+		want []int64
+	}{
+		{"", []int64{e, d, c, b, a}},
+		{domain.SortNewestFirst, []int64{e, d, c, b, a}},
+		{domain.SortOldestFirst, []int64{a, b, c, d, e}},
+		// equal amounts by date as newest_first and oldest_first
+		{domain.SortLargestFirst, []int64{b, d, e, a, c}},
+		{domain.SortSmallestFirst, []int64{c, a, e, d, b}},
+	}
+	for _, tt := range tests {
+		ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{Sort: tt.sort},
+			pagination.NewParams(pagination.Cursor{}, 0))
+		require.NoError(t, err)
+		ids := make([]int64, len(ops))
+		for i, op := range ops {
+			ids[i] = op.ID
+		}
+		assert.Equal(t, tt.want, ids, tt.sort)
+
+		// pages of two items seek through the same order
+		var (
+			paged []int64
+			p     = pagination.NewParams(pagination.Cursor{}, 2)
+		)
+		for {
+			ops, next, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{Sort: tt.sort}, p)
+			require.NoError(t, err)
+			for _, op := range ops {
+				paged = append(paged, op.ID)
+			}
+			if next.IsZero() {
+				break
+			}
+			p.After, err = pagination.ParseCursor(next.String())
+			require.NoError(t, err)
+		}
+		assert.Equal(t, tt.want, paged, tt.sort)
+	}
+
+	_, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{Sort: "date"},
+		pagination.NewParams(pagination.Cursor{}, 0))
+	require.ErrorIs(t, err, errors.ErrInvalid)
+}
+
 func TestOperationValidation(t *testing.T) {
 	t.Parallel()
 

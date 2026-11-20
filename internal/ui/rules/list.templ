@@ -8,11 +8,11 @@ import (
 )
 
 templ listPage(v kit.Page, d rulesData) {
-	@kit.Layout(v, false, nil) {
+	@kit.Layout(v, false, learnedToast(d)) {
 		<div class="hstack justify-between mb-4">
 			<ot-dropdown>
 				<menu class="buttons">
-					<li><a class="button" href="/rules/new">+ { kit.T(ctx, "New rule") }</a></li>
+					<li><a class="button" href="/rules/new">+ { kit.T(ctx, "Rule") }</a></li>
 					<li>
 						<button type="button" popovertarget="rule-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
 					</li>
@@ -29,63 +29,69 @@ templ listPage(v kit.Page, d rulesData) {
 					reset = "/rules"
 				}
 			}}
-			@kit.Filter("/rules", d.Filter.Query, d.FilterCount, reset) {
+			@kit.Filter("/rules", d.Filter.Query, kit.T(ctx, "Value or category"), d.FilterCount, reset) {
 				@filterFields(d)
 			}
 		</div>
-		if d.Learned >= 0 {
-			<p role="status" class="badge mb-4" data-variant="success">{ kit.T(ctx, "Learned %d rules.", d.Learned) }</p>
-		}
-		if d.Filtered {
-			<p class="text-light mb-4">{ kit.T(ctx, "Showing %d of %d rules.", d.Shown, d.Total) }</p>
-		}
-		for _, s := range d.Stages {
-			if len(d.Stages) > 1 || s.Stage != domain.RuleStageDefault {
-				<h2>{ ruleStageLabel(ctx, s.Stage) }</h2>
+		<div id="list-results">
+			if d.Filtered {
+				<p class="text-light mb-4">{ kit.T(ctx, "Showing %d of %d rules.", d.Shown, d.Total) }</p>
 			}
-			<div class="table mb-4">
-				<table>
-					<thead><tr><th>{ kit.T(ctx, "If") }</th><th>{ kit.T(ctx, "Then") }</th><th></th></tr></thead>
-					<tbody>
-						for _, r := range s.Rules {
-							<tr>
-								<td>
-									<a href={ fmt.Sprintf("/rules/%d", r.ID) }>
-										for i, c := range r.Conds {
+			for _, s := range d.Stages {
+				if len(d.Stages) > 1 || s.Stage != domain.RuleStageDefault {
+					<h2>{ ruleStageLabel(ctx, s.Stage) }</h2>
+				}
+				<div class="table mb-4">
+					<table>
+						<thead><tr><th>{ kit.T(ctx, "If") }</th><th>{ kit.T(ctx, "Then") }</th><th></th></tr></thead>
+						<tbody>
+							for _, r := range s.Rules {
+								<tr>
+									<td>
+										<a href={ fmt.Sprintf("/rules/%d", r.ID) }>
+											for i, c := range r.Conds {
+												<div>
+													if i > 0 && c.Any {
+														<span class="text-light">{ kit.T(ctx, "or") } </span>
+													} else if i > 0 {
+														<span class="text-light">{ kit.T(ctx, "and") } </span>
+													}
+													<span class="text-light">{ ruleFieldLabel(ctx, c.Field) } { ruleOpLabel(ctx, c.Op) }</span> { c.Values }
+												</div>
+											}
+										</a>
+									</td>
+									<td>
+										for _, a := range r.Actions {
 											<div>
-												if i > 0 && c.Any {
-													<span class="text-light">{ kit.T(ctx, "or") } </span>
-												} else if i > 0 {
-													<span class="text-light">{ kit.T(ctx, "and") } </span>
-												}
-												<span class="text-light">{ ruleFieldLabel(ctx, c.Field) } { ruleOpLabel(ctx, c.Op) }</span> { c.Values }
+												<span class="text-light">{ ruleActionLabel(ctx, a.Type) }</span> { a.Value }
 											</div>
 										}
-									</a>
-								</td>
-								<td>
-									for _, a := range r.Actions {
-										<div>
-											<span class="text-light">{ ruleActionLabel(ctx, a.Type) }</span> { a.Value }
-										</div>
-									}
-								</td>
-								<td class="align-right">
-									if r.Origin == domain.RuleOriginLearned {
-										@learnedBadge()
-									}
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-		}
-		if len(d.Stages) == 0 && d.Filtered {
-			<p class="text-light">{ kit.T(ctx, "No rules match.") }</p>
-		} else if len(d.Stages) == 0 {
-			<p class="text-light">{ kit.T(ctx, "No rules yet.") }</p>
-		}
+									</td>
+									<td class="align-right">
+										if r.Origin == domain.RuleOriginLearned {
+											@learnedBadge()
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+			if len(d.Stages) == 0 && d.Filtered {
+				<p class="text-light">{ kit.T(ctx, "No rules match.") }</p>
+			} else if len(d.Stages) == 0 {
+				<p class="text-light">{ kit.T(ctx, "No rules yet.") }</p>
+			}
+		</div>
+	}
+}
+
+// learnedToast is the toast of how many rules were just learned, if any were asked for.
+templ learnedToast(d rulesData) {
+	if d.Learned >= 0 {
+		@kit.Toast("success", kit.T(ctx, "Learned %d rules", d.Learned))
 	}
 }
 

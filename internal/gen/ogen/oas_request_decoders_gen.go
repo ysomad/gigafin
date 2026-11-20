@@ -410,7 +410,7 @@ func (s *Server) decodeListOperationsRequest(r *http.Request) (
 }
 
 func (s *Server) decodeRunRulesRequest(r *http.Request) (
-	req *OperationQuery,
+	req *OperationFilter,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -457,7 +457,7 @@ func (s *Server) decodeRunRulesRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request OperationQuery
+		var request OperationFilter
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err

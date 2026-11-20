@@ -30,7 +30,6 @@ func New(app *kit.App) *Handler { return &Handler{app: app} }
 func (h *Handler) Routes() map[string]kit.Handler {
 	return map[string]kit.Handler{
 		"GET /operations":               h.operations,
-		"GET /operations/search":        h.search,
 		"GET /operations/new":           h.newOperation,
 		"GET /operations/split":         h.operationSplit,
 		"POST /operations":              h.createOperation,
@@ -72,6 +71,10 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		return err
 	}
 	days := kit.GroupByDay(ops)
+	if f.Sort.ByAmount() && len(ops) > 0 {
+		// an order by amount runs days apart, so the rows are listed with their dates
+		days = []kit.DayGroup{{Ops: ops}}
+	}
 	if len(days) > 0 && !p.After.IsZero() && days[0].Date.Equal(p.After.Date) {
 		days[0].Continued = true
 	}
@@ -97,6 +100,10 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	run.Del("cursor")
 	run.Del("changed")
 	d.RunURL = "/operations/rules?" + run.Encode()
+	d.ResetURL = "/operations"
+	if f.Sort != "" {
+		d.ResetURL += "?" + url.Values{"sort": {string(f.Sort)}}.Encode()
+	}
 	if !next.IsZero() {
 		q.Set("cursor", next.String())
 		d.MoreURL = "/operations?" + q.Encode()
@@ -120,52 +127,6 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		d,
 		kit.Failure{},
 	)
-}
-
-// search serves the search page, whose results the page swaps in from it while typing.
-func (h *Handler) search(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	q := r.URL.Query()
-	d := opSearch{Query: strings.TrimSpace(q.Get("q"))}
-	page := kit.Page{User: &user, Nav: "operations", Title: "Search"}
-	if d.Query == "" {
-		return kit.Render(h.app, w, r, http.StatusOK, searchPage, page, d, kit.Failure{})
-	}
-	var after pagination.Cursor
-	if c := q.Get("cursor"); c != "" {
-		var err error
-		if after, err = pagination.ParseCursor(c); err != nil {
-			return domain.NewError(errors.ErrInvalid, "invalid page link")
-		}
-	}
-	p := pagination.NewParams(after, 0)
-	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, domain.Filter{Query: d.Query}, p)
-	if err != nil {
-		return err
-	}
-	accounts, err := h.app.Svc.Accounts.List(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
-	tree, err := h.app.Svc.Categories.Tree(r.Context(), user.ID)
-	if err != nil {
-		return err
-	}
-	d.Days = kit.GroupByDay(ops)
-	if len(d.Days) > 0 && !p.After.IsZero() && d.Days[0].Date.Equal(p.After.Date) {
-		d.Days[0].Continued = true
-	}
-	if err := h.app.WholeLastDay(r.Context(), user.ID, domain.Filter{Query: d.Query}, d.Days, next); err != nil {
-		return err
-	}
-	d.AccByID = domain.AccountsByID(accounts)
-	d.CatNames = domain.CategoryShortNames(tree)
-	if !next.IsZero() {
-		d.MoreURL = "/operations/search?" + url.Values{"q": {d.Query}, "cursor": {next.String()}}.Encode()
-	}
-	if !p.After.IsZero() && kit.IsHTMX(r) {
-		return h.app.Fragment(w, r, http.StatusOK, kit.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL))
-	}
-	return kit.Render(h.app, w, r, http.StatusOK, searchPage, page, d, kit.Failure{})
 }
 
 // loadBanks sets in d whether the user syncs a bank and the bank accounts whose
@@ -207,7 +168,7 @@ func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		// a failing bank is not a fault of this server
 		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
-		h.app.SetNotice(w, kit.T(ctx, "Sync failed. Try again later."))
+		h.app.SetNotice(w, kit.T(ctx, "Sync failed. Try again later"))
 	} else {
 		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
 	}

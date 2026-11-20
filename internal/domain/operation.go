@@ -442,6 +442,33 @@ func parseDateTime(date time.Time, tm string) (time.Time, string, error) {
 	return timex.Date(date), clock, nil
 }
 
+// OpSort is an order of listed operations, SortNewestFirst when empty.
+type OpSort string
+
+const (
+	// SortNewestFirst lists the newest first, by date and time, parts of a split together.
+	SortNewestFirst OpSort = "newest_first"
+	// SortOldestFirst lists the oldest first.
+	SortOldestFirst OpSort = "oldest_first"
+	// SortLargestFirst lists the largest absolute amount in minor units first, whatever
+	// the currency, then by date as SortNewestFirst.
+	SortLargestFirst OpSort = "largest_first"
+	// SortSmallestFirst lists the least absolute amount in minor units first, then by date
+	// as SortOldestFirst.
+	SortSmallestFirst OpSort = "smallest_first"
+)
+
+// OpSorts returns all orders of listed operations.
+func OpSorts() []OpSort {
+	return []OpSort{SortNewestFirst, SortOldestFirst, SortLargestFirst, SortSmallestFirst}
+}
+
+// ByAmount reports whether s orders by absolute amount first, else by date.
+func (s OpSort) ByAmount() bool { return s == SortLargestFirst || s == SortSmallestFirst }
+
+// Ascending reports whether s lists the least first.
+func (s OpSort) Ascending() bool { return s == SortOldestFirst || s == SortSmallestFirst }
+
 // Filter selects operations. Zero fields match everything.
 type Filter struct {
 	AccountID  int64
@@ -459,6 +486,8 @@ type Filter struct {
 	AmountMax money.NullAmount
 	// Tags are tag names, matched exactly; an operation matches any of them.
 	Tags []string
+	// Sort orders the listed operations. It selects none, so Filtered and Count skip it.
+	Sort OpSort
 }
 
 // Filtered reports whether any field is set.
@@ -494,6 +523,9 @@ func (f Filter) Validate() error {
 	}
 	if f.Uncategorized && f.CategoryID != 0 {
 		return NewError(errors.ErrInvalid, "category: choose a category or no category")
+	}
+	if f.Sort != "" && !slices.Contains(OpSorts(), f.Sort) {
+		return NewError(errors.ErrInvalid, "sort: must be newest_first, oldest_first, largest_first or smallest_first")
 	}
 	return nil
 }

@@ -3107,12 +3107,12 @@ func toasts(d pageData) templ.Component {
 		}
 		if d.RatesSync.Done {
 			if d.RatesSync.Updated > 0 {
-				templ_7745c5c3_Err = kit.Toast("success", kit.T(ctx, "Daily rates updated: %d.", d.RatesSync.Updated)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = kit.Toast("success", kit.T(ctx, "Daily rates updated: %d", d.RatesSync.Updated)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = kit.Toast("success", kit.T(ctx, "Rates are up to date.")).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = kit.Toast("success", kit.T(ctx, "Rates are up to date")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -3129,7 +3129,7 @@ func toasts(d pageData) templ.Component {
 			}
 		}
 		if d.Banks.SyncFailed {
-			templ_7745c5c3_Err = kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later.")).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

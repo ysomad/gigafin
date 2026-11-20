@@ -10,9 +10,8 @@ import (
 templ listPage(v kit.Page, d listData) {
 	@kit.Layout(v, false, nil) {
 		<div class="hstack mb-4">
-			<a class="button" href="/imports/new">+ { kit.T(ctx, "New import") }</a>
+			<a class="button" href="/imports/new">+ { kit.T(ctx, "Import") }</a>
 		</div>
-		<h2>{ kit.T(ctx, "Recent imports") }</h2>
 		<div class="table">
 			<table>
 				<thead><tr><th>#</th><th>{ kit.T(ctx, "File") }</th><th>{ kit.T(ctx, "Uploaded") }</th><th>{ kit.T(ctx, "Status") }</th><th class="align-right">{ kit.T(ctx, "New") }</th><th class="align-right">{ kit.T(ctx, "Duplicates") }</th><th class="align-right">{ kit.T(ctx, "Skipped") }</th></tr></thead>

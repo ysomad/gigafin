@@ -1,7 +1,6 @@
 package service
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -97,8 +96,9 @@ func (s *Data) Export(ctx context.Context, userID int64, f domain.Filter, w io.W
 		if len(page) < pageSize {
 			break
 		}
-		last := page[len(page)-1]
-		cursor = pagination.Cursor{Date: last.Date, Time: last.Time, Group: cmp.Or(last.OriginID, last.ID), ID: last.ID}
+		if cursor, err = opCursor(filter.Sort, page[len(page)-1]); err != nil {
+			return err
+		}
 	}
 
 	slices.Reverse(ops)

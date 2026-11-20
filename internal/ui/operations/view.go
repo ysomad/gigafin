@@ -29,17 +29,10 @@ type opList struct {
 	Tags        []string
 	// RunURL runs rules on the operations matching Filter.
 	RunURL string
+	// ResetURL lists all operations in the order of Filter.
+	ResetURL string
 	// Changed is the number of operations rules just changed, -1 when they did not run.
 	Changed int
-}
-
-// opSearch is the search page: the operations matching Query, none while it is empty.
-type opSearch struct {
-	Query    string
-	Days     []kit.DayGroup
-	MoreURL  string
-	AccByID  map[int64]domain.Account
-	CatNames map[int64]string
 }
 
 // splitPart is a part of the split form.

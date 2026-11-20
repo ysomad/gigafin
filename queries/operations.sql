@@ -46,9 +46,16 @@ ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DES
 DELETE FROM operations WHERE id = ? AND user_id = ?;
 
 -- name: ListOperations :many
+-- the order is bound once here, as sqlc leaves arguments in ORDER BY unbound
+WITH sort AS (
+    SELECT
+        cast(sqlc.arg(ascending) AS INTEGER) AS ascending,
+        cast(sqlc.arg(by_amount) AS INTEGER) AS by_amount
+)
 SELECT sqlc.embed(o), a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
+CROSS JOIN sort
 WHERE
     o.user_id = sqlc.arg(user_id)
     AND (
@@ -89,14 +96,43 @@ WHERE
     OR sqlc.narg(tags) IS NULL)
     -- seeks past the cursor in the order below, see pagination.Cursor
     AND (
-        (o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
-        < (
-            cast(sqlc.narg(before_date) AS TEXT), cast(sqlc.narg(before_time) AS TEXT),
-            cast(sqlc.narg(before_group) AS INTEGER), cast(sqlc.narg(before_id) AS INTEGER)
+        cast(sqlc.narg(after_id) AS INTEGER) IS NULL
+        OR (
+            NOT sort.ascending
+            AND (
+                iif(sort.by_amount, abs(o.amount), 0),
+                o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id
+            )
+            < (
+                cast(sqlc.narg(after_amount) AS INTEGER), cast(sqlc.narg(after_date) AS TEXT),
+                cast(sqlc.narg(after_time) AS TEXT), cast(sqlc.narg(after_group) AS INTEGER),
+                cast(sqlc.narg(after_id) AS INTEGER)
+            )
         )
-        OR sqlc.narg(before_date) IS NULL
+        OR (
+            sort.ascending
+            AND (
+                iif(sort.by_amount, abs(o.amount), 0),
+                o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id
+            )
+            > (
+                cast(sqlc.narg(after_amount) AS INTEGER), cast(sqlc.narg(after_date) AS TEXT),
+                cast(sqlc.narg(after_time) AS TEXT), cast(sqlc.narg(after_group) AS INTEGER),
+                cast(sqlc.narg(after_id) AS INTEGER)
+            )
+        )
     )
-ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
+ORDER BY
+    -- the keys of the cursor, all ascending or all descending: the keys of the other
+    -- direction are NULL for every row, so they do not reorder. The amount key is zero
+    -- unless ordered by amount.
+    iif(sort.ascending, iif(sort.by_amount, abs(o.amount), 0), NULL),
+    iif(sort.ascending, o.date, NULL),
+    iif(sort.ascending, coalesce(o.time, ''), NULL),
+    iif(sort.ascending, coalesce(o.origin_id, o.id), NULL),
+    iif(sort.ascending, o.id, NULL),
+    iif(sort.by_amount, abs(o.amount), 0) DESC,
+    o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
 LIMIT sqlc.arg(lim);
 
 -- name: SumFilteredOperations :many

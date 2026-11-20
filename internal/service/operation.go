@@ -309,8 +309,8 @@ func (s *Operations) Months(ctx context.Context, userID int64, include ...timex.
 	return months, nil
 }
 
-// List returns a page of operations matching f, newest first, and the cursor of the
-// next page, which is zero on the last page.
+// List returns a page of operations matching f in the order of f.Sort and the cursor
+// of the next page, which is zero on the last page.
 func (s *Operations) List(
 	ctx context.Context, userID int64, f domain.Filter, p pagination.Params,
 ) ([]domain.Operation, pagination.Cursor, error) {
@@ -321,10 +321,28 @@ func (s *Operations) List(
 	if err != nil {
 		return nil, pagination.Cursor{}, err
 	}
+	var cursorErr error
 	ops, next := pagination.Cut(ops, p.PageSize, func(op domain.Operation) pagination.Cursor {
-		return pagination.Cursor{Date: op.Date, Time: op.Time, Group: cmp.Or(op.OriginID, op.ID), ID: op.ID}
+		var c pagination.Cursor
+		c, cursorErr = opCursor(f.Sort, op)
+		return c
 	})
+	if cursorErr != nil {
+		return nil, pagination.Cursor{}, cursorErr
+	}
 	return ops, next, nil
+}
+
+// opCursor returns the position of op in a list in the order of sort.
+func opCursor(sort domain.OpSort, op domain.Operation) (pagination.Cursor, error) {
+	c := pagination.Cursor{Date: op.Date, Time: op.Time, Group: cmp.Or(op.OriginID, op.ID), ID: op.ID}
+	if sort.ByAmount() {
+		var err error
+		if c.Amount, err = op.Amount.Abs().ToMinor(op.Currency); err != nil {
+			return pagination.Cursor{}, fmt.Errorf("cursor amount: %w", err)
+		}
+	}
+	return c, nil
 }
 
 // createOperation validates in against refs and stores it.

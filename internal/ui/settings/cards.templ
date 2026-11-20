@@ -501,15 +501,15 @@ templ toasts(d pageData) {
 	}
 	if d.RatesSync.Done {
 		if d.RatesSync.Updated > 0 {
-			@kit.Toast("success", kit.T(ctx, "Daily rates updated: %d.", d.RatesSync.Updated))
+			@kit.Toast("success", kit.T(ctx, "Daily rates updated: %d", d.RatesSync.Updated))
 		} else {
-			@kit.Toast("success", kit.T(ctx, "Rates are up to date."))
+			@kit.Toast("success", kit.T(ctx, "Rates are up to date"))
 		}
 		if d.RatesSync.Err != nil {
 			@kit.Toast("danger", kit.T(ctx, "Some failed:")+" "+kit.ErrMsg(ctx, d.RatesSync.Err))
 		}
 	}
 	if d.Banks.SyncFailed {
-		@kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later."))
+		@kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later"))
 	}
 }

@@ -11,7 +11,7 @@ import (
 templ accountsPage(v kit.Page, d accountsData) {
 	@kit.Layout(v, false, nil) {
 		<div class="hstack mb-4">
-			<a class="button" href="/accounts/new">+ { kit.T(ctx, "New account") }</a>
+			<a class="button" href="/accounts/new">+ { kit.T(ctx, "Account") }</a>
 		</div>
 		if len(d.Assets) == 0 && len(d.Liabilities) == 0 && len(d.Archived) == 0 {
 			<p class="text-light">{ kit.T(ctx, "No accounts yet.") }</p>

@@ -171,10 +171,10 @@ func (UnimplementedHandler) ListRules(ctx context.Context, params ListRulesParam
 
 // RunRules implements runRules operation.
 //
-// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
+// Runs on the operations the filter selects. Parts of splits are left alone.
 //
 // POST /rules/run
-func (UnimplementedHandler) RunRules(ctx context.Context, req *OperationQuery) (r *RulesRunResult, _ error) {
+func (UnimplementedHandler) RunRules(ctx context.Context, req *OperationFilter) (r *RulesRunResult, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

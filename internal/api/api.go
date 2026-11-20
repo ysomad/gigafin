@@ -272,10 +272,11 @@ func (h *Handler) ListOperations(ctx context.Context, req *ogen.OperationQuery) 
 	if !ok {
 		return nil, errors.ErrUnauthorized
 	}
-	f, err := fromOperationQuery(req)
+	f, err := fromOperationFilter(req.Filter.Or(ogen.OperationFilter{}))
 	if err != nil {
 		return nil, err
 	}
+	f.Sort = domain.OpSort(req.Sort.Or(""))
 	var after pagination.Cursor
 	if c, ok := req.PageCursor.Get(); ok {
 		if after, err = pagination.ParseCursor(c); err != nil {
@@ -537,13 +538,13 @@ func (h *Handler) ApplyRule(ctx context.Context, params ogen.ApplyRuleParams) (*
 }
 
 // RunRules implements ogen.Handler.
-func (h *Handler) RunRules(ctx context.Context, req *ogen.OperationQuery) (*ogen.RulesRunResult, error) {
+func (h *Handler) RunRules(ctx context.Context, req *ogen.OperationFilter) (*ogen.RulesRunResult, error) {
 	// every operation requires a key, so a missing one is a wiring bug; fail closed
 	key, ok := ctx.Value(keyCtx{}).(domain.APIKey)
 	if !ok {
 		return nil, errors.ErrUnauthorized
 	}
-	f, err := fromOperationQuery(req)
+	f, err := fromOperationFilter(*req)
 	if err != nil {
 		return nil, err
 	}
@@ -711,9 +712,8 @@ func fromOperationInput(req *ogen.OperationInput) (domain.OperationInput, error)
 	return in, nil
 }
 
-// fromOperationQuery returns the filter of req; its cursor and page size are not part
-// of it.
-func fromOperationQuery(req *ogen.OperationQuery) (domain.Filter, error) {
+// fromOperationFilter returns the filter of req.
+func fromOperationFilter(req ogen.OperationFilter) (domain.Filter, error) {
 	f := domain.Filter{
 		AccountID:     req.AccountID.Or(0),
 		CategoryID:    req.CategoryID.Or(0),

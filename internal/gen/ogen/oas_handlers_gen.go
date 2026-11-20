@@ -2374,7 +2374,7 @@ func (s *Server) handleListRulesRequest(args [0]string, argsEscaped bool, w http
 
 // handleRunRulesRequest handles runRules operation.
 //
-// Parts of splits are left alone. page_cursor and page_size of the filter are ignored.
+// Runs on the operations the filter selects. Parts of splits are left alone.
 //
 // POST /rules/run
 func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2467,7 +2467,7 @@ func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.
 		}
 
 		type (
-			Request  = *OperationQuery
+			Request  = *OperationFilter
 			Params   = struct{}
 			Response = *RulesRunResult
 		)

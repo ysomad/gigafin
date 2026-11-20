@@ -169,9 +169,15 @@ func (q *Queries) GetOperation(ctx context.Context, arg GetOperationParams) (Get
 }
 
 const listOperations = `-- name: ListOperations :many
+WITH sort AS (
+    SELECT
+        cast(?21 AS INTEGER) AS ascending,
+        cast(?22 AS INTEGER) AS by_amount
+)
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
+CROSS JOIN sort
 WHERE
     o.user_id = ?1
     AND (
@@ -212,15 +218,44 @@ WHERE
     OR ?14 IS NULL)
     -- seeks past the cursor in the order below, see pagination.Cursor
     AND (
-        (o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
-        < (
-            cast(?15 AS TEXT), cast(?16 AS TEXT),
-            cast(?17 AS INTEGER), cast(?18 AS INTEGER)
+        cast(?15 AS INTEGER) IS NULL
+        OR (
+            NOT sort.ascending
+            AND (
+                iif(sort.by_amount, abs(o.amount), 0),
+                o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id
+            )
+            < (
+                cast(?16 AS INTEGER), cast(?17 AS TEXT),
+                cast(?18 AS TEXT), cast(?19 AS INTEGER),
+                cast(?15 AS INTEGER)
+            )
         )
-        OR ?15 IS NULL
+        OR (
+            sort.ascending
+            AND (
+                iif(sort.by_amount, abs(o.amount), 0),
+                o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id
+            )
+            > (
+                cast(?16 AS INTEGER), cast(?17 AS TEXT),
+                cast(?18 AS TEXT), cast(?19 AS INTEGER),
+                cast(?15 AS INTEGER)
+            )
+        )
     )
-ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
-LIMIT ?19
+ORDER BY
+    -- the keys of the cursor, all ascending or all descending: the keys of the other
+    -- direction are NULL for every row, so they do not reorder. The amount key is zero
+    -- unless ordered by amount.
+    iif(sort.ascending, iif(sort.by_amount, abs(o.amount), 0), NULL),
+    iif(sort.ascending, o.date, NULL),
+    iif(sort.ascending, coalesce(o.time, ''), NULL),
+    iif(sort.ascending, coalesce(o.origin_id, o.id), NULL),
+    iif(sort.ascending, o.id, NULL),
+    iif(sort.by_amount, abs(o.amount), 0) DESC,
+    o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
+LIMIT ?20
 `
 
 type ListOperationsParams struct {
@@ -238,11 +273,14 @@ type ListOperationsParams struct {
 	AmountMin     sql.NullString
 	AmountMax     sql.NullString
 	Tags          sql.NullString
-	BeforeDate    sql.NullString
-	BeforeTime    sql.NullString
-	BeforeGroup   sql.NullInt64
-	BeforeID      sql.NullInt64
+	AfterID       sql.NullInt64
+	AfterAmount   sql.NullInt64
+	AfterDate     sql.NullString
+	AfterTime     sql.NullString
+	AfterGroup    sql.NullInt64
 	Lim           int64
+	Ascending     int64
+	ByAmount      int64
 }
 
 type ListOperationsRow struct {
@@ -250,6 +288,7 @@ type ListOperationsRow struct {
 	Currency  string
 }
 
+// the order is bound once here, as sqlc leaves arguments in ORDER BY unbound
 func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) ([]ListOperationsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listOperations,
 		arg.UserID,
@@ -266,11 +305,14 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 		arg.AmountMin,
 		arg.AmountMax,
 		arg.Tags,
-		arg.BeforeDate,
-		arg.BeforeTime,
-		arg.BeforeGroup,
-		arg.BeforeID,
+		arg.AfterID,
+		arg.AfterAmount,
+		arg.AfterDate,
+		arg.AfterTime,
+		arg.AfterGroup,
 		arg.Lim,
+		arg.Ascending,
+		arg.ByAmount,
 	)
 	if err != nil {
 		return nil, err

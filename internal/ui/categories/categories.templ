@@ -23,8 +23,8 @@ templ categoriesPage(v kit.Page, d listData) {
 			}
 		}}
 		<div class="hstack justify-between mb-4">
-			<a class="button" href={ fmt.Sprintf("/categories/new?kind=%s", d.Kind) }>+ { kit.T(ctx, "New category") }</a>
-			@kit.Filter("/categories", d.Query, count, reset) {
+			<a class="button" href={ fmt.Sprintf("/categories/new?kind=%s", d.Kind) }>+ { kit.T(ctx, "Category") }</a>
+			@kit.Filter("/categories", d.Query, "", count, reset) {
 				@kit.Field("col-6", kit.T(ctx, "Kind"), "", "", nil) {
 					<select name="kind">
 						<option value="">{ kit.T(ctx, "All") }</option>
@@ -42,6 +42,7 @@ templ categoriesPage(v kit.Page, d listData) {
 				}
 			}
 		</div>
+		<div id="list-results">
 		for _, g := range d.Groups {
 			if len(d.Groups) > 1 {
 				<h2>{ kit.KindLabel(ctx, g.Kind) }</h2>
@@ -78,6 +79,7 @@ templ categoriesPage(v kit.Page, d listData) {
 		} else if len(d.Groups) == 0 {
 			<p class="text-light">{ kit.T(ctx, "No categories yet.") }</p>
 		}
+		</div>
 	}
 }
 

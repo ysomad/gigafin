@@ -47,6 +47,11 @@ td.nowrap {
   }
 }
 
+/* Button adding an operation, floating under the thumb on phones only. */
+.fab {
+  display: none;
+}
+
 /* On phones the top nav becomes a bottom tab bar without the brand, above the home
    indicator of the installed app. */
 @media (max-width: 768px) {
@@ -55,6 +60,27 @@ td.nowrap {
   }
   .to-top {
     bottom: calc(4.5rem + var(--space-2) + env(safe-area-inset-bottom));
+  }
+  .fab {
+    position: fixed;
+    right: var(--space-4);
+    bottom: calc(4.5rem + var(--space-2) + env(safe-area-inset-bottom));
+    z-index: 4;
+    display: inline-flex;
+  }
+  /* outlined floating buttons stand out from the rows under them, which show through
+     faintly */
+  :is(.fab, .to-top).outline {
+    background-color: color-mix(in srgb, var(--background) 85%, transparent);
+    box-shadow: var(--shadow-medium);
+  }
+  /* the scroll-to-top button stacks above it, a button high */
+  body:has(.fab) .to-top {
+    bottom: calc(4.5rem + 2.5rem + var(--space-4) + env(safe-area-inset-bottom));
+  }
+  /* the floating button adds an operation instead */
+  .op-new {
+    display: none;
   }
   /* iOS zooms into a focused field whose text is under 16px, as Oat's is */
   :is(input, select, textarea) {
@@ -85,10 +111,21 @@ td.nowrap {
   }
 }
 
+/* The search of a list opens near the top, not centered. */
+#search {
+  margin-block-start: var(--space-16);
+}
+
 /* A dialog opened with autofocus takes the focus itself, not its first field: no ring
    around the whole dialog. */
 dialog[autofocus]:focus-visible {
   outline: none;
+}
+
+/* The count of set filters on the filter button is no higher than its icon, so the
+   button stays as high as the icon buttons beside it. */
+.filter-count {
+  line-height: 1;
 }
 
 /* Form with tight, even spacing between fields, such as the operations filter. */

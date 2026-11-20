@@ -285,8 +285,8 @@ func (r *Operations) ByPayees(ctx context.Context, userID int64, payees []string
 	return ops, nil
 }
 
-// List returns up to limit operations matching f, newest first, starting past the
-// cursor unless it is zero.
+// List returns up to limit operations matching f in the order of f.Sort, starting
+// past the cursor unless it is zero.
 func (r *Operations) List(
 	ctx context.Context, userID int64, f domain.Filter, cursor pagination.Cursor, limit int,
 ) ([]domain.Operation, error) {
@@ -311,11 +311,18 @@ func (r *Operations) List(
 		AmountMax:     fp.AmountMax,
 		Lim:           int64(limit),
 	}
+	if f.Sort.Ascending() {
+		params.Ascending = 1
+	}
+	if f.Sort.ByAmount() {
+		params.ByAmount = 1
+	}
 	if !cursor.IsZero() {
-		params.BeforeDate = sql.NullString{String: timex.FormatDate(cursor.Date), Valid: true}
-		params.BeforeTime = sql.NullString{String: cursor.Time, Valid: true}
-		params.BeforeGroup = sql.NullInt64{Int64: cursor.Group, Valid: true}
-		params.BeforeID = sql.NullInt64{Int64: cursor.ID, Valid: true}
+		params.AfterAmount = sql.NullInt64{Int64: cursor.Amount, Valid: true}
+		params.AfterDate = sql.NullString{String: timex.FormatDate(cursor.Date), Valid: true}
+		params.AfterTime = sql.NullString{String: cursor.Time, Valid: true}
+		params.AfterGroup = sql.NullInt64{Int64: cursor.Group, Valid: true}
+		params.AfterID = sql.NullInt64{Int64: cursor.ID, Valid: true}
 	}
 	rows, err := r.q.ListOperations(ctx, params)
 	if err != nil {

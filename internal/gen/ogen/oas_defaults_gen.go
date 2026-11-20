@@ -5,6 +5,10 @@ package ogen
 // setDefaults set default value of fields.
 func (s *OperationQuery) setDefaults() {
 	{
+		val := OperationQuerySort("newest_first")
+		s.Sort.SetTo(val)
+	}
+	{
 		val := int(50)
 		s.PageSize.SetTo(val)
 	}

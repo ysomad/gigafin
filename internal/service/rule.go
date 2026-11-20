@@ -1,7 +1,6 @@
 package service
 
 import (
-	"cmp"
 	"context"
 	"log/slog"
 	"slices"
@@ -362,8 +361,8 @@ func storeRules(ctx context.Context, r repository.Repos, userID int64, rules []d
 	return nil
 }
 
-// allOperations returns all the user's operations matching f, newest first, reading
-// them page by page.
+// allOperations returns all the user's operations matching f in the order of f.Sort,
+// reading them page by page.
 func allOperations(ctx context.Context, r repository.Repos, userID int64, f domain.Filter) ([]domain.Operation, error) {
 	const page = 500
 	var (
@@ -379,8 +378,9 @@ func allOperations(ctx context.Context, r repository.Repos, userID int64, f doma
 		if len(ops) < page {
 			return all, nil
 		}
-		last := ops[len(ops)-1]
-		cursor = pagination.Cursor{Date: last.Date, Time: last.Time, Group: cmp.Or(last.OriginID, last.ID), ID: last.ID}
+		if cursor, err = opCursor(f.Sort, ops[len(ops)-1]); err != nil {
+			return nil, err
+		}
 	}
 }
 

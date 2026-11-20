@@ -358,9 +358,9 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request, user do
 	// all sessions end on a password change, this browser gets a new one
 	http.SetCookie(w, h.app.Cookie(kit.SessionCookie, token, int(h.app.SessionTTL.Seconds())))
 	p := kit.PrefsFrom(r.Context())
-	notice := h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out.")
+	notice := h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out")
 	if f.RevokeAPIKeys {
-		notice = h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out and API keys revoked.")
+		notice = h.app.Dicts.T(p.Lang, "Password changed. Other sessions are signed out and API keys revoked")
 	}
 	if !kit.IsHTMX(r) {
 		h.app.SetNotice(w, notice)
@@ -407,7 +407,7 @@ func (h *Handler) enableTwoFactor(w http.ResponseWriter, r *http.Request, user d
 	// sessions started with the password alone end, this browser gets a new one
 	http.SetCookie(w, h.app.Cookie(kit.SessionCookie, token, int(h.app.SessionTTL.Seconds())))
 	p := kit.PrefsFrom(r.Context())
-	notice := h.app.Dicts.T(p.Lang, "Two-factor authentication is on. Other sessions are signed out.")
+	notice := h.app.Dicts.T(p.Lang, "Two-factor authentication is on. Other sessions are signed out")
 	return h.settingsReply(w, r, user, pageData{RecoveryCodes: codes, Notice: notice},
 		kit.Failure{}, _twoFactorCard, _accessCard)
 }

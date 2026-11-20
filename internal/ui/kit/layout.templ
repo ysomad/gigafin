@@ -70,7 +70,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 				}
 				{ children... }
 				if toTop {
-					<a class="button to-top" href="#top" hx-boost="false" hidden aria-label={ T(ctx, "Scroll to top") }>↑</a>
+					<a class="button outline to-top" href="#top" hx-boost="false" hidden aria-label={ T(ctx, "Scroll to top") }>↑</a>
 				}
 				// after the content, whose inputs take their field messages first
 				@Toasts(v, false, toasts)

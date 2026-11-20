@@ -752,6 +752,128 @@ func (s *Operation) SetUpdatedAt(val OptDateTime) {
 	s.UpdatedAt = val
 }
 
+// Selects operations; unset fields match everything.
+// Ref: #/components/schemas/OperationFilter
+type OperationFilter struct {
+	AccountID OptInt64 `json:"account_id"`
+	// A root category also matches its nested categories.
+	CategoryID OptInt64 `json:"category_id"`
+	// Only expenses and income without a category; not with category_id.
+	IsUncategorized OptBool          `json:"is_uncategorized"`
+	Type            OptOperationType `json:"type"`
+	DateFrom        OptDate          `json:"date_from"`
+	DateTo          OptDate          `json:"date_to"`
+	// Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a
+	// tag; a number may match the absolute amount instead, whole units any fraction of them.
+	Query OptString `json:"query"`
+	// Tag name, matched exactly.
+	Tag OptString `json:"tag"`
+	// Least absolute amount, inclusive, in the currency of each operation.
+	AmountMin OptAmount `json:"amount_min"`
+	// Greatest absolute amount, inclusive, in the currency of each operation.
+	AmountMax OptAmount `json:"amount_max"`
+}
+
+// GetAccountID returns the value of AccountID.
+func (s *OperationFilter) GetAccountID() OptInt64 {
+	return s.AccountID
+}
+
+// GetCategoryID returns the value of CategoryID.
+func (s *OperationFilter) GetCategoryID() OptInt64 {
+	return s.CategoryID
+}
+
+// GetIsUncategorized returns the value of IsUncategorized.
+func (s *OperationFilter) GetIsUncategorized() OptBool {
+	return s.IsUncategorized
+}
+
+// GetType returns the value of Type.
+func (s *OperationFilter) GetType() OptOperationType {
+	return s.Type
+}
+
+// GetDateFrom returns the value of DateFrom.
+func (s *OperationFilter) GetDateFrom() OptDate {
+	return s.DateFrom
+}
+
+// GetDateTo returns the value of DateTo.
+func (s *OperationFilter) GetDateTo() OptDate {
+	return s.DateTo
+}
+
+// GetQuery returns the value of Query.
+func (s *OperationFilter) GetQuery() OptString {
+	return s.Query
+}
+
+// GetTag returns the value of Tag.
+func (s *OperationFilter) GetTag() OptString {
+	return s.Tag
+}
+
+// GetAmountMin returns the value of AmountMin.
+func (s *OperationFilter) GetAmountMin() OptAmount {
+	return s.AmountMin
+}
+
+// GetAmountMax returns the value of AmountMax.
+func (s *OperationFilter) GetAmountMax() OptAmount {
+	return s.AmountMax
+}
+
+// SetAccountID sets the value of AccountID.
+func (s *OperationFilter) SetAccountID(val OptInt64) {
+	s.AccountID = val
+}
+
+// SetCategoryID sets the value of CategoryID.
+func (s *OperationFilter) SetCategoryID(val OptInt64) {
+	s.CategoryID = val
+}
+
+// SetIsUncategorized sets the value of IsUncategorized.
+func (s *OperationFilter) SetIsUncategorized(val OptBool) {
+	s.IsUncategorized = val
+}
+
+// SetType sets the value of Type.
+func (s *OperationFilter) SetType(val OptOperationType) {
+	s.Type = val
+}
+
+// SetDateFrom sets the value of DateFrom.
+func (s *OperationFilter) SetDateFrom(val OptDate) {
+	s.DateFrom = val
+}
+
+// SetDateTo sets the value of DateTo.
+func (s *OperationFilter) SetDateTo(val OptDate) {
+	s.DateTo = val
+}
+
+// SetQuery sets the value of Query.
+func (s *OperationFilter) SetQuery(val OptString) {
+	s.Query = val
+}
+
+// SetTag sets the value of Tag.
+func (s *OperationFilter) SetTag(val OptString) {
+	s.Tag = val
+}
+
+// SetAmountMin sets the value of AmountMin.
+func (s *OperationFilter) SetAmountMin(val OptAmount) {
+	s.AmountMin = val
+}
+
+// SetAmountMax sets the value of AmountMax.
+func (s *OperationFilter) SetAmountMax(val OptAmount) {
+	s.AmountMax = val
+}
+
 // Ref: #/components/schemas/OperationInput
 type OperationInput struct {
 	Type      OperationType `json:"type"`
@@ -898,76 +1020,24 @@ func (s *OperationList) SetNextPageCursor(val OptString) {
 
 // Ref: #/components/schemas/OperationQuery
 type OperationQuery struct {
-	AccountID OptInt64 `json:"account_id"`
-	// A root category also matches its nested categories.
-	CategoryID OptInt64 `json:"category_id"`
-	// Only expenses and income without a category; not with category_id.
-	IsUncategorized OptBool          `json:"is_uncategorized"`
-	Type            OptOperationType `json:"type"`
-	DateFrom        OptDate          `json:"date_from"`
-	DateTo          OptDate          `json:"date_to"`
-	// Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a
-	// tag; a number may match the absolute amount instead, whole units any fraction of them.
-	Query OptString `json:"query"`
-	// Tag name, matched exactly.
-	Tag OptString `json:"tag"`
-	// Least absolute amount, inclusive, in the currency of each operation.
-	AmountMin OptAmount `json:"amount_min"`
-	// Greatest absolute amount, inclusive, in the currency of each operation.
-	AmountMax OptAmount `json:"amount_max"`
+	Filter OptOperationFilter `json:"filter"`
+	// Order of the list. newest_first lists by date and time, parts of a split together; largest_first by
+	// absolute amount in minor units, whatever the currency, then by date. A page_cursor is valid only
+	// with the sort it was returned for.
+	Sort OptOperationQuerySort `json:"sort"`
 	// Next_page_cursor of the previous page.
 	PageCursor OptString `json:"page_cursor"`
 	PageSize   OptInt    `json:"page_size"`
 }
 
-// GetAccountID returns the value of AccountID.
-func (s *OperationQuery) GetAccountID() OptInt64 {
-	return s.AccountID
+// GetFilter returns the value of Filter.
+func (s *OperationQuery) GetFilter() OptOperationFilter {
+	return s.Filter
 }
 
-// GetCategoryID returns the value of CategoryID.
-func (s *OperationQuery) GetCategoryID() OptInt64 {
-	return s.CategoryID
-}
-
-// GetIsUncategorized returns the value of IsUncategorized.
-func (s *OperationQuery) GetIsUncategorized() OptBool {
-	return s.IsUncategorized
-}
-
-// GetType returns the value of Type.
-func (s *OperationQuery) GetType() OptOperationType {
-	return s.Type
-}
-
-// GetDateFrom returns the value of DateFrom.
-func (s *OperationQuery) GetDateFrom() OptDate {
-	return s.DateFrom
-}
-
-// GetDateTo returns the value of DateTo.
-func (s *OperationQuery) GetDateTo() OptDate {
-	return s.DateTo
-}
-
-// GetQuery returns the value of Query.
-func (s *OperationQuery) GetQuery() OptString {
-	return s.Query
-}
-
-// GetTag returns the value of Tag.
-func (s *OperationQuery) GetTag() OptString {
-	return s.Tag
-}
-
-// GetAmountMin returns the value of AmountMin.
-func (s *OperationQuery) GetAmountMin() OptAmount {
-	return s.AmountMin
-}
-
-// GetAmountMax returns the value of AmountMax.
-func (s *OperationQuery) GetAmountMax() OptAmount {
-	return s.AmountMax
+// GetSort returns the value of Sort.
+func (s *OperationQuery) GetSort() OptOperationQuerySort {
+	return s.Sort
 }
 
 // GetPageCursor returns the value of PageCursor.
@@ -980,54 +1050,14 @@ func (s *OperationQuery) GetPageSize() OptInt {
 	return s.PageSize
 }
 
-// SetAccountID sets the value of AccountID.
-func (s *OperationQuery) SetAccountID(val OptInt64) {
-	s.AccountID = val
+// SetFilter sets the value of Filter.
+func (s *OperationQuery) SetFilter(val OptOperationFilter) {
+	s.Filter = val
 }
 
-// SetCategoryID sets the value of CategoryID.
-func (s *OperationQuery) SetCategoryID(val OptInt64) {
-	s.CategoryID = val
-}
-
-// SetIsUncategorized sets the value of IsUncategorized.
-func (s *OperationQuery) SetIsUncategorized(val OptBool) {
-	s.IsUncategorized = val
-}
-
-// SetType sets the value of Type.
-func (s *OperationQuery) SetType(val OptOperationType) {
-	s.Type = val
-}
-
-// SetDateFrom sets the value of DateFrom.
-func (s *OperationQuery) SetDateFrom(val OptDate) {
-	s.DateFrom = val
-}
-
-// SetDateTo sets the value of DateTo.
-func (s *OperationQuery) SetDateTo(val OptDate) {
-	s.DateTo = val
-}
-
-// SetQuery sets the value of Query.
-func (s *OperationQuery) SetQuery(val OptString) {
-	s.Query = val
-}
-
-// SetTag sets the value of Tag.
-func (s *OperationQuery) SetTag(val OptString) {
-	s.Tag = val
-}
-
-// SetAmountMin sets the value of AmountMin.
-func (s *OperationQuery) SetAmountMin(val OptAmount) {
-	s.AmountMin = val
-}
-
-// SetAmountMax sets the value of AmountMax.
-func (s *OperationQuery) SetAmountMax(val OptAmount) {
-	s.AmountMax = val
+// SetSort sets the value of Sort.
+func (s *OperationQuery) SetSort(val OptOperationQuerySort) {
+	s.Sort = val
 }
 
 // SetPageCursor sets the value of PageCursor.
@@ -1038,6 +1068,64 @@ func (s *OperationQuery) SetPageCursor(val OptString) {
 // SetPageSize sets the value of PageSize.
 func (s *OperationQuery) SetPageSize(val OptInt) {
 	s.PageSize = val
+}
+
+// Order of the list. newest_first lists by date and time, parts of a split together; largest_first by
+// absolute amount in minor units, whatever the currency, then by date. A page_cursor is valid only
+// with the sort it was returned for.
+type OperationQuerySort string
+
+const (
+	OperationQuerySortNewestFirst   OperationQuerySort = "newest_first"
+	OperationQuerySortOldestFirst   OperationQuerySort = "oldest_first"
+	OperationQuerySortLargestFirst  OperationQuerySort = "largest_first"
+	OperationQuerySortSmallestFirst OperationQuerySort = "smallest_first"
+)
+
+// AllValues returns all OperationQuerySort values.
+func (OperationQuerySort) AllValues() []OperationQuerySort {
+	return []OperationQuerySort{
+		OperationQuerySortNewestFirst,
+		OperationQuerySortOldestFirst,
+		OperationQuerySortLargestFirst,
+		OperationQuerySortSmallestFirst,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OperationQuerySort) MarshalText() ([]byte, error) {
+	switch s {
+	case OperationQuerySortNewestFirst:
+		return []byte(s), nil
+	case OperationQuerySortOldestFirst:
+		return []byte(s), nil
+	case OperationQuerySortLargestFirst:
+		return []byte(s), nil
+	case OperationQuerySortSmallestFirst:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OperationQuerySort) UnmarshalText(data []byte) error {
+	switch OperationQuerySort(data) {
+	case OperationQuerySortNewestFirst:
+		*s = OperationQuerySortNewestFirst
+		return nil
+	case OperationQuerySortOldestFirst:
+		*s = OperationQuerySortOldestFirst
+		return nil
+	case OperationQuerySortLargestFirst:
+		*s = OperationQuerySortLargestFirst
+		return nil
+	case OperationQuerySortSmallestFirst:
+		*s = OperationQuerySortSmallestFirst
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #/components/schemas/OperationType
@@ -1458,6 +1546,98 @@ func (o OptInt64) Get() (v int64, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt64) Or(d int64) int64 {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOperationFilter returns new OptOperationFilter with value set to v.
+func NewOptOperationFilter(v OperationFilter) OptOperationFilter {
+	return OptOperationFilter{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOperationFilter is optional OperationFilter.
+type OptOperationFilter struct {
+	Value OperationFilter
+	Set   bool
+}
+
+// IsSet returns true if OptOperationFilter was set.
+func (o OptOperationFilter) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOperationFilter) Reset() {
+	var v OperationFilter
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOperationFilter) SetTo(v OperationFilter) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOperationFilter) Get() (v OperationFilter, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOperationFilter) Or(d OperationFilter) OperationFilter {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOperationQuerySort returns new OptOperationQuerySort with value set to v.
+func NewOptOperationQuerySort(v OperationQuerySort) OptOperationQuerySort {
+	return OptOperationQuerySort{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOperationQuerySort is optional OperationQuerySort.
+type OptOperationQuerySort struct {
+	Value OperationQuerySort
+	Set   bool
+}
+
+// IsSet returns true if OptOperationQuerySort was set.
+func (o OptOperationQuerySort) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOperationQuerySort) Reset() {
+	var v OperationQuerySort
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOperationQuerySort) SetTo(v OperationQuerySort) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOperationQuerySort) Get() (v OperationQuerySort, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOperationQuerySort) Or(d OperationQuerySort) OperationQuerySort {
 	if v, ok := o.Get(); ok {
 		return v
 	}

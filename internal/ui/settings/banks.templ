@@ -113,7 +113,7 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 			</form>
 		} else {
 			if b.Conn.LastError != "" {
-				<p class="text-danger">{ kit.T(ctx, "Sync failed. Try again later.") }</p>
+				<p class="text-danger">{ kit.T(ctx, "Sync failed. Try again later") }</p>
 			}
 			@bankAccounts(v, d, b.Bank)
 		}
