@@ -264,8 +264,6 @@ func (h *Handler) parseOpForm(r *http.Request) (opForm, domain.OperationInput, k
 		errs["to_account"] = domain.NewError(errors.ErrInvalid, "required")
 	case f.Type == domain.OpTransfer && in.ToAccountID == in.AccountID:
 		errs["to_account"] = domain.NewError(errors.ErrInvalid, "must differ from the source account")
-	case (f.Type == domain.OpExpense || f.Type == domain.OpIncome) && in.CategoryID == 0:
-		errs["category"] = domain.NewError(errors.ErrInvalid, "required")
 	}
 	var err error
 	switch in.Amount, err = money.Parse(f.Amount); {
@@ -476,6 +474,10 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 		return err
 	}
 	f.ID = id
+	// a new operation may be left uncategorized, a saved one is not
+	if (f.Type == domain.OpExpense || f.Type == domain.OpIncome) && in.CategoryID == 0 {
+		errs["category"] = domain.NewError(errors.ErrInvalid, "required")
+	}
 	if len(errs) > 0 {
 		return h.renderForm(w, r, user, http.StatusUnprocessableEntity, f, errs)
 	}

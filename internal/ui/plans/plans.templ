@@ -2,6 +2,7 @@ package plans
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/money"
@@ -104,7 +105,7 @@ templ newPlanPage(v kit.Page, d planFormData) {
 							tree = append(tree, domain.ByKind(d.Categories, k)...)
 						}
 					}}
-					@kit.CategorySelect("category", tree, d.Posted.Category, nil, false, kit.Invalid(e, "category-error"))
+					@kit.Select("category", kit.CategoryOptions(ctx, tree, []int64{d.Posted.Category}, false), strconv.FormatInt(d.Posted.Category, 10), kit.Invalid(e, "category-error"))
 				}
 				{{ e = v.Errors.Get("currency") }}
 				@kit.Field("col-6", kit.T(ctx, "Currency"), e, "currency-error", nil) {

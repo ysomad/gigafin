@@ -265,7 +265,7 @@ func (h *Handler) saveCategories(w http.ResponseWriter, r *http.Request, user do
 		c := domain.CategoryChoice{Name: name, Kind: domain.Kind(form.Kinds[i]), CategoryID: form.IDs[i]}
 		if c.CategoryID == 0 {
 			// "Parent / Child" creates a nested category
-			parent, child, _ := strings.Cut(form.NewNames[i], " / ")
+			parent, child, _ := strings.Cut(form.NewNames[i], domain.CategorySep)
 			c.Cat1, c.Cat2 = strings.TrimSpace(parent), strings.TrimSpace(child)
 		}
 		categories = append(categories, c)

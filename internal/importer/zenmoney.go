@@ -83,7 +83,7 @@ func parseZenMoneyRow(get func(column string) string, loc *time.Location) (domai
 	if parent, child, ok := strings.Cut(row.Category, " / "); ok {
 		row.Category = domain.FullName(
 			strings.TrimSpace(parent),
-			strings.ReplaceAll(strings.TrimSpace(child), " / ", "/"),
+			strings.ReplaceAll(strings.TrimSpace(child), domain.CategorySep, "/"),
 		)
 	}
 

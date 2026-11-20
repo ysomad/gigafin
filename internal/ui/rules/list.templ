@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/ui/kit"
@@ -134,7 +135,15 @@ templ filterFields(d rulesData) {
 		</select>
 	}
 	@kit.Field("col-12", kit.T(ctx, "Category"), "", "", nil) {
-		@kit.CategorySelect("category", d.Categories, d.Category, []kit.CategoryChoice{{Value: "", Label: kit.T(ctx, "All")}}, false, nil)
+		@kit.Select(
+			"category",
+			append(
+				[]kit.SelectOption{{Value: "", Label: kit.T(ctx, "All"), Empty: true}},
+				kit.CategoryOptions(ctx, d.Categories, []int64{d.Category}, false)...,
+			),
+			strconv.FormatInt(d.Category, 10),
+			nil,
+		)
 	}
 	@kit.Field("col-12", kit.T(ctx, "Account"), "", "", nil) {
 		<select name="account">

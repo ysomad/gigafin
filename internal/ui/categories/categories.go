@@ -75,8 +75,8 @@ func categoryNameError(name string) error {
 		return domain.NewError(errors.ErrInvalid, "required")
 	case utf8.RuneCountInString(name) > domain.MaxTextLen:
 		return domain.NewError(errors.ErrInvalid, "too long")
-	case strings.Contains(name, " / "):
-		return domain.NewError(errors.ErrInvalid, "must not contain %q", " / ")
+	case strings.Contains(name, domain.CategorySep):
+		return domain.NewError(errors.ErrInvalid, "must not contain %q", domain.CategorySep)
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func (h *Handler) categories(w http.ResponseWriter, r *http.Request, user domain
 		for _, p := range domain.ByKind(tree, k) {
 			var children []domain.Category
 			for _, c := range p.Children {
-				if shown(c, p.Name+" / "+c.Name) {
+				if shown(c, domain.FullName(p.Name, c.Name)) {
 					children = append(children, c)
 				}
 			}

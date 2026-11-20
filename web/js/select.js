@@ -1,5 +1,5 @@
-// A [data-category-select] picks a category by typing: its search input filters the
-// list of categories in a popover under it, and its hidden input holds the picked value.
+// A [data-select] picks an option by typing: its search input filters the list of
+// options in a popover under it, and its hidden input holds the picked value.
 // A [data-multiple] one picks any number of them, each option holding a checkbox; its
 // search input lists the picked ones while the list is closed.
 (() => {
@@ -17,8 +17,9 @@
     return [...list.querySelectorAll('[role=option]:not([hidden])')];
   }
 
-  // filter shows the options whose label contains query, with the cat1 of a shown cat2
-  // and the kind of a shown option. Options left out by kind, [data-off], stay hidden.
+  // filter shows the options whose label contains query, with the parent of a shown
+  // child and the group of a shown option. Options left out by kind, [data-off], stay
+  // hidden.
   function filter(list, query) {
     query = query.trim().toLocaleLowerCase();
     let group;
@@ -26,16 +27,17 @@
     for (const li of list.children) {
       if (li.hasAttribute('data-group')) {
         group = li;
+        parent = null;
         li.hidden = true;
         continue;
       }
       li.hidden = li.hasAttribute('data-off') || !li.dataset.label.toLocaleLowerCase().includes(query);
       if (!li.hasAttribute('data-child')) {
         parent = li;
-      } else if (!li.hidden && parent && li.dataset.label.startsWith(parent.dataset.label + ' / ')) {
+      } else if (!li.hidden && parent) {
         parent.hidden = false;
       }
-      if (!li.hidden && group && li.dataset.kind) group.hidden = false;
+      if (!li.hidden && group) group.hidden = false;
     }
   }
 
@@ -46,7 +48,7 @@
       input.removeAttribute('aria-activedescendant');
       return;
     }
-    li.id ||= `category-option-${++seq}`;
+    li.id ||= `select-option-${++seq}`;
     li.setAttribute('aria-selected', 'true');
     input.setAttribute('aria-activedescendant', li.id);
     li.scrollIntoView({ block: 'nearest' });
@@ -54,28 +56,26 @@
 
   const isMultiple = picker => picker.hasAttribute('data-multiple');
 
-  // summary lists the own names of the checked options of a multiple picker, a cat2
-  // without its cat1.
+  // summary lists the texts of the checked options of a multiple picker, a child
+  // without its parent.
   function summary(picker) {
-    return [...parts(picker).list.querySelectorAll('[role=option]')]
-      .filter(o => o.querySelector('input').checked)
-      .map(o => o.textContent.trim())
-      .join(', ');
+    const { list } = parts(picker);
+    return [...list.querySelectorAll('[role=option]:has(input:checked)')].map(o => o.textContent.trim()).join(', ');
   }
 
   function open(picker) {
     const { value, input, list } = parts(picker);
     if (list.matches(':popover-open')) return;
-    list.id ||= `category-list-${++seq}`;
+    list.id ||= `select-list-${++seq}`;
     input.setAttribute('aria-controls', list.id);
     filter(list, '');
     list.showPopover();
     input.setAttribute('aria-expanded', 'true');
-    setActive(picker, visibleOptions(list).find(o => isMultiple(picker) || o.dataset.value === value.value));
+    if (!isMultiple(picker)) setActive(picker, visibleOptions(list).find(o => o.dataset.value === value.value));
   }
 
   // close hides the list, putting the label of the picked value back in the input. An
-  // emptied input unpicks the category, taking the first choice, such as "All", if any.
+  // emptied input unpicks the option, taking the [data-empty] one, such as "All", if any.
   function close(picker) {
     const { value, input, list } = parts(picker);
     if (list.matches(':popover-open')) list.hidePopover();
@@ -86,9 +86,9 @@
       return;
     }
     if (input.value.trim() === '') {
-      value.value = list.querySelector('[role=option]:not([data-kind])')?.dataset.value ?? '';
+      value.value = list.querySelector('[role=option][data-empty]')?.dataset.value ?? '';
     }
-    const picked = [...list.querySelectorAll('[role=option]')].find(o => o.dataset.value === value.value);
+    const picked = list.querySelector(`[role=option][data-value="${CSS.escape(value.value)}"]`);
     input.value = picked?.dataset.label ?? '';
   }
 
@@ -107,7 +107,7 @@
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  const pickerOf = el => el.closest?.('[data-category-select]');
+  const pickerOf = el => el.closest?.('[data-select]');
 
   document.addEventListener('focusin', e => {
     const picker = pickerOf(e.target);
@@ -118,7 +118,8 @@
 
   document.addEventListener('focusout', e => {
     const picker = pickerOf(e.target);
-    if (picker && !picker.contains(e.relatedTarget)) close(picker);
+    if (!picker || picker.contains(e.relatedTarget)) return;
+    close(picker);
   });
 
   document.addEventListener('input', e => {
@@ -146,8 +147,7 @@
           return;
         }
         if (options.length === 0) return;
-        if (e.key === 'ArrowDown') setActive(picker, options[Math.min(i + 1, options.length - 1)]);
-        else setActive(picker, options[Math.max(i - 1, 0)]);
+        setActive(picker, options[Math.max(0, Math.min(i + (e.key === 'ArrowDown' ? 1 : -1), options.length - 1))]);
         break;
       case 'Enter':
         if (!isOpen || i < 0) return;
@@ -187,8 +187,8 @@
   // A checkbox changed while the list is closed, such as by the type filter, is listed.
   document.addEventListener('change', e => {
     const picker = pickerOf(e.target);
-    if (picker && isMultiple(picker) && !parts(picker).list.matches(':popover-open')) {
-      parts(picker).input.value = summary(picker);
-    }
+    if (!picker || !isMultiple(picker)) return;
+    const { input, list } = parts(picker);
+    if (!list.matches(':popover-open')) input.value = summary(picker);
   });
 })();

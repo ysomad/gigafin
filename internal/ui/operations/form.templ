@@ -2,6 +2,7 @@ package operations
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/money"
@@ -92,7 +93,7 @@ templ formPage(v kit.Page, d opForm) {
 				if d.Type == domain.OpExpense || d.Type == domain.OpIncome {
 					{{ e := v.Errors.Get("category") }}
 					@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
-						@kit.CategorySelect("category", d.Categories, d.CategoryID, nil, false, kit.Invalid(e, errID("category")))
+						@kit.Select("category", kit.CategoryOptions(ctx, d.Categories, []int64{d.CategoryID}, false), strconv.FormatInt(d.CategoryID, 10), kit.Invalid(e, errID("category")))
 					}
 				}
 			</fieldset>
@@ -144,7 +145,10 @@ templ formPage(v kit.Page, d opForm) {
 			@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
 				<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
 			}
-			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Enter or comma"), d.AllTags, v.Errors.Get("tags"), "", false)
+			{{ e = v.Errors.Get("tags") }}
+			@kit.Field("", kit.T(ctx, "Tags"), e, errID("tags"), nil) {
+				@kit.TagInput("tags", d.Tags, d.AllTags, kit.T(ctx, "Enter or comma"), kit.Invalid(e, errID("tags")))
+			}
 			<div class="hstack justify-between">
 				<div class="hstack">
 					<button type="submit">{ kit.T(ctx, "Save") }</button>
@@ -181,38 +185,4 @@ templ accountOptions(accounts []domain.Account, selected int64, editing bool) {
 			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ kit.Money(ctx, a.Balance, a.Currency) } { money.CurrencySymbol(a.Currency) })</option>
 		}
 	}
-}
-
-// tagsField is the tags input of id, completed from all by the datalist of listID,
-// with the comma separated tags of value, posted as tags, or each as tag when repeat
-// is set, and the message err.
-templ tagsField(id, listID, value, placeholder string, all []string, err, class string, repeat bool) {
-	<div
-		data-field
-		data-operation-tags
-		data-repeat?={ repeat }
-		if class != "" {
-			class={ class }
-		}
-		if err != "" {
-			aria-invalid="true"
-		}
-	>
-		<label for={ id }>{ kit.T(ctx, "Tags") }</label>
-		<ot-taginput value={ value }>
-			<input id={ id } list={ listID } autocomplete="off" placeholder={ placeholder }/>
-			<datalist id={ listID }></datalist>
-		</ot-taginput>
-		if repeat {
-			<input type="hidden" name="tag" value={ value }/>
-		} else {
-			<input type="hidden" name="tags" value={ value }/>
-		}
-		<template data-tag-suggestions>
-			for _, tag := range all {
-				<option value={ tag }></option>
-			}
-		</template>
-		@kit.FieldError(err, "")
-	</div>
 }

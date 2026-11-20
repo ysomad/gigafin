@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/money"
@@ -118,7 +119,7 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			switch r.Field {
 				case domain.RuleFieldCategory:
-					@kit.CategorySelect("cond_value", categories, r.ID, nil, false, nil)
+					@kit.Select("cond_value", kit.CategoryOptions(ctx, categories, []int64{r.ID}, false), strconv.FormatInt(r.ID, 10), nil)
 				case domain.RuleFieldAccount:
 					<select name="cond_value">
 						<option value="">—</option>
@@ -158,7 +159,7 @@ templ actionFields(r actionRow, categories []domain.Category, index int, errs *k
 		}
 		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			if r.Type == domain.ActionSetCategory {
-				@kit.CategorySelect("act_value", categories, r.ID, nil, false, nil)
+				@kit.Select("act_value", kit.CategoryOptions(ctx, categories, []int64{r.ID}, false), strconv.FormatInt(r.ID, 10), nil)
 			} else {
 				<input name="act_value" value={ r.Value } autocomplete="off"/>
 			}

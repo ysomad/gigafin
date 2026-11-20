@@ -127,9 +127,10 @@ templ SearchDialog(action, query, placeholder string, oob ...string) {
 }
 
 // ResetButton links to reset, the unfiltered list, if any. It is list-reset, swapped in
-// with the results of the list.
+// with the results of the list, and hidden without reset so the gap of its toolbar does
+// not push the buttons before it off the right edge.
 templ ResetButton(reset string) {
-	<span id="list-reset">
+	<span id="list-reset" hidden?={ reset == "" }>
 		if reset != "" {
 			<a class="button ghost" href={ reset } aria-label={ T(ctx, "Reset") } title={ T(ctx, "Reset") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#x"></use></svg></a>
 		}

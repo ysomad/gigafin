@@ -53,7 +53,7 @@
 - [x] operations sorting
 - [x] operations multi tag / category filtering
 - [x] unsplit
-- [ ] consistent split / rules ui
+- [x] consistent split / rules ui
 - [ ] better plans ui/ux
 - [ ] sber sync
 - [ ] alfa sync

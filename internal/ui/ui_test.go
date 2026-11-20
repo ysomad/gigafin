@@ -275,7 +275,6 @@ func TestPagesAndFlows(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
 	for _, e := range []string{
-		`<div id="category-error-expense" class="error" role="status">required</div>`,
 		`<div id="amount-error-expense" class="error" role="status">enter a number</div>`,
 		`<div id="date-error-expense" class="error" role="status">must be YYYY-MM-DD</div>`,
 	} {
@@ -389,11 +388,11 @@ func TestPagesAndFlows(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, body)
 	status, body = b.get(opPath + "/edit")
 	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, body, `value="food, trip"`)
+	assert.Contains(t, body, `value="food, trip" placeholder`)
 	status, body = b.get("/operations?tag=trip&tag=nope")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "100.25")
-	assert.Contains(t, body, `<input type="hidden" name="tag" value="trip, nope">`)
+	assert.Contains(t, body, `<input type="checkbox" name="tag" value="trip" checked tabindex="-1">`)
 
 	status, body = b.get("/?month=2026-10")
 	require.Equal(t, http.StatusOK, status)

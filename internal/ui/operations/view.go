@@ -52,7 +52,7 @@ type opForm struct {
 	Type        domain.OpType `form:"type"`
 	AccountID   int64         `form:"account"`    // 0 is not found
 	ToAccountID int64         `form:"to_account"` // 0 is not found
-	CategoryID  int64         `form:"category"`   // 0 is reported by validation
+	CategoryID  int64         `form:"category"`   // 0 is uncategorized
 	Amount      string        `form:"amount"`
 	Date        string        `form:"date"`
 	Time        string        `form:"time"`

@@ -2,6 +2,7 @@ package imports
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/money"
@@ -166,12 +167,13 @@ templ categoriesStep(d wizardData, base string) {
 								</div>
 							</td>
 							<td>
-								@kit.CategorySelect(
+								@kit.Select(
 									"cat_id",
-									domain.ByKind(d.Categories, c.Kind),
-									c.CategoryID,
-									[]kit.CategoryChoice{{Value: "0", Label: kit.T(ctx, "Create new category") + " →"}},
-									false,
+									append(
+										[]kit.SelectOption{{Value: "0", Label: kit.T(ctx, "Create new category") + " →", Empty: true}},
+										kit.CategoryOptions(ctx, domain.ByKind(d.Categories, c.Kind), []int64{c.CategoryID}, false)...,
+									),
+									strconv.FormatInt(c.CategoryID, 10),
 									templ.Attributes{"aria-label": kit.T(ctx, "Category")},
 								)
 							</td>

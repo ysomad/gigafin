@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/timex"
@@ -182,9 +181,22 @@ templ filterFields(d opList) {
 				selected = append([]int64{kit.NoCategory}, selected...)
 			}
 		}}
-		@kit.CategoryMultiSelect("cat", d.Categories, selected, []kit.CategoryChoice{
-			{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")},
-		}, kit.T(ctx, "All"), templ.Attributes{"id": "filter-category"})
+		{{
+			var picked []string
+			for _, id := range selected {
+				picked = append(picked, strconv.FormatInt(id, 10))
+			}
+		}}
+		@kit.MultiSelect(
+			"cat",
+			append(
+				[]kit.SelectOption{{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")}},
+				kit.CategoryOptions(ctx, d.Categories, nil, true)...,
+			),
+			picked,
+			kit.T(ctx, "All"),
+			templ.Attributes{"id": "filter-category"},
+		)
 	</div>
 	<div data-field class="col-12">
 		<label for="filter-from">{ kit.T(ctx, "Date") }</label>
@@ -225,6 +237,16 @@ templ filterFields(d opList) {
 		</fieldset>
 	</div>
 	if len(d.Tags) > 0 {
-		@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12", true)
+		// not a kit.Field: the checkboxes in a label would lay it out as one of theirs
+		<div data-field class="col-12">
+			<label for="filter-tags">{ kit.T(ctx, "Tags") }</label>
+			{{
+				tags := make([]kit.SelectOption, 0, len(d.Tags))
+				for _, t := range d.Tags {
+					tags = append(tags, kit.SelectOption{Value: t, Label: t})
+				}
+			}}
+			@kit.MultiSelect("tag", tags, d.Filter.Tags, kit.T(ctx, "All"), templ.Attributes{"id": "filter-tags"})
+		</div>
 	}
 }

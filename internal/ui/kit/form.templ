@@ -1,6 +1,8 @@
 package kit
 
 import (
+	"cmp"
+	"context"
 	"slices"
 	"strconv"
 	"strings"
@@ -98,34 +100,75 @@ templ CurrencySelect(currencies []string, selected, err string) {
 	</select>
 }
 
-// CategoryChoice is an option of CategorySelect besides the categories, such as "All".
-type CategoryChoice struct {
+// SelectOption is an option of Select or MultiSelect.
+type SelectOption struct {
 	Value string
+	// Label is searched by typing and shown in the input of Select when picked.
 	Label string
+	// Text is shown in the list and in the input of MultiSelect; Label when empty.
+	Text string
+	// Group is the caption put before the first option of each group.
+	Group string
+	// Kind is the category kind of the option, for the type filter of operations.
+	Kind string
+	// Child is indented under the option before it that is not a child.
+	Child bool
+	// Empty is picked when the input of Select is emptied, such as "All".
+	Empty bool
 }
 
-// CategorySelect is the input name picking a category of tree, searched by typing, or
-// one of choices before them. It holds selected, the choice of that value, or else the
-// first choice. Archived categories are left out, unless selected or archived is set.
-// The categories of a tree of several kinds are grouped under their kind. attrs are
-// added to the search input.
-templ CategorySelect(name string, tree []domain.Category, selected int64, choices []CategoryChoice, archived bool, attrs templ.Attributes) {
-	{{
-		value, label := "", ""
-		if len(choices) > 0 {
-			value, label = choices[0].Value, choices[0].Label
+// CategoryOptions returns the categories of tree as options, each cat2 under its cat1
+// with the label "cat1 / cat2". Archived categories are left out, unless selected or
+// archived is set; a cat2 of a cat1 left out is not under it. The categories of a tree
+// of several kinds are grouped under their kind.
+func CategoryOptions(ctx context.Context, tree []domain.Category, selected []int64, archived bool) []SelectOption {
+	grouped := len(tree) > 0 && tree[0].Kind != tree[len(tree)-1].Kind
+	var options []SelectOption
+	for _, parent := range tree {
+		var group string
+		if grouped {
+			group = KindLabel(ctx, parent.Kind)
 		}
-		for _, c := range choices {
-			if c.Value == strconv.FormatInt(selected, 10) {
-				value, label = c.Value, c.Label
+		shown := archived || !parent.Archived || slices.Contains(selected, parent.ID)
+		if shown {
+			options = append(options, SelectOption{
+				Value: strconv.FormatInt(parent.ID, 10),
+				Label: parent.Name,
+				Group: group,
+				Kind:  string(parent.Kind),
+			})
+		}
+		for _, c := range parent.Children {
+			if archived || !c.Archived || slices.Contains(selected, c.ID) {
+				o := SelectOption{
+					Value: strconv.FormatInt(c.ID, 10),
+					Label: domain.FullName(parent.Name, c.Name),
+					Group: group,
+					Kind:  string(parent.Kind),
+				}
+				if shown {
+					o.Text, o.Child = c.Name, true
+				}
+				options = append(options, o)
 			}
 		}
-		if name, ok := domain.CategoryNames(tree)[selected]; ok {
-			value, label = strconv.FormatInt(selected, 10), name
+	}
+	return options
+}
+
+// Select is the input name picking one of options, searched by typing. It holds the
+// option of selected, or else the first Empty one. attrs are added to the search input.
+templ Select(name string, options []SelectOption, selected string, attrs templ.Attributes) {
+	{{
+		value, label := "", ""
+		if i := slices.IndexFunc(options, func(o SelectOption) bool { return o.Empty }); i >= 0 {
+			value, label = options[i].Value, options[i].Label
 		}
-		grouped := len(tree) > 0 && tree[0].Kind != tree[len(tree)-1].Kind
+		if i := slices.IndexFunc(options, func(o SelectOption) bool { return o.Value == selected }); i >= 0 {
+			value, label = options[i].Value, options[i].Label
+		}
 	}}
-	<div data-category-select>
+	<div data-select>
 		<input type="hidden" name={ name } value={ value }/>
 		<input
 			type="text"
@@ -137,64 +180,38 @@ templ CategorySelect(name string, tree []domain.Category, selected int64, choice
 			{ attrs... }
 		/>
 		<ul role="listbox" popover="manual">
-			for _, c := range choices {
-				<li role="option" data-value={ c.Value } data-label={ c.Label }>{ c.Label }</li>
-			}
-			for i, parent := range tree {
-				if grouped && (i == 0 || tree[i-1].Kind != parent.Kind) {
-					<li role="presentation" data-group>{ KindLabel(ctx, parent.Kind) }</li>
+			for i, o := range options {
+				if o.Group != "" && (i == 0 || options[i-1].Group != o.Group) {
+					<li role="presentation" data-group>{ o.Group }</li>
 				}
-				if archived || !parent.Archived || parent.ID == selected {
-					<li role="option" data-value={ parent.ID } data-kind={ string(parent.Kind) } data-label={ parent.Name }>{ parent.Name }</li>
-				}
-				for _, c := range parent.Children {
-					if archived || !c.Archived || c.ID == selected {
-						<li
-							role="option"
-							data-value={ c.ID }
-							data-kind={ string(parent.Kind) }
-							data-label={ parent.Name + " / " + c.Name }
-							data-child
-						>{ c.Name }</li>
+				<li
+					role="option"
+					data-value={ o.Value }
+					data-label={ o.Label }
+					if o.Kind != "" {
+						data-kind={ o.Kind }
 					}
-				}
+					data-child?={ o.Child }
+					data-empty?={ o.Empty }
+				>{ cmp.Or(o.Text, o.Label) }</li>
 			}
 		</ul>
 	</div>
 }
 
-// CategoryMultiSelect is CategorySelect picking any of choices and categories of tree,
-// archived ones too: each option is a checkbox name, checked when its value is one of
-// selected. The search input lists the picked ones by their own names, or placeholder
-// when none is; attrs are added to it.
-templ CategoryMultiSelect(
-	name string, tree []domain.Category, selected []int64, choices []CategoryChoice, placeholder string,
-	attrs templ.Attributes,
-) {
+// MultiSelect is Select picking any of options: each is a checkbox name, checked when
+// its value is one of selected. The search input lists the picked ones by their Text,
+// or placeholder when none is; attrs are added to it.
+templ MultiSelect(name string, options []SelectOption, selected []string, placeholder string, attrs templ.Attributes) {
 	{{
 		var labels []string
-		picked := func(value string) bool {
-			id, err := strconv.ParseInt(value, 10, 64)
-			return err == nil && slices.Contains(selected, id)
-		}
-		for _, c := range choices {
-			if picked(c.Value) {
-				labels = append(labels, c.Label)
+		for _, o := range options {
+			if slices.Contains(selected, o.Value) {
+				labels = append(labels, cmp.Or(o.Text, o.Label))
 			}
 		}
-		for _, parent := range tree {
-			if slices.Contains(selected, parent.ID) {
-				labels = append(labels, parent.Name)
-			}
-			for _, c := range parent.Children {
-				if slices.Contains(selected, c.ID) {
-					labels = append(labels, c.Name)
-				}
-			}
-		}
-		grouped := len(tree) > 0 && tree[0].Kind != tree[len(tree)-1].Kind
 	}}
-	<div data-category-select data-multiple>
+	<div data-select data-multiple>
 		<input
 			type="text"
 			role="combobox"
@@ -206,29 +223,44 @@ templ CategoryMultiSelect(
 			{ attrs... }
 		/>
 		<ul role="listbox" aria-multiselectable="true" popover="manual">
-			for _, c := range choices {
-				<li role="option" data-value={ c.Value } data-label={ c.Label }>
-					<input type="checkbox" name={ name } value={ c.Value } checked?={ picked(c.Value) } tabindex="-1"/> { c.Label }
+			for i, o := range options {
+				if o.Group != "" && (i == 0 || options[i-1].Group != o.Group) {
+					<li role="presentation" data-group>{ o.Group }</li>
+				}
+				<li
+					role="option"
+					data-value={ o.Value }
+					data-label={ o.Label }
+					if o.Kind != "" {
+						data-kind={ o.Kind }
+					}
+					data-child?={ o.Child }
+				>
+					<input type="checkbox" name={ name } value={ o.Value } checked?={ slices.Contains(selected, o.Value) } tabindex="-1"/> { cmp.Or(o.Text, o.Label) }
 				</li>
 			}
-			for i, parent := range tree {
-				if grouped && (i == 0 || tree[i-1].Kind != parent.Kind) {
-					<li role="presentation" data-group>{ KindLabel(ctx, parent.Kind) }</li>
-				}
-				<li role="option" data-value={ parent.ID } data-kind={ string(parent.Kind) } data-label={ parent.Name }>
-					<input type="checkbox" name={ name } value={ parent.ID } checked?={ slices.Contains(selected, parent.ID) } tabindex="-1"/> { parent.Name }
-				</li>
-				for _, c := range parent.Children {
-					<li
-						role="option"
-						data-value={ c.ID }
-						data-kind={ string(parent.Kind) }
-						data-label={ domain.FullName(parent.Name, c.Name) }
-						data-child
-					>
-						<input type="checkbox" name={ name } value={ c.ID } checked?={ slices.Contains(selected, c.ID) } tabindex="-1"/> { c.Name }
-					</li>
-				}
+		</ul>
+	</div>
+}
+
+// TagInput is the input name of the comma separated tags of value, the tag being typed
+// completed from all. attrs are added to it.
+templ TagInput(name, value string, all []string, placeholder string, attrs templ.Attributes) {
+	<div data-tags>
+		<input
+			type="text"
+			name={ name }
+			role="combobox"
+			aria-autocomplete="list"
+			aria-expanded="false"
+			autocomplete="off"
+			value={ value }
+			placeholder={ placeholder }
+			{ attrs... }
+		/>
+		<ul role="listbox" popover="manual">
+			for _, t := range all {
+				<li role="option" data-label={ t }>{ t }</li>
 			}
 		</ul>
 	</div>

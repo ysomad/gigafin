@@ -161,19 +161,19 @@ fieldset.group {
   height: auto;
 }
 
-/* Category picker: its list is a popover anchored under the search input, or over it
-   when there is more room there, cat2s indented under their cat1 and the kinds as
+/* Select and tag input: the list is a popover anchored under the search input, or over it
+   when there is more room there, children indented under their parent and the groups as
    captions. It takes the text of Oat's inputs, not of the label it is in, and the look
    of Oat's dropdown menus. */
-[data-category-select] {
-  anchor-scope: --category-input;
+:is([data-select], [data-tags]) {
+  anchor-scope: --select-input;
   > [role="combobox"] {
-    anchor-name: --category-input;
+    anchor-name: --select-input;
   }
 }
-[data-category-select] [role="listbox"] {
+:is([data-select], [data-tags]) [role="listbox"] {
   position: fixed;
-  position-anchor: --category-input;
+  position-anchor: --select-input;
   inset: auto;
   position-area: bottom span-right;
   position-try-fallbacks: flip-block;
@@ -210,7 +210,7 @@ fieldset.group {
   > [data-child] {
     padding-inline-start: var(--space-6);
   }
-  /* a checkbox of a picker of several categories lines up with the name */
+  /* a checkbox of a picker of several options lines up with the name */
   > [role="option"]:not([hidden]):has(> input[type="checkbox"]) {
     display: flex;
     align-items: center;
@@ -233,11 +233,6 @@ menu.buttons > li {
 menu[popover] > small {
   display: block;
   padding: var(--space-2) var(--space-3);
-}
-
-/* Oat's tag input keeps its placeholder next to tags; show it only while empty. */
-ot-taginput:has(.badge) input::placeholder {
-  color: transparent;
 }
 
 /* Dense card for list rows such as operations. */

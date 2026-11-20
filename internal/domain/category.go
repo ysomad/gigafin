@@ -16,8 +16,8 @@ const (
 	KindIncome  Kind = "income"
 )
 
-// _nameSep joins cat1 and cat2 in display names, so names must not contain it.
-const _nameSep = " / "
+// CategorySep joins cat1 and cat2 in display names, so names must not contain it.
+const CategorySep = " / "
 
 // Kinds returns all category kinds.
 func Kinds() []Kind {
@@ -50,7 +50,7 @@ func FullName(parent, child string) string {
 	if child == "" {
 		return parent
 	}
-	return parent + _nameSep + child
+	return parent + CategorySep + child
 }
 
 // NewCategory validates a new cat1 of kind, or a cat2 under parent, which takes the
@@ -196,8 +196,8 @@ func categoryName(s string) (string, error) {
 	if utf8.RuneCountInString(name) > MaxTextLen {
 		return "", NewError(errors.ErrInvalid, "name: too long")
 	}
-	if strings.Contains(name, _nameSep) {
-		return "", NewError(errors.ErrInvalid, "name: must not contain %q", _nameSep)
+	if strings.Contains(name, CategorySep) {
+		return "", NewError(errors.ErrInvalid, "name: must not contain %q", CategorySep)
 	}
 	return name, nil
 }
