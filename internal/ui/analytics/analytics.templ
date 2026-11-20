@@ -156,7 +156,7 @@ templ analyticsPage(v kit.Page, d analyticsData) {
 
 // compareForm picks the month to compare the expenses of the month of d with.
 templ compareForm(d analyticsData) {
-	<form method="get" action="/" class="hstack mt-6 mb-4" hx-boost="false" hx-get="/" hx-trigger="change, submit" hx-target="body" hx-swap="outerSync" hx-push-url="true">
+	<form method="get" action="/" class="hstack mt-6 mb-4" hx-boost="false" hx-get="/" hx-trigger="change, submit" hx-target="body" hx-swap="outerSync" hx-replace-url="true">
 		<input type="hidden" name="month" value={ d.An.Month.String() }/>
 		<div data-field>
 			<label for="compare">{ kit.T(ctx, "Compare with") }</label>

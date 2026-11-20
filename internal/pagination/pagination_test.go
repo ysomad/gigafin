@@ -1,6 +1,7 @@
 package pagination_test
 
 import (
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -22,12 +23,15 @@ func TestCursorRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, c, got)
 	}
-	assert.Equal(t, "2026-10-06_18:05_40_42", pagination.Cursor{Date: date, Time: "18:05", Group: 40, ID: 42}.String())
+	assert.Equal(t, "MjAyNi0xMC0wNl8xODowNV80MF80Mg",
+		pagination.Cursor{Date: date, Time: "18:05", Group: 40, ID: 42}.String())
 
 	for _, s := range []string{"", "2026-10-06", "2026-10-06_42", "bad__42_42", "2026-10-06__x_42", "2026-10-06__42_x"} {
-		_, err := pagination.ParseCursor(s)
+		_, err := pagination.ParseCursor(base64.RawURLEncoding.EncodeToString([]byte(s)))
 		require.ErrorIs(t, err, errors.ErrInvalid, s)
 	}
+	_, err := pagination.ParseCursor("2026-10-06_18:05_40_42")
+	require.ErrorIs(t, err, errors.ErrInvalid, "plain text")
 }
 
 func TestNewParams(t *testing.T) {

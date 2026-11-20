@@ -79,7 +79,7 @@ func searchPage(v kit.Page, d opSearch) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" autocomplete=\"off\" autofocus hx-get=\"/operations/search\" hx-trigger=\"input changed delay:300ms, search\" hx-target=\"#search-results\" hx-select=\"#search-results\" hx-swap=\"outerHTML\" hx-push-url=\"true\"></form><div id=\"search-results\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" autocomplete=\"off\" autofocus hx-get=\"/operations/search\" hx-trigger=\"input changed delay:300ms, search\" hx-target=\"#search-results\" hx-select=\"#search-results\" hx-swap=\"outerHTML\" hx-replace-url=\"true\"></form><div id=\"search-results\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

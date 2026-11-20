@@ -30,6 +30,11 @@ form.htmx-request:not([method="get"]) button:not([type="button"], [formaction], 
   }
 }
 
+/* An operation scrolled to, as after editing it, stays clear of the sticky nav and day. */
+li[id^="op-"] {
+  scroll-margin-top: var(--space-16);
+}
+
 /* Table cells holding a date or time keep it on one line. */
 td.nowrap {
   white-space: nowrap;

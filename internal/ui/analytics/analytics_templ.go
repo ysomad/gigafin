@@ -739,7 +739,7 @@ func compareForm(d analyticsData) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<form method=\"get\" action=\"/\" class=\"hstack mt-6 mb-4\" hx-boost=\"false\" hx-get=\"/\" hx-trigger=\"change, submit\" hx-target=\"body\" hx-swap=\"outerSync\" hx-push-url=\"true\"><input type=\"hidden\" name=\"month\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<form method=\"get\" action=\"/\" class=\"hstack mt-6 mb-4\" hx-boost=\"false\" hx-get=\"/\" hx-trigger=\"change, submit\" hx-target=\"body\" hx-swap=\"outerSync\" hx-replace-url=\"true\"><input type=\"hidden\" name=\"month\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -4,6 +4,7 @@
 package pagination
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/timex"
 )
+
+// cursorSep separates the fields of an encoded cursor.
+const cursorSep = "_"
 
 // Cursor points at the last item of a page, ordered descending by date, time (empty
 // last), group and id. Group keeps the parts of a split together: the origin id of a
@@ -29,15 +33,20 @@ func (c Cursor) IsZero() bool {
 	return c.ID == 0
 }
 
-// String encodes the cursor for URLs.
+// String encodes the cursor for URLs, opaque so clients pass it back as it is and its
+// format can change.
 func (c Cursor) String() string {
-	return timex.FormatDate(c.Date) + "_" + c.Time + "_" + strconv.FormatInt(c.Group, 10) + "_" +
-		strconv.FormatInt(c.ID, 10)
+	return base64.RawURLEncoding.EncodeToString([]byte(timex.FormatDate(c.Date) + cursorSep + c.Time + cursorSep +
+		strconv.FormatInt(c.Group, 10) + cursorSep + strconv.FormatInt(c.ID, 10)))
 }
 
 // ParseCursor decodes a cursor produced by Cursor.String.
 func ParseCursor(s string) (Cursor, error) {
-	parts := strings.Split(s, "_")
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
+	}
+	parts := strings.Split(string(b), cursorSep)
 	if len(parts) != 4 {
 		return Cursor{}, fmt.Errorf("cursor: malformed: %w", errors.ErrInvalid)
 	}

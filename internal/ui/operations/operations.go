@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"cmp"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -56,7 +57,13 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		}
 	}
 	p := pagination.NewParams(after, 0)
-	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, f, p)
+	// at is the operation the list is returned to, which the first page runs through
+	var at int64
+	if n, err := strconv.ParseInt(q.Get("at"), 10, 64); err == nil {
+		at = n
+	}
+	q.Del("at")
+	ops, next, err := h.app.Svc.Operations.ListThrough(r.Context(), user.ID, f, p, at)
 	if err != nil {
 		return err
 	}
@@ -90,6 +97,7 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	run := r.URL.Query()
 	run.Del("cursor")
 	run.Del("changed")
+	run.Del("at")
 	d.RunURL = "/operations/rules?" + run.Encode()
 	if !next.IsZero() {
 		q.Set("cursor", next.String())
@@ -132,7 +140,11 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request, user domain.Use
 		}
 	}
 	p := pagination.NewParams(after, 0)
-	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, domain.Filter{Query: d.Query}, p)
+	var at int64
+	if n, err := strconv.ParseInt(q.Get("at"), 10, 64); err == nil {
+		at = n
+	}
+	ops, next, err := h.app.Svc.Operations.ListThrough(r.Context(), user.ID, domain.Filter{Query: d.Query}, p, at)
 	if err != nil {
 		return err
 	}
@@ -384,6 +396,13 @@ func (h *Handler) editOperation(w http.ResponseWriter, r *http.Request, user dom
 		Note:        op.Note,
 		Tags:        strings.Join(op.Tags, ", "),
 		SourcePayee: op.SourcePayee,
+		Back:        "/operations",
+	}
+	// the list the edit was opened from, not a page of the operation itself, such as its
+	// split
+	if ref, err := url.Parse(r.Referer()); err == nil && ref.Host == r.Host &&
+		!strings.HasPrefix(ref.Path+"/", "/operations/"+r.PathValue("id")+"/") {
+		f.Back = ref.RequestURI()
 	}
 	return h.renderForm(w, r, user, http.StatusOK, f, nil)
 }
@@ -509,7 +528,8 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 	if err != nil {
 		return err
 	}
-	kit.Redirect(w, r, "/operations")
+	// back to the list, scrolled to the operation
+	kit.Redirect(w, r, f.returnURL()+"#op-"+r.PathValue("id"))
 	return nil
 }
 
@@ -518,10 +538,13 @@ func (h *Handler) deleteOperation(w http.ResponseWriter, r *http.Request, user d
 	if err != nil {
 		return err
 	}
+	if err := r.ParseForm(); err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
 	if err := h.app.Svc.Operations.Delete(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	kit.Redirect(w, r, "/operations")
+	kit.Redirect(w, r, cmp.Or(r.PostFormValue("back"), "/operations"))
 	return nil
 }
 

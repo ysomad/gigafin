@@ -5,7 +5,7 @@ import "github.com/ysomad/gigafin/internal/ui/kit"
 templ searchPage(v kit.Page, d opSearch) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
 		// typing swaps in the results of the page for the query, keeping the input and its
-		// focus; Enter loads the page
+		// focus, and replaces the URL so Back leaves the search; Enter loads the page
 		<form method="get" action="/operations/search" role="search" class="mb-4">
 			<input
 				type="search"
@@ -20,7 +20,7 @@ templ searchPage(v kit.Page, d opSearch) {
 				hx-target="#search-results"
 				hx-select="#search-results"
 				hx-swap="outerHTML"
-				hx-push-url="true"
+				hx-replace-url="true"
 			/>
 		</form>
 		<div id="search-results">

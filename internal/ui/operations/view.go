@@ -1,6 +1,8 @@
 package operations
 
 import (
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -68,11 +70,26 @@ type opForm struct {
 	// SourcePayee is the payee as the bank sent it.
 	SourcePayee string
 	// Tags are comma separated names.
-	Tags       string `form:"tags"`
+	Tags string `form:"tags"`
+	// Back is the page the edit was opened from, which saving, deleting and cancelling
+	// return to.
+	Back       string `form:"back"`
 	Accounts   []domain.Account
 	Categories []domain.Category
 	// AllTags are the user's tags to pick from.
 	AllTags []string
+}
+
+// returnURL is Back at the operation, its list running through it.
+func (f opForm) returnURL() string {
+	u, err := url.Parse(f.Back)
+	if err != nil || f.Back == "" {
+		u = &url.URL{Path: "/operations"}
+	}
+	q := u.Query()
+	q.Set("at", strconv.FormatInt(f.ID, 10))
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // opSplit is the split page of a saved expense or income: its parts, the operation as
