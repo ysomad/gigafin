@@ -42,12 +42,12 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
 			<title>{ v.Title } · gigafin</title>
 			// ?v= makes browsers load the files anew once they change, see web.Version
-			<link rel="stylesheet" href={ "/static/app.min.css?v=" + web.Version }/>
+			<link rel="stylesheet" href={ "/static/dist/app.min.css?v=" + web.Version }/>
 			<script src={ "/static/lib/htmx.min.js?v=" + web.Version } defer></script>
 			<script src={ "/static/lib/hx-history-cache.min.js?v=" + web.Version } defer></script>
 			<script src={ "/static/lib/uplot.min.js?v=" + web.Version } defer></script>
 			<script src={ "/static/lib/oat.min.js?v=" + web.Version } defer></script>
-			<script src={ "/static/app.min.js?v=" + web.Version } defer></script>
+			<script src={ "/static/dist/app.min.js?v=" + web.Version } defer></script>
 		</head>
 		<body id="top" hx-boost:inherited="true">
 			<header data-topnav>

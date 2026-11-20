@@ -1,5 +1,5 @@
 /* Entry point of the UI stylesheet bundle: make generate bundles it into
-   web/static/app.min.css. Order is the old <link> order. */
+   web/static/dist/app.min.css. Order is the old <link> order. */
 @import "./lib/oat.min.css";
 @import "./lib/uplot.min.css";
 @import "./app.css";

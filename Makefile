@@ -6,7 +6,7 @@ ADDR ?= $(or $(HTTP_ADDR),127.0.0.1:8080)
 TOOL = go tool
 GOOSE = $(TOOL) goose -dir migrations sqlite3 $(DB)
 
-.PHONY: tools generate build build-app build-cli run dev test lint vuln locales migrate-up migrate-down migrate-status migrate-create \
+.PHONY: tools generate bundle build build-app build-cli run dev test lint vuln locales migrate-up migrate-down migrate-status migrate-create \
 	user-add user-passwd user-role user-2fa-off clean
 
 tools:
@@ -16,11 +16,14 @@ generate:
 	$(TOOL) sqlc generate -f .sqlc.yaml
 	$(TOOL) ogen --config .ogen.yaml --target internal/gen/ogen --package ogen --clean api/openapi.yaml
 	$(TOOL) templ generate -path internal/ui
-	$(TOOL) esbuild web/js/main.js web/css/main.css --bundle --minify --outdir=web/static --entry-names=app.min
+
+# bundle builds web/static/dist, which is not committed, so it runs before every build
+bundle:
+	$(TOOL) esbuild web/js/main.js web/css/main.css --bundle --minify --outdir=web/static/dist --entry-names=app.min
 
 build: build-app build-cli
 
-build-app:
+build-app: bundle
 	go build -o bin/gigafin ./cmd/app
 
 build-cli:
@@ -75,4 +78,4 @@ user-2fa-off: build-cli
 	$(DOTENV) DB_PATH=$(DB) ./bin/gigafin-cli user 2fa-off -login $(login)
 
 clean:
-	rm -rf bin
+	rm -rf bin web/static/dist
