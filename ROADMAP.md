@@ -52,14 +52,13 @@
 - [x] infinite scroll navigation
 - [x] operations sorting
 - [x] operations multi tag / category filtering
-- [ ] rules pagination
-- [ ] unsplit
-- [ ] mobile first ui
+- [x] unsplit
+- [ ] consistent split / rules ui
+- [ ] better plans ui/ux
 - [ ] sber sync
 - [ ] alfa sync
 - [ ] raiifaizen sync
 - [ ] bybit sync?
-- [ ] better plans ui/ux
 - [ ] alerts: when a plan is overspent or a bill is due (telegram?)
 - [ ] shared household plan (between multiple users)
 - [ ] No Cross-currency transfers. An operation has one amount, so a RUB→USD transfer can't record both sides. It needs a to_amount.

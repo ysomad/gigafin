@@ -52,20 +52,6 @@
     li.scrollIntoView({ block: 'nearest' });
   }
 
-  // place puts the list under the input, or over it when there is more room there.
-  function place(picker) {
-    const { input, list } = parts(picker);
-    const r = input.getBoundingClientRect();
-    const below = innerHeight - r.bottom - 8;
-    const above = r.top - 8;
-    const up = below < 200 && above > below;
-    list.style.left = `${r.left}px`;
-    list.style.width = `${r.width}px`;
-    list.style.maxHeight = `${Math.min(up ? above : below, 320)}px`;
-    list.style.top = up ? 'auto' : `${r.bottom + 4}px`;
-    list.style.bottom = up ? `${innerHeight - r.top + 4}px` : 'auto';
-  }
-
   const isMultiple = picker => picker.hasAttribute('data-multiple');
 
   // summary lists the own names of the checked options of a multiple picker, a cat2
@@ -85,7 +71,6 @@
     filter(list, '');
     list.showPopover();
     input.setAttribute('aria-expanded', 'true');
-    place(picker);
     setActive(picker, visibleOptions(list).find(o => isMultiple(picker) || o.dataset.value === value.value));
   }
 
@@ -206,12 +191,4 @@
       parts(picker).input.value = summary(picker);
     }
   });
-
-  for (const type of ['scroll', 'resize']) {
-    addEventListener(type, e => {
-      for (const list of document.querySelectorAll('[data-category-select] [role=listbox]:popover-open')) {
-        if (e.target !== list) place(list.closest('[data-category-select]'));
-      }
-    }, { capture: true, passive: true });
-  }
 })();
