@@ -2,7 +2,9 @@
 package categories
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
+	"github.com/ysomad/gigafin/internal/pagination"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -36,7 +39,13 @@ func (h *Handler) Routes() map[string]kit.Handler {
 	}
 }
 
-// renderCategories renders page, the categories or the new category page, titled title, of d.
+// The statuses of the categories filter.
+const (
+	_statusActive   = "active"
+	_statusArchived = "archived"
+)
+
+// renderCategories renders page, the new category page, titled title, of d.
 func (h *Handler) renderCategories(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -73,8 +82,50 @@ func categoryNameError(name string) error {
 }
 
 func (h *Handler) categories(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	d := categoriesData{Kind: domain.Kind(r.URL.Query().Get("kind"))}
-	return h.renderCategories(w, r, user, categoriesPage, "Categories", http.StatusOK, d, nil)
+	q := r.URL.Query()
+	d := listData{Kind: domain.Kind(q.Get("kind")), Query: q.Get("q"), Status: q.Get("status")}
+	if _, err := domain.ParseKind(string(d.Kind)); err != nil {
+		d.Kind = ""
+	}
+	if d.Status != _statusActive && d.Status != _statusArchived {
+		d.Status = ""
+	}
+	tree, err := h.app.Svc.Categories.Tree(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	// the categories named with the query and of the status, with the cat1 of a shown
+	// cat2; a cat2 is named after its cat1, so the cat2s of a found cat1 show too
+	query := strings.ToLower(strings.TrimSpace(d.Query))
+	shown := func(c domain.Category, name string) bool {
+		if d.Status != "" && c.Archived != (d.Status == _statusArchived) {
+			return false
+		}
+		return strings.Contains(strings.ToLower(name), query)
+	}
+	for _, k := range domain.Kinds() {
+		if d.Kind != "" && k != d.Kind {
+			continue
+		}
+		g := kindGroup{Kind: k}
+		for _, p := range domain.ByKind(tree, k) {
+			var children []domain.Category
+			for _, c := range p.Children {
+				if shown(c, p.Name+" / "+c.Name) {
+					children = append(children, c)
+				}
+			}
+			if len(children) > 0 || shown(p, p.Name) {
+				p.Children = children
+				g.Categories = append(g.Categories, p)
+			}
+		}
+		if len(g.Categories) > 0 {
+			d.Groups = append(d.Groups, g)
+		}
+	}
+	return kit.Render(h.app, w, r, http.StatusOK, categoriesPage,
+		kit.Page{User: &user, Nav: "settings", Title: "Categories"}, d, kit.Failure{})
 }
 
 func (h *Handler) newCategory(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -124,6 +175,21 @@ func (h *Handler) renderCategory(
 		d.Name, d.Parent = f.Name, f.Parent
 	}
 	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
+	// the first page of the operations; the operations list serves the next ones
+	ctx := r.Context()
+	filter := domain.Filter{CategoryID: c.ID}
+	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, filter, pagination.NewParams(pagination.Cursor{}, 20))
+	if err != nil {
+		return err
+	}
+	accounts, err := h.app.Svc.Accounts.List(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	d.Days, d.CatNames, d.AccByID = kit.GroupByDay(ops), domain.CategoryShortNames(tree), domain.AccountsByID(accounts)
+	if !next.IsZero() {
+		d.MoreURL = fmt.Sprintf("/operations?category=%d&cursor=%s", c.ID, url.QueryEscape(next.String()))
+	}
 	return kit.Render(h.app, w, r, status, categoryPage, kit.Page{
 		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name},
 	}, d, kit.Failure{Err: viewErr, Form: "category"})

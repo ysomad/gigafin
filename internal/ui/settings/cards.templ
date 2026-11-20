@@ -373,7 +373,7 @@ templ accessCard(v kit.Page, d pageData, oob bool) {
 							<td>{ kit.T(ctx, "Session") }</td>
 							<td>
 								{{ ua := useragent.Parse(s.UserAgent) }}
-								switch {
+								switch  {
 									case ua.Browser != "" && ua.OS != "":
 										{ kit.T(ctx, "%s on %s", ua.Browser, ua.OS) }
 									case ua.Browser != "":

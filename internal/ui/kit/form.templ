@@ -1,6 +1,10 @@
 package kit
 
-import "github.com/ysomad/gigafin/internal/domain"
+import (
+	"strconv"
+
+	"github.com/ysomad/gigafin/internal/domain"
+)
 
 // Field is a form field: a label of class with the input as children, followed by
 // the message err about it, with id errID when set. attrs are added to the label.
@@ -82,17 +86,67 @@ templ CurrencySelect(currencies []string, selected, err string) {
 	</select>
 }
 
-// CategoryOptions are the options of the categories of tree, cat2 named after their
-// cat1. Archived ones are left out, unless selected.
-templ CategoryOptions(tree []domain.Category, selected int64) {
-	for _, parent := range tree {
-		if !parent.Archived || parent.ID == selected {
-			<option value={ parent.ID } selected?={ parent.ID == selected }>{ parent.Name }</option>
+// CategoryChoice is an option of CategorySelect besides the categories, such as "All".
+type CategoryChoice struct {
+	Value string
+	Label string
+}
+
+// CategorySelect is the input name picking a category of tree, searched by typing, or
+// one of choices before them. It holds selected, the choice of that value, or else the
+// first choice. Archived categories are left out, unless selected or archived is set.
+// The categories of a tree of several kinds are grouped under their kind. attrs are
+// added to the search input.
+templ CategorySelect(name string, tree []domain.Category, selected int64, choices []CategoryChoice, archived bool, attrs templ.Attributes) {
+	{{
+		value, label := "", ""
+		if len(choices) > 0 {
+			value, label = choices[0].Value, choices[0].Label
 		}
-		for _, c := range parent.Children {
-			if !c.Archived || c.ID == selected {
-				<option value={ c.ID } selected?={ c.ID == selected }>{ parent.Name } / { c.Name }</option>
+		for _, c := range choices {
+			if c.Value == strconv.FormatInt(selected, 10) {
+				value, label = c.Value, c.Label
 			}
 		}
-	}
+		if name, ok := domain.CategoryNames(tree)[selected]; ok {
+			value, label = strconv.FormatInt(selected, 10), name
+		}
+		grouped := len(tree) > 0 && tree[0].Kind != tree[len(tree)-1].Kind
+	}}
+	<div data-category-select>
+		<input type="hidden" name={ name } value={ value }/>
+		<input
+			type="text"
+			role="combobox"
+			aria-autocomplete="list"
+			aria-expanded="false"
+			autocomplete="off"
+			value={ label }
+			{ attrs... }
+		/>
+		<ul role="listbox" popover="manual">
+			for _, c := range choices {
+				<li role="option" data-value={ c.Value } data-label={ c.Label }>{ c.Label }</li>
+			}
+			for i, parent := range tree {
+				if grouped && (i == 0 || tree[i-1].Kind != parent.Kind) {
+					<li role="presentation" data-group>{ KindLabel(ctx, parent.Kind) }</li>
+				}
+				if archived || !parent.Archived || parent.ID == selected {
+					<li role="option" data-value={ parent.ID } data-kind={ string(parent.Kind) } data-label={ parent.Name }>{ parent.Name }</li>
+				}
+				for _, c := range parent.Children {
+					if archived || !c.Archived || c.ID == selected {
+						<li
+							role="option"
+							data-value={ c.ID }
+							data-kind={ string(parent.Kind) }
+							data-label={ parent.Name + " / " + c.Name }
+							data-child
+						>{ c.Name }</li>
+					}
+				}
+			}
+		</ul>
+	</div>
 }

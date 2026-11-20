@@ -2,6 +2,7 @@ package operations
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -52,25 +53,15 @@ templ listPage(v kit.Page, d opList) {
 					}
 				}
 			</div>
-			<form method="get" action="/operations">
-				<div class="hstack">
-					<fieldset class="group">
-						<input type="search" name="q" value={ d.Filter.Query } placeholder={ kit.T(ctx, "Search") } aria-label={ kit.T(ctx, "Search") }/>
-						<button type="submit" class="icon" aria-label={ kit.T(ctx, "Search") }><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#search"></use></svg></button>
-					</fieldset>
-					<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ kit.T(ctx, "Filter") }>
-						<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
-						if d.FilterCount > 0 {
-							<span class="badge">{ d.FilterCount }</span>
-						}
-					</button>
-					if d.Filtered {
-						<a class="button ghost" href="/operations">{ kit.T(ctx, "Reset") }</a>
-					}
-				</div>
-				// outside the hstack, which zeroes the margins that center a dialog
-				@filterDialog(d)
-			</form>
+			{{
+				reset := ""
+				if d.Filtered {
+					reset = "/operations"
+				}
+			}}
+			@kit.Filter("/operations", d.Filter.Query, d.FilterCount, reset) {
+				@filterFields(d)
+			}
 		</div>
 		if len(d.Mismatched) > 0 {
 			<div class="vstack gap-2 mb-4">
@@ -102,83 +93,76 @@ templ listPage(v kit.Page, d opList) {
 	}
 }
 
-// filterDialog is the dialog of the filters of the operations of d, but the query.
-templ filterDialog(d opList) {
-	<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ kit.T(ctx, "Filter") } closedby="any" autofocus>
-		<div class="row">
-			@kit.Field("col-6", kit.T(ctx, "Account"), "", "", nil) {
-				<select name="account">
-					<option value="">{ kit.T(ctx, "All") }</option>
-					for _, a := range d.Accounts {
-						<option value={ a.ID } selected?={ a.ID == d.Filter.AccountID }>{ a.Name }</option>
-					}
-				</select>
+// filterFields are the fields of the filter dialog of the operations of d, but the query.
+templ filterFields(d opList) {
+	@kit.Field("col-6", kit.T(ctx, "Account"), "", "", nil) {
+		<select name="account">
+			<option value="">{ kit.T(ctx, "All") }</option>
+			for _, a := range d.Accounts {
+				<option value={ a.ID } selected?={ a.ID == d.Filter.AccountID }>{ a.Name }</option>
 			}
-			@kit.Field("col-6", kit.T(ctx, "Type"), "", "", nil) {
-				<select name="type" data-category-type>
-					<option value="">{ kit.T(ctx, "All") }</option>
-					for _, typ := range domain.OpTypes() {
-						<option value={ string(typ) } selected?={ typ == d.Filter.Type }>{ kit.T(ctx, string(typ)) }</option>
-					}
-				</select>
+		</select>
+	}
+	@kit.Field("col-6", kit.T(ctx, "Type"), "", "", nil) {
+		<select name="type" data-category-type>
+			<option value="">{ kit.T(ctx, "All") }</option>
+			for _, typ := range domain.OpTypes() {
+				<option value={ string(typ) } selected?={ typ == d.Filter.Type }>{ kit.T(ctx, string(typ)) }</option>
 			}
-			@kit.Field("col-12", kit.T(ctx, "Category"), "", "", templ.Attributes{"data-category-field": true}) {
-				<select name="category">
-					<option value="">{ kit.T(ctx, "All") }</option>
-					<option value={ kit.NoCategory } selected?={ d.Filter.Uncategorized }>{ kit.T(ctx, "No category") }</option>
-					for _, parent := range d.Categories {
-						<option value={ parent.ID } data-kind={ string(parent.Kind) } selected?={ parent.ID == d.Filter.CategoryID }>{ parent.Name }</option>
-						for _, c := range parent.Children {
-							<option value={ c.ID } data-kind={ string(parent.Kind) } selected?={ c.ID == d.Filter.CategoryID }>{ parent.Name } / { c.Name }</option>
-						}
-					}
-				</select>
+		</select>
+	}
+	@kit.Field("col-12", kit.T(ctx, "Category"), "", "", templ.Attributes{"data-category-field": true}) {
+		{{
+			selected := d.Filter.CategoryID
+			if d.Filter.Uncategorized {
+				selected = kit.NoCategory
 			}
-			<div data-field class="col-12">
-				<label for="filter-from">{ kit.T(ctx, "Date") }</label>
-				<fieldset class="group">
-					<input type="date" id="filter-from" name="from" value={ timex.FormatDate(d.Filter.DateFrom) } aria-label={ kit.T(ctx, "From") }/>
-					<label for="filter-to" aria-hidden="true">—</label>
-					<input type="date" id="filter-to" name="to" value={ timex.FormatDate(d.Filter.DateTo) } aria-label={ kit.T(ctx, "To") }/>
-				</fieldset>
-			</div>
-			<div data-field class="col-12">
-				<label for="filter-min">{ kit.T(ctx, "Amount") }</label>
-				<fieldset class="group">
-					<input
-						id="filter-min"
-						name="min"
-						inputmode="decimal"
-						if d.Filter.AmountMin.Valid {
-							value={ kit.AmountInput(ctx, d.Filter.AmountMin.Amount.String()) }
-						} else {
-							value=""
-						}
-						placeholder={ kit.T(ctx, "min") }
-						aria-label={ kit.T(ctx, "Amount from") }
-					/>
-					<label for="filter-max" aria-hidden="true">—</label>
-					<input
-						id="filter-max"
-						name="max"
-						inputmode="decimal"
-						if d.Filter.AmountMax.Valid {
-							value={ kit.AmountInput(ctx, d.Filter.AmountMax.Amount.String()) }
-						} else {
-							value=""
-						}
-						placeholder={ kit.T(ctx, "max") }
-						aria-label={ kit.T(ctx, "Amount to") }
-					/>
-				</fieldset>
-			</div>
-			if len(d.Tags) > 0 {
-				@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12")
+			choices := []kit.CategoryChoice{
+				{Value: "", Label: kit.T(ctx, "All")},
+				{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")},
 			}
-		</div>
-		<footer class="hstack justify-end mt-4">
-			<button type="button" class="outline" commandfor="filter-dialog" command="close">{ kit.T(ctx, "Close") }</button>
-			<button type="submit">{ kit.T(ctx, "Apply") }</button>
-		</footer>
-	</dialog>
+		}}
+		@kit.CategorySelect("category", d.Categories, selected, choices, true, nil)
+	}
+	<div data-field class="col-12">
+		<label for="filter-from">{ kit.T(ctx, "Date") }</label>
+		<fieldset class="group">
+			<input type="date" id="filter-from" name="from" value={ timex.FormatDate(d.Filter.DateFrom) } aria-label={ kit.T(ctx, "From") }/>
+			<label for="filter-to" aria-hidden="true">—</label>
+			<input type="date" id="filter-to" name="to" value={ timex.FormatDate(d.Filter.DateTo) } aria-label={ kit.T(ctx, "To") }/>
+		</fieldset>
+	</div>
+	<div data-field class="col-12">
+		<label for="filter-min">{ kit.T(ctx, "Amount") }</label>
+		<fieldset class="group">
+			<input
+				id="filter-min"
+				name="min"
+				inputmode="decimal"
+				if d.Filter.AmountMin.Valid {
+					value={ kit.AmountInput(ctx, d.Filter.AmountMin.Amount.String()) }
+				} else {
+					value=""
+				}
+				placeholder={ kit.T(ctx, "min") }
+				aria-label={ kit.T(ctx, "Amount from") }
+			/>
+			<label for="filter-max" aria-hidden="true">—</label>
+			<input
+				id="filter-max"
+				name="max"
+				inputmode="decimal"
+				if d.Filter.AmountMax.Valid {
+					value={ kit.AmountInput(ctx, d.Filter.AmountMax.Amount.String()) }
+				} else {
+					value=""
+				}
+				placeholder={ kit.T(ctx, "max") }
+				aria-label={ kit.T(ctx, "Amount to") }
+			/>
+		</fieldset>
+	</div>
+	if len(d.Tags) > 0 {
+		@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12")
+	}
 }

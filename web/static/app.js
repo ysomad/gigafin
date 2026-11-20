@@ -62,13 +62,17 @@ document.addEventListener('htmx:response:error', e => {
 // types without categories. A category of another kind is unselected.
 function filterCategories(typeSelect) {
   const field = typeSelect.form.querySelector('[data-category-field]');
-  const select = field.querySelector('select');
+  const value = field.querySelector('input[type=hidden]');
+  const input = field.querySelector('[role=combobox]');
   const type = typeSelect.value;
-  const options = [...select.options].filter(o => o.dataset.kind);
-  for (const o of options) o.hidden = type !== '' && o.dataset.kind !== type;
-  field.hidden = type !== '' && options.every(o => o.hidden);
-  select.disabled = field.hidden;
-  if (field.hidden || select.selectedOptions[0]?.hidden) select.value = '';
+  const options = [...field.querySelectorAll('[role=option][data-kind]')];
+  for (const o of options) o.toggleAttribute('data-off', type !== '' && o.dataset.kind !== type);
+  field.hidden = type !== '' && options.every(o => o.hasAttribute('data-off'));
+  value.disabled = input.disabled = field.hidden;
+  if (field.hidden || options.find(o => o.dataset.value === value.value)?.hasAttribute('data-off')) {
+    value.value = '';
+    input.value = field.querySelector('[role=option][data-value=""]')?.dataset.label ?? '';
+  }
 }
 document.addEventListener('change', e => {
   if (e.target.matches('[data-category-type]')) filterCategories(e.target);

@@ -89,10 +89,7 @@ templ formPage(v kit.Page, d opForm) {
 				if d.Type == domain.OpExpense || d.Type == domain.OpIncome {
 					{{ e := v.Errors.Get("category") }}
 					@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
-						<select name="category" { kit.Invalid(e, errID("category"))... }>
-							<option value="">—</option>
-							@kit.CategoryOptions(d.Categories, d.CategoryID)
-						</select>
+						@kit.CategorySelect("category", d.Categories, d.CategoryID, nil, false, kit.Invalid(e, errID("category")))
 					}
 				}
 			</fieldset>
@@ -144,7 +141,7 @@ templ formPage(v kit.Page, d opForm) {
 			@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
 				<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
 			}
-			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Add tags with Enter or comma"), d.AllTags, v.Errors.Get("tags"), "")
+			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Enter or comma"), d.AllTags, v.Errors.Get("tags"), "")
 			<div class="hstack justify-between">
 				<div class="hstack">
 					<button type="submit">{ kit.T(ctx, "Save") }</button>

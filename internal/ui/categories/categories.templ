@@ -7,47 +7,77 @@ import (
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
-templ categoriesPage(v kit.Page, d categoriesData) {
+templ categoriesPage(v kit.Page, d listData) {
 	@kit.Layout(v, true, nil) {
+		{{
+			filtered := d.Kind != "" || d.Query != "" || d.Status != ""
+			count, reset := 0, ""
+			if d.Kind != "" {
+				count++
+			}
+			if d.Status != "" {
+				count++
+			}
+			if filtered {
+				reset = "/categories"
+			}
+		}}
 		<div class="hstack justify-between mb-4">
 			<a class="button" href={ fmt.Sprintf("/categories/new?kind=%s", d.Kind) }>+ { kit.T(ctx, "New category") }</a>
-			<div class="hstack">
-				for _, k := range domain.Kinds() {
-					@kit.SegmentLink(fmt.Sprintf("/categories?kind=%s", k), k == d.Kind, kit.KindLabel(ctx, k))
+			@kit.Filter("/categories", d.Query, count, reset) {
+				@kit.Field("col-6", kit.T(ctx, "Kind"), "", "", nil) {
+					<select name="kind">
+						<option value="">{ kit.T(ctx, "All") }</option>
+						for _, k := range domain.Kinds() {
+							<option value={ string(k) } selected?={ k == d.Kind }>{ kit.KindLabel(ctx, k) }</option>
+						}
+					</select>
 				}
-			</div>
+				@kit.Field("col-6", kit.T(ctx, "Status"), "", "", nil) {
+					<select name="status">
+						<option value="">{ kit.T(ctx, "All") }</option>
+						<option value={ _statusActive } selected?={ d.Status == _statusActive }>{ kit.T(ctx, "Active") }</option>
+						<option value={ _statusArchived } selected?={ d.Status == _statusArchived }>{ kit.T(ctx, "Archived") }</option>
+					</select>
+				}
+			}
 		</div>
-		<div class="table">
-			<table>
-				<thead><tr><th>{ kit.T(ctx, "Name") }</th></tr></thead>
-				<tbody>
-					{{ tree := domain.ByKind(d.Categories, d.Kind) }}
-					for _, parent := range tree {
-						<tr>
-							<td>
-								<a href={ fmt.Sprintf("/categories/%d", parent.ID) }>{ parent.Name }</a>
-								if parent.Archived {
-									@kit.ArchivedBadge()
-								}
-							</td>
-						</tr>
-						for _, c := range parent.Children {
+		for _, g := range d.Groups {
+			if len(d.Groups) > 1 {
+				<h2>{ kit.KindLabel(ctx, g.Kind) }</h2>
+			}
+			<div class="table mb-4">
+				<table>
+					<tbody>
+						for _, parent := range g.Categories {
 							<tr>
 								<td>
-									<span class="text-light">{ parent.Name } › </span><a href={ fmt.Sprintf("/categories/%d", c.ID) }>{ c.Name }</a>
-									if c.Archived {
+									<a href={ fmt.Sprintf("/categories/%d", parent.ID) }>{ parent.Name }</a>
+									if parent.Archived {
 										@kit.ArchivedBadge()
 									}
 								</td>
 							</tr>
+							for _, c := range parent.Children {
+								<tr>
+									<td>
+										<span class="text-light">{ parent.Name } › </span><a href={ fmt.Sprintf("/categories/%d", c.ID) }>{ c.Name }</a>
+										if c.Archived {
+											@kit.ArchivedBadge()
+										}
+									</td>
+								</tr>
+							}
 						}
-					}
-					if len(tree) == 0 {
-						<tr><td class="text-light">{ kit.T(ctx, "No categories yet.") }</td></tr>
-					}
-				</tbody>
-			</table>
-		</div>
+					</tbody>
+				</table>
+			</div>
+		}
+		if len(d.Groups) == 0 && filtered {
+			<p class="text-light">{ kit.T(ctx, "No categories match.") }</p>
+		} else if len(d.Groups) == 0 {
+			<p class="text-light">{ kit.T(ctx, "No categories yet.") }</p>
+		}
 	}
 }
 
@@ -69,8 +99,7 @@ templ categoryPage(v kit.Page, d categoryData) {
 				}
 			</span>
 		</h1>
-		<p class="text-light mb-4"><a href={ fmt.Sprintf("/operations?category=%d", c.ID) }>{ kit.T(ctx, "Operations") }</a></p>
-		<form id="form-category" class="form-compact" method="post" action={ base }>
+		<form id="form-category" class="form-compact mb-4" method="post" action={ base }>
 			@kit.FormError(v.Errors.Form("category"), "")
 			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Category") }>
 				{{ e := v.Errors.Get("name") }}
@@ -94,9 +123,19 @@ templ categoryPage(v kit.Page, d categoryData) {
 				</div>
 				@kit.ArchiveDelete("category", c.Archived)
 			</div>
-			<p class="text-light">{ kit.T(ctx, "Categories that contain other categories or have operations can only be archived.") }</p>
 		</form>
 		@kit.ArchiveDeleteForms("category", base, c.Archived, kit.T(ctx, "Delete category %s?", c.Name))
+		<div class="hstack justify-between">
+			<h2>{ kit.T(ctx, "Operations") }</h2>
+			<a class="button outline" href={ fmt.Sprintf("/operations?category=%d", c.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg></a>
+		</div>
+		if len(d.Days) > 0 {
+			<ul class="unstyled vstack gap-1">
+				@kit.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL)
+			</ul>
+		} else {
+			@kit.NoOperations()
+		}
 	}
 }
 

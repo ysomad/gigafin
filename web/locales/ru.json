@@ -1,6 +1,7 @@
 {
   "$schema": "./schema.json",
   "accounts": {
+    "Active": "Активные",
     "Archived": "Архив",
     "As of": "На дату",
     "Available": "Доступно",
@@ -10,6 +11,7 @@
     "New account": "Новый счёт",
     "New balance": "Новый баланс",
     "No accounts yet.": "Счетов пока нет.",
+    "No categories match.": "Категории не найдены.",
     "No categories yet.": "Категорий пока нет.",
     "Opening balance": "Начальный баланс",
     "Owed": "Долг",
@@ -35,7 +37,6 @@
     "Sign in": "Войти"
   },
   "categories": {
-    "Categories that contain other categories or have operations can only be archived.": "Категорию с подкатегориями или операциями можно только архивировать.",
     "Delete category %s?": "Удалить категорию %s?",
     "Inside": "Внутри",
     "Top level": "Верхний уровень"
@@ -464,7 +465,6 @@
   },
   "operations": {
     "Add part": "Добавить часть",
-    "Add tags with Enter or comma": "Добавляйте теги клавишей Enter или запятой",
     "All": "Все",
     "Amount from": "Сумма от",
     "Amount to": "Сумма до",
@@ -474,6 +474,7 @@
     "Delete this operation?": "Удалить эту операцию?",
     "Divide the saved amount between categories. Each part becomes an operation of its own.": "Разделите сохранённую сумму между категориями. Каждая часть станет отдельной операцией.",
     "Edit %s": "Редактирование: %s",
+    "Enter or comma": "Enter или запятая",
     "Filter": "Фильтр",
     "Imported in": "Из импорта",
     "Last sync: %s": "Последняя синхронизация: %s",

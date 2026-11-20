@@ -98,13 +98,13 @@ templ newPlanPage(v kit.Page, d planFormData) {
 				}
 				{{ e := v.Errors.Get("category") }}
 				@kit.Field("col-6", kit.T(ctx, "Category"), e, "category-error", nil) {
-					<select name="category" { kit.Invalid(e, "category-error")... }>
+					{{
+						var tree []domain.Category
 						for _, k := range domain.Kinds() {
-							<optgroup label={ kit.KindLabel(ctx, k) }>
-								@kit.CategoryOptions(domain.ByKind(d.Categories, k), d.Posted.Category)
-							</optgroup>
+							tree = append(tree, domain.ByKind(d.Categories, k)...)
 						}
-					</select>
+					}}
+					@kit.CategorySelect("category", tree, d.Posted.Category, nil, false, kit.Invalid(e, "category-error"))
 				}
 				{{ e = v.Errors.Get("currency") }}
 				@kit.Field("col-6", kit.T(ctx, "Currency"), e, "currency-error", nil) {

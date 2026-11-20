@@ -119,10 +119,7 @@ templ condFields(r condRow, fields []domain.RuleFieldOps, categories []domain.Ca
 		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			switch r.Field {
 				case domain.RuleFieldCategory:
-					<select name="cond_value">
-						<option value="">—</option>
-						@kit.CategoryOptions(categories, r.ID)
-					</select>
+					@kit.CategorySelect("cond_value", categories, r.ID, nil, false, nil)
 				case domain.RuleFieldAccount:
 					<select name="cond_value">
 						<option value="">—</option>
@@ -162,10 +159,7 @@ templ actionFields(r actionRow, categories []domain.Category, index int, errs *k
 		}
 		@kit.Field("col-5", kit.T(ctx, "Value"), valueErr, "", nil) {
 			if r.Type == domain.ActionSetCategory {
-				<select name="act_value">
-					<option value="">—</option>
-					@kit.CategoryOptions(categories, r.ID)
-				</select>
+				@kit.CategorySelect("act_value", categories, r.ID, nil, false, nil)
 			} else {
 				<input name="act_value" value={ r.Value } autocomplete="off"/>
 			}
@@ -196,4 +190,3 @@ templ previewList(d rulePreview) {
 		<p class="text-light">{ kit.T(ctx, "Matches no operations.") }</p>
 	}
 }
-

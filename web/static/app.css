@@ -144,6 +144,50 @@ fieldset.group {
   height: auto;
 }
 
+/* Category picker: its list is a popover under the search input, placed by
+   category-select.js, cat2s indented under their cat1 and the kinds as captions. It
+   takes the text of Oat's inputs, not of the label it is in, and the look of Oat's
+   dropdown menus. */
+[data-category-select] [role="listbox"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  overflow-y: auto;
+  padding: var(--space-1);
+  list-style: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-7);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  color: var(--foreground);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-medium);
+  > li {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-small);
+    &[hidden] {
+      display: none;
+    }
+  }
+  > [role="option"] {
+    cursor: pointer;
+    &:hover,
+    &[aria-selected="true"] {
+      background-color: var(--accent);
+    }
+  }
+  > [data-child] {
+    padding-inline-start: var(--space-6);
+  }
+  > [data-group] {
+    font-size: var(--text-8);
+    font-weight: var(--font-medium);
+    color: var(--muted-foreground);
+  }
+}
+
 /* Oat's tag input keeps its placeholder next to tags; show it only while empty. */
 ot-taginput:has(.badge) input::placeholder {
   color: transparent;

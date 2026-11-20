@@ -71,6 +71,44 @@ templ ArchiveDeleteForms(prefix, base string, archived bool, confirm string) {
 	<form id={ prefix + "-delete" } method="post" action={ base + "/delete" } hx-confirm={ confirm }></form>
 }
 
+// Filter is the filter form of a list, getting action: a button opening its dialog,
+// showing how many of count filters and the search query are set, and a link to
+// reset, the unfiltered list, if any. The dialog has the search input of query, then
+// the fields of children.
+templ Filter(action, query string, count int, reset string) {
+	{{
+		if query != "" {
+			count++
+		}
+	}}
+	<form method="get" action={ action }>
+		<div class="hstack">
+			<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
+				<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
+				if count > 0 {
+					<span class="badge">{ count }</span>
+				}
+			</button>
+			if reset != "" {
+				<a class="button ghost" href={ reset }>{ T(ctx, "Reset") }</a>
+			}
+		</div>
+		// outside the hstack, which zeroes the margins that center a dialog
+		<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ T(ctx, "Filter") } closedby="any" autofocus>
+			<div class="row">
+				@Field("col-12", T(ctx, "Search"), "", "", nil) {
+					<input type="search" name="q" value={ query } autocomplete="off"/>
+				}
+				{ children... }
+			</div>
+			<footer class="hstack justify-end mt-4">
+				<button type="button" class="outline" commandfor="filter-dialog" command="close">{ T(ctx, "Close") }</button>
+				<button type="submit">{ T(ctx, "Apply") }</button>
+			</footer>
+		</dialog>
+	</form>
+}
+
 // NoOperations is the text of a page that would list operations when the user has none.
 templ NoOperations() {
 	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>

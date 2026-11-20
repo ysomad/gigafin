@@ -62,10 +62,7 @@ templ splitRow(categories []domain.Category, s splitPart, first bool, index int,
 			}
 		</div>
 		@kit.Field("col-6", kit.T(ctx, "Category"), catErr, "", nil) {
-			<select name="split_category" { kit.Invalid(catErr, "")... }>
-				<option value="">—</option>
-				@kit.CategoryOptions(categories, s.CategoryID)
-			</select>
+			@kit.CategorySelect("split_category", categories, s.CategoryID, nil, false, kit.Invalid(catErr, ""))
 		}
 		@kit.Field("col-6", kit.T(ctx, "Amount"), amountErr, "", nil) {
 			<input

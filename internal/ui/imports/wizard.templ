@@ -166,10 +166,14 @@ templ categoriesStep(d wizardData, base string) {
 								</div>
 							</td>
 							<td>
-								<select name="cat_id" aria-label={ kit.T(ctx, "Category") }>
-									<option value="0">{ kit.T(ctx, "Create new category") } →</option>
-									@kit.CategoryOptions(domain.ByKind(d.Categories, c.Kind), c.CategoryID)
-								</select>
+								@kit.CategorySelect(
+									"cat_id",
+									domain.ByKind(d.Categories, c.Kind),
+									c.CategoryID,
+									[]kit.CategoryChoice{{Value: "0", Label: kit.T(ctx, "Create new category") + " →"}},
+									false,
+									templ.Attributes{"aria-label": kit.T(ctx, "Category")},
+								)
 							</td>
 							<td>
 								<input
