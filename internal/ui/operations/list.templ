@@ -14,7 +14,7 @@ templ listPage(v kit.Page, d opList) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
 		<div class="hstack justify-between mb-4">
 			<div class="hstack">
-				<a class="button op-new" href="/operations/new">+ { kit.T(ctx, "Operation") }</a>
+				@kit.NewButton("/operations/new", kit.T(ctx, "Operation"))
 				<ot-dropdown>
 					<button type="button" class="outline" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#ellipsis"></use></svg></button>
 					<menu popover id="op-actions">
@@ -86,8 +86,6 @@ templ listPage(v kit.Page, d opList) {
 		<div id="list-results">
 			@listResults(d)
 		</div>
-		// on phones it replaces the button of the toolbar, under the thumb
-		<a class="button outline fab" href="/operations/new" aria-label={ kit.T(ctx, "Operation") }>+</a>
 	}
 }
 

@@ -54,7 +54,7 @@
 - [x] operations multi tag / category filtering
 - [x] unsplit
 - [x] consistent split / rules ui
-- [ ] better plans ui/ux
+- [x] better plans ui/ux
 - [ ] sber sync
 - [ ] alfa sync
 - [ ] raiifaizen sync

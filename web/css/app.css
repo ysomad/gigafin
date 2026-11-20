@@ -47,7 +47,7 @@ td.nowrap {
   }
 }
 
-/* Button adding an operation, floating under the thumb on phones only. */
+/* Button adding an item to a list, floating under the thumb on phones only. */
 .fab {
   display: none;
 }
@@ -78,8 +78,8 @@ td.nowrap {
   body:has(.fab) .to-top {
     bottom: calc(4.5rem + 2.5rem + var(--space-4) + env(safe-area-inset-bottom));
   }
-  /* the floating button adds an operation instead */
-  .op-new {
+  /* the floating button adds the item instead */
+  .new-button {
     display: none;
   }
   /* iOS zooms into a focused field whose text is under 16px, as Oat's is */
@@ -264,6 +264,24 @@ summary:hover progress {
   background-color: var(--border);
   &::-webkit-progress-bar {
     background-color: var(--border);
+  }
+}
+
+/* A plan meter over its plan, as long as the amount, with a tick where the plan of
+   --plan, its share of the amount, ends. */
+.over-plan {
+  position: relative;
+  > meter {
+    display: block;
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    inset-block: calc(-1 * var(--space-1));
+    inset-inline-start: var(--plan);
+    width: 2px;
+    border-radius: var(--radius-full);
+    background-color: var(--foreground);
   }
 }
 

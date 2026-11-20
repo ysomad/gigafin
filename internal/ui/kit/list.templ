@@ -96,6 +96,13 @@ templ Filter(action, query, placeholder string, count int, reset string) {
 	</div>
 }
 
+// NewButton is the button of a list toolbar adding the item labeled label at href. On
+// phones a button floating under the thumb replaces it.
+templ NewButton(href, label string) {
+	<a class="button new-button" href={ href }>+ { label }</a>
+	<a class="button outline fab" href={ href } aria-label={ label }>+</a>
+}
+
 // SearchButton opens the dialog of SearchDialog.
 templ SearchButton() {
 	<button type="button" class="outline" commandfor="search" command="toggle-popover" aria-label={ T(ctx, "Search") }>

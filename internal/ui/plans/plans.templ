@@ -11,67 +11,43 @@ import (
 
 templ plansPage(v kit.Page, d plansData) {
 	@kit.Layout(v, false, nil) {
-		<div class="hstack justify-between mb-6">
-			<ot-dropdown>
-				<menu class="buttons">
-					<li><a class="button" href={ "/plans/new?month=" + d.Month.String() }>+ { kit.T(ctx, "New plan") }</a></li>
-					<li>
-						<button type="button" popovertarget="plan-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
-					</li>
-				</menu>
-				<menu popover id="plan-actions">
-					<form method="post" action="/plans/fill">
-						<input type="hidden" name="month" value={ d.Month.String() }/>
-						<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Fill repeating plans into %s", d.Month) }</button>
-					</form>
-				</menu>
-			</ot-dropdown>
+		<div class="hstack justify-between mb-4">
+			<div class="hstack">
+				@kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan"))
+				<form method="post" action="/plans/fill">
+					<input type="hidden" name="month" value={ d.Month.String() }/>
+					<button type="submit" class="outline" title={ kit.T(ctx, "Repeat plans") } data-tooltip-placement="right"><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#refresh-cw"></use></svg></button>
+				</form>
+			</div>
 			@kit.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
 		</div>
 		for _, sec := range d.Sections {
 			{{ inc := sec.Kind == domain.KindIncome }}
 			<section class="mb-6">
-				<div class="hstack justify-between mb-2">
-					<h3>{ kit.KindLabel(ctx, sec.Kind) }</h3>
-					<div class="vstack gap-1 align-right">
-						for _, tot := range sec.Totals {
-							<span>
-								{ kit.Money(ctx, tot.Spent, tot.Currency) } <span class="text-light">{ kit.T(ctx, "of") } { kit.Money(ctx, tot.Plan, tot.Currency) } { money.CurrencySymbol(tot.Currency) } ·</span>
-								{ kit.Money(ctx, tot.Left().Abs(), tot.Currency) }
-								<span class="text-light">
-									switch  {
-										case tot.Left().IsNegative() && inc:
-											{ kit.T(ctx, "above plan") }
-										case tot.Left().IsNegative():
-											{ kit.T(ctx, "over") }
-										case inc:
-											{ kit.T(ctx, "to go") }
-										default:
-											{ kit.T(ctx, "left") }
-									}
-								</span>
-							</span>
-						}
+				<h2>{ kit.KindLabel(ctx, sec.Kind) }</h2>
+				for _, tot := range sec.Totals {
+					<div class="card p-4 vstack gap-2 mb-2">
+						<div class="hstack justify-between">
+							<strong>{ kit.T(ctx, "Total") }</strong>
+							<span class="text-light">{ kit.T(ctx, "%d%% of plan", tot.Percent()) }</span>
+						</div>
+						@planProgress(tot, inc, money.CurrencySymbol(tot.Currency))
 					</div>
-				</div>
+				}
 				for _, it := range sec.Planned {
 					<details open?={ d.Open == fmt.Sprintf("%d:%s", it.Row.Category.ID, it.Row.Currency) }>
 						<summary>
-							<span class="vstack gap-1 w-100">
-								<span class="hstack justify-between">
-									<span>
-										if it.Parent != "" {
-											<span class="text-light">{ it.Parent } › </span>
-										}
-										{ it.Row.Category.Name }
-										if it.Row.Repeating {
-											<span class="text-light" title={ kit.T(ctx, "Repeat every month") }>↻</span>
-										}
-									</span>
-									<span class="align-right">{ kit.Money(ctx, it.Row.Spent, it.Row.Currency) } <span class="text-light">/ { kit.Money(ctx, it.Row.Plan, it.Row.Currency) }</span></span>
+							<span class="vstack gap-2 w-100">
+								<span class="hstack gap-1">
+									if it.Parent != "" {
+										<span class="text-light">{ it.Parent } ›</span>
+									}
+									{ it.Row.Category.Name }
+									if it.Row.Repeating {
+										<svg width="12" height="12" class="text-light" role="img" aria-label={ kit.T(ctx, "Repeat every month") }><title>{ kit.T(ctx, "Repeat every month") }</title><use href="/static/img/icons.svg#refresh-cw"></use></svg>
+									}
 								</span>
-								// clamp only the graphic; the label keeps the actual percentage
-								<progress value={ min(max(it.Row.Percent(), 0), 100) } max="100" aria-label={ kit.T(ctx, "%d%% of plan", it.Row.Percent()) }>{ it.Row.Percent() }%</progress>
+								@planProgress(it.Row, inc, "")
 							</span>
 						</summary>
 						@planRowForm(it.Row, d, v.Errors)
@@ -83,6 +59,50 @@ templ plansPage(v kit.Page, d plansData) {
 			</section>
 		}
 	}
+}
+
+// planProgress is the meter of row against its plan, colored by how it goes for an
+// expense, or for an income if inc, and the amounts under it, the plan followed by
+// symbol, if any.
+templ planProgress(row domain.PlanRow, inc bool, symbol string) {
+	{{
+		left := row.Left()
+		pct := row.Percent()
+	}}
+	// clamp only the graphic; the label keeps the actual percentage. An expense turns
+	// yellow near its plan and red over it, an income green once it reaches it. Over the
+	// plan, the bar is as long as the amount, and a tick marks where the plan ends.
+	if pct > 100 {
+		<div class="over-plan" style={ fmt.Sprintf("--plan: %.2f%%", 10000/float64(pct)) }>
+			if inc {
+				<meter value="1" max="1" low="0.5" high="0.5" optimum="1" aria-label={ kit.T(ctx, "%d%% of plan", pct) }>{ pct }%</meter>
+			} else {
+				<meter value="1" max="1" low="0.5" high="0.5" optimum="0" aria-label={ kit.T(ctx, "%d%% of plan", pct) }>{ pct }%</meter>
+			}
+		</div>
+	} else if inc {
+		<meter value={ min(max(row.Percent(), 0), 100) } max="100" low="0" high="99" optimum="100" aria-label={ kit.T(ctx, "%d%% of plan", row.Percent()) }>{ row.Percent() }%</meter>
+	} else {
+		<meter value={ min(max(row.Percent(), 0), 101) } max="101" low="80" high="100" optimum="0" aria-label={ kit.T(ctx, "%d%% of plan", row.Percent()) }>{ row.Percent() }%</meter>
+	}
+	<small class="hstack justify-between">
+		<span>{ kit.Money(ctx, row.Spent, row.Currency) } <span class="text-light">{ kit.T(ctx, "of") } { kit.Money(ctx, row.Plan, row.Currency) } { symbol }</span></span>
+		<span>
+			{ kit.Money(ctx, left.Abs(), row.Currency) }
+			<span class="text-light">
+			switch {
+				case left.IsNegative() && inc:
+					{ kit.T(ctx, "above plan") }
+				case left.IsNegative():
+					{ kit.T(ctx, "over") }
+				case inc:
+					{ kit.T(ctx, "to go") }
+				default:
+					{ kit.T(ctx, "left") }
+			}
+			</span>
+		</span>
+	</small>
 }
 
 templ newPlanPage(v kit.Page, d planFormData) {
@@ -130,29 +150,30 @@ templ newPlanPage(v kit.Page, d planFormData) {
 // post re-renders the page with the errs of the form.
 templ planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) {
 	{{ e := errs.Get(planKey(row.Category.ID, row.Currency)) }}
-	<div class="vstack gap-1 p-4">
-		<form method="post" action="/plans" class="hstack gap-2" hx-post="/plans" hx-trigger="change" hx-target="main" hx-select="main" hx-swap="outerHTML">
-			<input type="hidden" name="month" value={ d.Month.String() }/>
-			<input type="hidden" name="category" value={ row.Category.ID }/>
-			<input type="hidden" name="currency" value={ row.Currency }/>
-			<input
-				name="amount"
-				class="small"
-				inputmode="decimal"
-				size="8"
-				if e != "" {
-					value={ d.Posted.Amount }
-				} else {
-					value={ kit.AmountInput(ctx, row.Plan.Fixed(row.Currency)) }
-				}
-				placeholder={ kit.T(ctx, "Amount") }
-				title={ kit.T(ctx, "Clear the amount to remove it for this month.") }
-				aria-label={ kit.T(ctx, "Plan for %s", row.Category.Name) }
-				{ kit.Invalid(e, "")... }
-			/>
-			<label><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Repeat every month") }</label>
-			<a href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }>{ kit.T(ctx, "Operations") } →</a>
-		</form>
-		@kit.FieldError(e, "")
-	</div>
+	<form method="post" action="/plans" class="form-compact" hx-post="/plans" hx-trigger="change" hx-target="main" hx-select="main" hx-swap="outerHTML">
+		<input type="hidden" name="month" value={ d.Month.String() }/>
+		<input type="hidden" name="category" value={ row.Category.ID }/>
+		<input type="hidden" name="currency" value={ row.Currency }/>
+		<fieldset class="row items-center">
+			@kit.Field("col-6", "", e, "", nil) {
+				<input
+					name="amount"
+					inputmode="decimal"
+					if e != "" {
+						value={ d.Posted.Amount }
+					} else {
+						value={ kit.AmountInput(ctx, row.Plan.Fixed(row.Currency)) }
+					}
+					placeholder={ kit.T(ctx, "Amount") }
+					title={ kit.T(ctx, "Clear the amount to remove it for this month.") }
+					aria-label={ kit.T(ctx, "Plan for %s", row.Category.Name) }
+					{ kit.Invalid(e, "")... }
+				/>
+			}
+			<div class="col-6 hstack justify-between">
+				<label><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Repeat every month") }</label>
+				<a class="button outline small" href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }><svg width="14" height="14" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg> { kit.T(ctx, "Operations") }</a>
+			</div>
+		</fieldset>
+	</form>
 }

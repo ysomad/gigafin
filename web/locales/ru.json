@@ -508,17 +508,19 @@
   "plans": {
     "%d%% of plan": "%d%% от плана",
     "Clear the amount to remove it for this month.": "Очистите сумму, чтобы убрать план на этот месяц.",
-    "Fill repeating plans into %s": "Перенести повторяющиеся планы на %s",
     "New plan": "Новый план",
     "No plans this month.": "В этом месяце нет планов.",
+    "Plan": "План",
     "Plan for %s": "План на «%s»",
     "Plans %s": "Планы %s",
     "Repeat every month": "Повторять каждый месяц",
+    "Repeat plans": "Повторить планы",
+    "Total": "Итого",
     "above plan": "сверх плана",
     "left": "осталось",
     "of": "из",
     "over": "перерасход",
-    "to go": "осталось получить"
+    "to go": "к получению"
   },
   "rules": {
     "Add action": "Добавить действие",
