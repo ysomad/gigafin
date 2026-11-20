@@ -906,7 +906,8 @@ type OperationQuery struct {
 	Type            OptOperationType `json:"type"`
 	DateFrom        OptDate          `json:"date_from"`
 	DateTo          OptDate          `json:"date_to"`
-	// Substring of payee or note.
+	// Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a
+	// tag; a number may match the absolute amount instead, whole units any fraction of them.
 	Query OptString `json:"query"`
 	// Tag name, matched exactly.
 	Tag OptString `json:"tag"`

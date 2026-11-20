@@ -154,23 +154,8 @@ CREATE VIRTUAL TABLE operations_fts USING fts5 (
 );
 
 -- +goose StatementBegin
-CREATE TRIGGER operations_fts_insert AFTER INSERT ON operations BEGIN
-    INSERT INTO operations_fts (rowid, body)
-    VALUES (new.id, replace(replace(coalesce(new.payee, '') || ' ' || coalesce(new.note, ''), 'ё', 'е'), 'Ё', 'Е'));
-END;
--- +goose StatementEnd
-
--- +goose StatementBegin
 CREATE TRIGGER operations_fts_delete AFTER DELETE ON operations BEGIN
     DELETE FROM operations_fts WHERE rowid = old.id;
-END;
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE TRIGGER operations_fts_update AFTER UPDATE OF payee, note ON operations BEGIN
-    DELETE FROM operations_fts WHERE rowid = old.id;
-    INSERT INTO operations_fts (rowid, body)
-    VALUES (new.id, replace(replace(coalesce(new.payee, '') || ' ' || coalesce(new.note, ''), 'ё', 'е'), 'Ё', 'Е'));
 END;
 -- +goose StatementEnd
 
@@ -209,6 +194,93 @@ CREATE TABLE operation_tags (
 ) STRICT;
 
 CREATE INDEX operation_tags_tag_idx ON operation_tags (tag_id);
+
+-- the text the operations search looks in: payee, bank payee, note, MCC, the names of
+-- the accounts, the category and its parent, and the tags; ё is е as in the query
+CREATE VIEW operation_search AS
+SELECT
+    o.id,
+    replace(replace(
+        coalesce(o.payee, '') || ' ' || coalesce(o.source_payee, '') || ' ' || coalesce(o.note, '') || ' '
+        || coalesce(o.mcc, '') || ' ' || a.name || ' ' || coalesce(ta.name, '') || ' ' || coalesce(c.name, '') || ' '
+        || coalesce(p.name, '') || ' ' || coalesce((
+            SELECT group_concat(t.name, ' ') FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
+            WHERE ot.operation_id = o.id
+        ), ''),
+        'ё', 'е'
+    ), 'Ё', 'Е') AS body
+FROM operations AS o
+JOIN accounts AS a ON a.id = o.account_id
+LEFT JOIN accounts AS ta ON ta.id = o.to_account_id
+LEFT JOIN categories AS c ON c.id = o.category_id
+LEFT JOIN categories AS p ON p.id = c.parent_id;
+
+-- +goose StatementBegin
+CREATE TRIGGER operations_fts_insert AFTER INSERT ON operations BEGIN
+    INSERT INTO operations_fts (rowid, body) SELECT s.id, s.body FROM operation_search AS s WHERE s.id = new.id;
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER operations_fts_update
+AFTER UPDATE OF payee, source_payee, note, mcc, account_id, to_account_id, category_id ON operations BEGIN
+    DELETE FROM operations_fts WHERE rowid = old.id;
+    INSERT INTO operations_fts (rowid, body) SELECT s.id, s.body FROM operation_search AS s WHERE s.id = new.id;
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER operation_tags_fts_insert AFTER INSERT ON operation_tags BEGIN
+    DELETE FROM operations_fts WHERE rowid = new.operation_id;
+    INSERT INTO operations_fts (rowid, body)
+    SELECT s.id, s.body FROM operation_search AS s WHERE s.id = new.operation_id;
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER operation_tags_fts_delete AFTER DELETE ON operation_tags BEGIN
+    DELETE FROM operations_fts WHERE rowid = old.operation_id;
+    INSERT INTO operations_fts (rowid, body)
+    SELECT s.id, s.body FROM operation_search AS s WHERE s.id = old.operation_id;
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER accounts_fts_update AFTER UPDATE OF name ON accounts BEGIN
+    DELETE FROM operations_fts WHERE rowid IN (
+        SELECT o.id FROM operations AS o WHERE o.account_id = new.id OR o.to_account_id = new.id
+    );
+    INSERT INTO operations_fts (rowid, body)
+    SELECT s.id, s.body FROM operation_search AS s
+    WHERE s.id IN (SELECT o.id FROM operations AS o WHERE o.account_id = new.id OR o.to_account_id = new.id);
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER categories_fts_update AFTER UPDATE OF name, parent_id ON categories BEGIN
+    DELETE FROM operations_fts WHERE rowid IN (
+        SELECT o.id FROM operations AS o
+        WHERE o.category_id = new.id OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = new.id)
+    );
+    INSERT INTO operations_fts (rowid, body)
+    SELECT s.id, s.body FROM operation_search AS s
+    WHERE s.id IN (
+        SELECT o.id FROM operations AS o
+        WHERE o.category_id = new.id OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = new.id)
+    );
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER tags_fts_update AFTER UPDATE OF name ON tags BEGIN
+    DELETE FROM operations_fts WHERE rowid IN (
+        SELECT ot.operation_id FROM operation_tags AS ot WHERE ot.tag_id = new.id
+    );
+    INSERT INTO operations_fts (rowid, body)
+    SELECT s.id, s.body FROM operation_search AS s
+    WHERE s.id IN (SELECT ot.operation_id FROM operation_tags AS ot WHERE ot.tag_id = new.id);
+END;
+-- +goose StatementEnd
 
 CREATE TABLE import_rows (
     id           INTEGER PRIMARY KEY,
@@ -334,13 +406,19 @@ DROP TABLE bank_connections;
 DROP TABLE import_category_map;
 DROP TABLE import_account_map;
 DROP TABLE import_rows;
+DROP TRIGGER tags_fts_update;
+DROP TRIGGER categories_fts_update;
+DROP TRIGGER accounts_fts_update;
+DROP TRIGGER operation_tags_fts_delete;
+DROP TRIGGER operation_tags_fts_insert;
+DROP TRIGGER operations_fts_update;
+DROP TRIGGER operations_fts_insert;
+DROP VIEW operation_search;
 DROP TABLE operation_tags;
 DROP TABLE tags;
 DROP TABLE plan_carries;
 DROP TABLE plans;
-DROP TRIGGER operations_fts_update;
 DROP TRIGGER operations_fts_delete;
-DROP TRIGGER operations_fts_insert;
 DROP TABLE operations_fts;
 DROP TABLE operations;
 DROP TABLE imports;

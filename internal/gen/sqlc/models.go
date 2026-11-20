@@ -159,6 +159,11 @@ type Operation struct {
 	UpdatedAt   sql.NullInt64
 }
 
+type OperationSearch struct {
+	ID   int64
+	Body string
+}
+
 type OperationTag struct {
 	OperationID int64
 	TagID       int64

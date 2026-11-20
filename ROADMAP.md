@@ -47,7 +47,8 @@
 - [x] 2fa
 - [x] theme toggle
 - [x] pwa
-- [ ] better categories ui/ux (icons, selectors)
+- [x] better categories ui/ux (icons, selectors)
+- [x] better operations search
 - [ ] operations tags filter
 - [ ] mobile first ui
 - [ ] sber sync

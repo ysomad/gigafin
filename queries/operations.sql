@@ -63,6 +63,13 @@ WHERE
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (query))
         OR sqlc.narg (query) IS NULL
     )
+    -- the numbers of the query match the text as the query does, or the absolute amount
+    -- within bounds as amount_min and amount_max below
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (number_query))
+        OR abs(o.amount) BETWEEN (sqlc.narg(number_min) ->> a.currency) AND (sqlc.narg(number_max) ->> a.currency)
+        OR sqlc.narg (number_query) IS NULL
+    )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
     AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)
     AND (abs(o.amount) <= (sqlc.narg(amount_max) ->> a.currency) OR sqlc.narg(amount_max) IS NULL)
@@ -111,6 +118,13 @@ WHERE
     AND (
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (query))
         OR sqlc.narg (query) IS NULL
+    )
+    -- the numbers of the query match the text as the query does, or the absolute amount
+    -- within bounds as amount_min and amount_max below
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (number_query))
+        OR abs(o.amount) BETWEEN (sqlc.narg(number_min) ->> a.currency) AND (sqlc.narg(number_max) ->> a.currency)
+        OR sqlc.narg (number_query) IS NULL
     )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
     AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)

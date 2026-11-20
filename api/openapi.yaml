@@ -641,7 +641,7 @@ components:
         query:
           type: string
           maxLength: 200
-          description: Substring of payee or note.
+          description: Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a tag; a number may match the absolute amount instead, whole units any fraction of them.
         tag:
           type: string
           maxLength: 50

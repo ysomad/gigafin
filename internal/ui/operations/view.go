@@ -33,6 +33,15 @@ type opList struct {
 	Changed int
 }
 
+// opSearch is the search page: the operations matching Query, none while it is empty.
+type opSearch struct {
+	Query    string
+	Days     []kit.DayGroup
+	MoreURL  string
+	AccByID  map[int64]domain.Account
+	CatNames map[int64]string
+}
+
 // splitPart is a part of the split form.
 type splitPart struct {
 	CategoryID int64

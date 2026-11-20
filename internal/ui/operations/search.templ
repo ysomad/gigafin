@@ -1,0 +1,36 @@
+package operations
+
+import "github.com/ysomad/gigafin/internal/ui/kit"
+
+templ searchPage(v kit.Page, d opSearch) {
+	@kit.Layout(v, len(d.Days) > 0, nil) {
+		// typing swaps in the results of the page for the query, keeping the input and its
+		// focus; Enter loads the page
+		<form method="get" action="/operations/search" role="search" class="mb-4">
+			<input
+				type="search"
+				name="q"
+				value={ d.Query }
+				placeholder={ kit.T(ctx, "Payee, amount, account, category, tag") }
+				aria-label={ kit.T(ctx, "Search") }
+				autocomplete="off"
+				autofocus
+				hx-get="/operations/search"
+				hx-trigger="input changed delay:300ms, search"
+				hx-target="#search-results"
+				hx-select="#search-results"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+			/>
+		</form>
+		<div id="search-results">
+			if len(d.Days) > 0 {
+				<ul class="unstyled vstack gap-1">
+					@kit.OpRows(d.Days, d.CatNames, d.AccByID, d.MoreURL)
+				</ul>
+			} else if d.Query != "" {
+				<p class="text-light">{ kit.T(ctx, "Nothing found.") }</p>
+			}
+		</div>
+	}
+}

@@ -282,6 +282,9 @@ func (r *Operations) List(
 		DateFrom:      fp.DateFrom,
 		DateTo:        fp.DateTo,
 		Query:         fp.Query,
+		NumberQuery:   fp.NumberQuery,
+		NumberMin:     fp.NumberMin,
+		NumberMax:     fp.NumberMax,
 		Tags:          fp.Tags,
 		AmountMin:     fp.AmountMin,
 		AmountMax:     fp.AmountMax,
@@ -337,13 +340,58 @@ func (r *Operations) Sum(ctx context.Context, userID int64, f domain.Filter) ([]
 // filterParams converts f to the conditions shared by ListOperations and
 // SumFilteredOperations.
 func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsParams, error) {
-	// every word of the query must match the start of a word of payee or note; words
-	// are quoted so FTS5 syntax in them is taken literally, and ё is е as in the index
-	words := strings.Fields(strings.NewReplacer("ё", "е", "Ё", "Е").Replace(f.Query))
-	for i, w := range words {
-		words[i] = `"` + strings.ReplaceAll(w, `"`, `""`) + `"*`
+	// every word of the query must match the start of a word of the text of
+	// operation_search; words are quoted so FTS5 syntax in them is taken literally, and ё
+	// is е as in the index. Numbers may match the absolute amount instead: whole units
+	// any fraction of them, so 679 is 679.00 to 679.99, and all numbers the same amount.
+	var words, numbers []string
+	var numMin, numMax map[string]int64
+	for w := range strings.FieldsSeq(strings.NewReplacer("ё", "е", "Ё", "Е").Replace(f.Query)) {
+		quoted := `"` + strings.ReplaceAll(w, `"`, `""`) + `"*`
+		n, err := money.Parse(w)
+		if err != nil || !strings.ContainsAny(w, "0123456789") {
+			words = append(words, quoted)
+			continue
+		}
+		numbers = append(numbers, quoted)
+		n = n.Abs()
+		if numMin == nil {
+			numMin, numMax = make(map[string]int64), make(map[string]int64)
+		}
+		for _, cur := range money.Currencies() {
+			lo, err := n.CeilMinor(cur)
+			if err != nil {
+				return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+			}
+			hi, err := n.FloorMinor(cur)
+			if !strings.ContainsAny(w, ".,") {
+				hi, err = n.Add(money.FromInt(1)).CeilMinor(cur)
+				hi--
+			}
+			if err != nil {
+				return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+			}
+			if old, ok := numMin[cur]; !ok || lo > old {
+				numMin[cur] = lo
+			}
+			if old, ok := numMax[cur]; !ok || hi < old {
+				numMax[cur] = hi
+			}
+		}
 	}
 	query := strings.Join(words, " ")
+	numberQuery := strings.Join(numbers, " ")
+	var numBounds [2]sql.NullString
+	for i, m := range []map[string]int64{numMin, numMax} {
+		if m == nil {
+			continue
+		}
+		js, err := json.Marshal(m)
+		if err != nil {
+			return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+		}
+		numBounds[i] = sql.NullString{String: string(js), Valid: true}
+	}
 	// amounts are minor units of each account currency, so a bound becomes minor units
 	// of every currency, as a JSON object by code; min rounds up and max down
 	var bounds [2]sql.NullString
@@ -382,7 +430,10 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 		DateFrom:      sql.NullString{String: timex.FormatDate(f.DateFrom), Valid: !f.DateFrom.IsZero()},
 		DateTo:        sql.NullString{String: timex.FormatDate(f.DateTo), Valid: !f.DateTo.IsZero()},
 		Query:         sql.NullString{String: query, Valid: query != ""},
-		Tags:          sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
+		NumberQuery:   sql.NullString{String: numberQuery, Valid: numberQuery != ""},
+		NumberMin:     numBounds[0],
+		NumberMax:     numBounds[1],
+		Tags:         sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
 		AmountMin:     bounds[0],
 		AmountMax:     bounds[1],
 	}, nil

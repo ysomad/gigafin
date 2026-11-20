@@ -60,14 +60,6 @@ td.nowrap {
   :is(input, select, textarea) {
     font-size: 16px;
   }
-  /* the operations toolbar wraps, its search taking a full row */
-  .toolbar {
-    flex-wrap: wrap;
-    > form,
-    > form > .hstack > .group {
-      flex: 1;
-    }
-  }
   /* the day of the operations under it stays in view while they scroll */
   li.day {
     position: sticky;
@@ -186,6 +178,12 @@ fieldset.group {
     font-weight: var(--font-medium);
     color: var(--muted-foreground);
   }
+}
+
+/* A caption in a dropdown menu, such as the last bank sync, lines up with its items. */
+menu[popover] > small {
+  display: block;
+  padding: var(--space-2) var(--space-3);
 }
 
 /* Oat's tag input keeps its placeholder next to tags; show it only while empty. */

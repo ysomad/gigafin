@@ -81,24 +81,40 @@ templ Filter(action, query string, count int, reset string) {
 			count++
 		}
 	}}
-	<form method="get" action={ action }>
+	<div>
 		<div class="hstack">
-			<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
-				<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
-				if count > 0 {
-					<span class="badge">{ count }</span>
-				}
-			</button>
+			@FilterButton(count)
 			if reset != "" {
 				<a class="button ghost" href={ reset }>{ T(ctx, "Reset") }</a>
 			}
 		</div>
 		// outside the hstack, which zeroes the margins that center a dialog
+		@FilterDialog(action) {
+			@Field("col-12", T(ctx, "Search"), "", "", nil) {
+				<input type="search" name="q" value={ query } autocomplete="off"/>
+			}
+			{ children... }
+		}
+	</div>
+}
+
+// FilterButton opens the dialog of FilterDialog, showing how many filters, count, are
+// set.
+templ FilterButton(count int) {
+	<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
+		<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
+		if count > 0 {
+			<span class="badge">{ count }</span>
+		}
+	</button>
+}
+
+// FilterDialog is the dialog of the filter form of a list, getting action, with the
+// fields of children. FilterButton opens it.
+templ FilterDialog(action string) {
+	<form method="get" action={ action }>
 		<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ T(ctx, "Filter") } closedby="any" autofocus>
 			<div class="row">
-				@Field("col-12", T(ctx, "Search"), "", "", nil) {
-					<input type="search" name="q" value={ query } autocomplete="off"/>
-				}
 				{ children... }
 			</div>
 			<footer class="hstack justify-end mt-4">

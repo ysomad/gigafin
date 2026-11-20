@@ -193,27 +193,34 @@ WHERE
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
         OR ?8 IS NULL
     )
+    -- the numbers of the query match the text as the query does, or the absolute amount
+    -- within bounds as amount_min and amount_max below
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?9)
+        OR abs(o.amount) BETWEEN (?10 ->> a.currency) AND (?11 ->> a.currency)
+        OR ?9 IS NULL
+    )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
-    AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
-    AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
+    AND (abs(o.amount) >= (?12 ->> a.currency) OR ?12 IS NULL)
+    AND (abs(o.amount) <= (?13 ->> a.currency) OR ?13 IS NULL)
     -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
     -- matches any of them
     AND (o.id IN (
         SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-        WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0
+        WHERE t.user_id = ?1 AND instr(?14, ',' || t.name || ',') > 0
     )
-    OR ?11 IS NULL)
+    OR ?14 IS NULL)
     -- seeks past the cursor in the order below, see pagination.Cursor
     AND (
         (o.date, coalesce(o.time, ''), coalesce(o.origin_id, o.id), o.id)
         < (
-            cast(?12 AS TEXT), cast(?13 AS TEXT),
-            cast(?14 AS INTEGER), cast(?15 AS INTEGER)
+            cast(?15 AS TEXT), cast(?16 AS TEXT),
+            cast(?17 AS INTEGER), cast(?18 AS INTEGER)
         )
-        OR ?12 IS NULL
+        OR ?15 IS NULL
     )
 ORDER BY o.date DESC, coalesce(o.time, '') DESC, coalesce(o.origin_id, o.id) DESC, o.id DESC
-LIMIT ?16
+LIMIT ?19
 `
 
 type ListOperationsParams struct {
@@ -225,6 +232,9 @@ type ListOperationsParams struct {
 	CategoryID    sql.NullInt64
 	Uncategorized int64
 	Query         sql.NullString
+	NumberQuery   sql.NullString
+	NumberMin     sql.NullString
+	NumberMax     sql.NullString
 	AmountMin     sql.NullString
 	AmountMax     sql.NullString
 	Tags          sql.NullString
@@ -250,6 +260,9 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 		arg.CategoryID,
 		arg.Uncategorized,
 		arg.Query,
+		arg.NumberQuery,
+		arg.NumberMin,
+		arg.NumberMax,
 		arg.AmountMin,
 		arg.AmountMax,
 		arg.Tags,
@@ -564,16 +577,23 @@ WHERE
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
         OR ?8 IS NULL
     )
+    -- the numbers of the query match the text as the query does, or the absolute amount
+    -- within bounds as amount_min and amount_max below
+    AND (
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?9)
+        OR abs(o.amount) BETWEEN (?10 ->> a.currency) AND (?11 ->> a.currency)
+        OR ?9 IS NULL
+    )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
-    AND (abs(o.amount) >= (?9 ->> a.currency) OR ?9 IS NULL)
-    AND (abs(o.amount) <= (?10 ->> a.currency) OR ?10 IS NULL)
+    AND (abs(o.amount) >= (?12 ->> a.currency) OR ?12 IS NULL)
+    AND (abs(o.amount) <= (?13 ->> a.currency) OR ?13 IS NULL)
     -- tags are names wrapped in commas, ",a,b,", as names have none; an operation
     -- matches any of them
     AND (o.id IN (
         SELECT ot.operation_id FROM operation_tags AS ot JOIN tags AS t ON t.id = ot.tag_id
-        WHERE t.user_id = ?1 AND instr(?11, ',' || t.name || ',') > 0
+        WHERE t.user_id = ?1 AND instr(?14, ',' || t.name || ',') > 0
     )
-    OR ?11 IS NULL)
+    OR ?14 IS NULL)
 GROUP BY o.type, a.currency
 `
 
@@ -586,6 +606,9 @@ type SumFilteredOperationsParams struct {
 	CategoryID    sql.NullInt64
 	Uncategorized int64
 	Query         sql.NullString
+	NumberQuery   sql.NullString
+	NumberMin     sql.NullString
+	NumberMax     sql.NullString
 	AmountMin     sql.NullString
 	AmountMax     sql.NullString
 	Tags          sql.NullString
@@ -609,6 +632,9 @@ func (q *Queries) SumFilteredOperations(ctx context.Context, arg SumFilteredOper
 		arg.CategoryID,
 		arg.Uncategorized,
 		arg.Query,
+		arg.NumberQuery,
+		arg.NumberMin,
+		arg.NumberMax,
 		arg.AmountMin,
 		arg.AmountMax,
 		arg.Tags,

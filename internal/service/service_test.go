@@ -445,6 +445,62 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	assert.Equal(t, day(t, "2026-10-06"), next.Date)
 }
 
+func TestSearchOperations(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	ctx := t.Context()
+
+	lavka, err := f.svc.Operations.Create(ctx, f.userID, domain.OperationInput{
+		Type: domain.OpExpense, AccountID: f.card.ID, Date: day(t, "2026-10-01"),
+		Payee: "Яндекс Лавка", SourcePayee: "YANDEX*5399*LAVKA", MCC: "5411", Note: "ужин",
+		CategoryID: f.groceries.ID, Amount: dec("1807.40"), Tags: []string{"Ёлка"},
+	})
+	require.NoError(t, err)
+	transfer, err := f.svc.Operations.Create(ctx, f.userID, domain.OperationInput{
+		Type: domain.OpTransfer, AccountID: f.cash.ID, ToAccountID: f.card.ID, Date: day(t, "2026-10-02"),
+		Note: "в 1807", Amount: dec("50"),
+	})
+	require.NoError(t, err)
+
+	search := func(q string) []int64 {
+		t.Helper()
+		page, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{Query: q},
+			pagination.NewParams(pagination.Cursor{}, 0))
+		require.NoError(t, err, q)
+		ids := make([]int64, len(page))
+		for i, op := range page {
+			ids[i] = op.ID
+		}
+		return ids
+	}
+	for q, want := range map[string][]int64{
+		"лавка":        {lavka.ID},
+		"yandex lavka": {lavka.ID},
+		"5411":         {lavka.ID},
+		"groc":         {lavka.ID},
+		"food ужин":    {lavka.ID},
+		"елка":         {lavka.ID},
+		"card":         {transfer.ID, lavka.ID},
+		"cash":         {transfer.ID},
+		"1807":         {transfer.ID, lavka.ID},
+		"1807,4":       {lavka.ID},
+		"-1807.40":     {lavka.ID},
+		"1807.41":      {},
+		"50":           {transfer.ID},
+		"50 cash":      {transfer.ID},
+		"50 card ужин": {},
+	} {
+		assert.Equal(t, want, search(q), q)
+	}
+
+	require.NoError(t, f.svc.Accounts.Update(ctx, f.userID, f.cash.ID, domain.AccountInput{Name: "Wallet"}))
+	require.NoError(t, f.svc.Categories.Update(ctx, f.userID, f.groceries.ID, "Market", f.groceries.ParentID))
+	assert.Equal(t, []int64{transfer.ID}, search("wallet"), "index follows account names")
+	assert.Empty(t, search("cash"))
+	assert.Equal(t, []int64{lavka.ID}, search("market"), "and category names")
+}
+
 func TestPlanReport(t *testing.T) {
 	t.Parallel()
 

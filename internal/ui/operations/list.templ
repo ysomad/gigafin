@@ -12,57 +12,70 @@ import (
 
 templ listPage(v kit.Page, d opList) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
-		<div class="toolbar hstack justify-between mb-4">
-			<div class="hstack">
-				<ot-dropdown>
-					<menu class="buttons">
-						<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
-						<li>
-							<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
-						</li>
-					</menu>
-					<menu popover id="op-actions">
-						<form
-							method="post"
-							action={ d.RunURL }
-							if d.Filtered {
-								hx-confirm={ kit.T(ctx, "Run rules on the filtered operations?") }
-							} else {
-								hx-confirm={ kit.T(ctx, "Run rules on all operations?") }
-							}
-						>
-							<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Run rules") }</button>
-						</form>
-						<a href="/rules" role="menuitem" class="button ghost">{ kit.T(ctx, "Rules") }</a>
-					</menu>
-				</ot-dropdown>
-				if d.BankSync {
-					<menu class="buttons">
-						<li>
-							<form method="post" action="/operations/sync" hx-disable="find button">
-								<button
-									type="submit"
-									class="outline"
-									aria-label={ kit.T(ctx, "Sync") }
-								><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#refresh-cw"></use></svg></button>
-							</form>
-						</li>
-					</menu>
-					if !d.BankSyncAt.IsZero() {
-						<small class="text-light">{ kit.Datetime(ctx, d.BankSyncAt, v.User) }</small>
+		<div class="hstack justify-between mb-4">
+			<ot-dropdown>
+				<menu class="buttons">
+					<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
+					<li>
+						<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
+					</li>
+				</menu>
+				<menu popover id="op-actions">
+					if d.BankSync && !d.BankSyncAt.IsZero() {
+						<small class="text-light">{ kit.T(ctx, "Synced %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }</small>
 					}
+					<form
+						method="post"
+						action={ d.RunURL }
+						if d.Filtered {
+							hx-confirm={ kit.T(ctx, "Run rules on the filtered operations?") }
+						} else {
+							hx-confirm={ kit.T(ctx, "Run rules on all operations?") }
+						}
+					>
+						<button type="submit" role="menuitem" class="ghost">{ kit.T(ctx, "Run rules") }</button>
+					</form>
+					<a href="/rules" role="menuitem" class="button ghost">{ kit.T(ctx, "Rules") }</a>
+				</menu>
+			</ot-dropdown>
+			<div class="hstack">
+				<menu class="buttons">
+					<li>
+						<a class="button outline" href="/operations/search" aria-label={ kit.T(ctx, "Search") }>
+							<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#search"></use></svg>
+						</a>
+					</li>
+					if d.BankSync {
+						<li>
+							<button
+								type="submit"
+								form="op-sync"
+								id="op-sync-button"
+								class="outline"
+								aria-label={ kit.T(ctx, "Sync") }
+								if !d.BankSyncAt.IsZero() {
+									title={ kit.T(ctx, "Synced %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
+								}
+							><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#refresh-cw"></use></svg></button>
+						</li>
+					}
+					<li>
+						@kit.FilterButton(d.FilterCount)
+					</li>
+				</menu>
+				if d.Filtered {
+					<a class="button ghost" href="/operations">{ kit.T(ctx, "Reset") }</a>
 				}
 			</div>
-			{{
-				reset := ""
-				if d.Filtered {
-					reset = "/operations"
-				}
-			}}
-			@kit.Filter("/operations", d.Filter.Query, d.FilterCount, reset) {
-				@filterFields(d)
-			}
 		</div>
+		// outside the toolbar: the group joins only buttons, and an hstack zeroes the
+		// margins that center a dialog
+		if d.BankSync {
+			<form id="op-sync" method="post" action="/operations/sync" hx-disable="#op-sync-button"></form>
+		}
+		@kit.FilterDialog("/operations") {
+			@filterFields(d)
+		}
 		if len(d.Mismatched) > 0 {
 			<div class="vstack gap-2 mb-4">
 				for _, t := range d.Mismatched {
