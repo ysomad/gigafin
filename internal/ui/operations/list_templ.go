@@ -53,9 +53,9 @@ func listPage(v kit.Page, d opList) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "New operation"))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Operation"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `operations/list.templ`, Line: 18, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `operations/list.templ`, Line: 18, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -190,7 +190,7 @@ func listPage(v kit.Page, d opList) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><svg width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#search\"></use></svg></a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><svg width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#search\"></use></svg></a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -231,7 +231,7 @@ func listPage(v kit.Page, d opList) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "><svg width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#refresh-cw\"></use></svg></button></li>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "><svg width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#refresh-cw\"></use></svg></button></li>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

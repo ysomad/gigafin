@@ -4,23 +4,48 @@ import (
 	"fmt"
 
 	"github.com/ysomad/gigafin/internal/domain"
+	"github.com/ysomad/gigafin/internal/money"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
 templ splitPage(v kit.Page, d opSplit) {
 	@kit.Layout(v, false, nil) {
 		<h1>{ kit.T(ctx, "Split") }</h1>
-		<p class="text-light">
-			if d.Payee != "" {
-				{ d.Payee } ·
-			}
-			{ kit.AmountInput(ctx, d.Amount) }
-		</p>
-		<form id="form-split" class="form-compact" method="post" action={ fmt.Sprintf("/operations/%d/split", d.ID) } data-split-total={ d.Amount }>
+		<div class="card compact hstack justify-between mb-4">
+			<div>
+				<div>{ kit.OpCategory(ctx, d.Op, d.CatNames) }</div>
+				<small class="flex flex-col text-light">
+					<span>
+						{ kit.DayTitle(ctx, d.Op.Date) }
+						if d.Op.Time != "" {
+							{ d.Op.Time }
+						}
+					</span>
+					<span class="hstack gap-1">
+						<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/img/icons.svg#wallet"></use></svg>
+						{ kit.OpAccounts(d.Op, d.AccByID) }
+					</span>
+					if d.Op.Payee != "" {
+						<span class="hstack gap-1">
+							<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/img/icons.svg#store"></use></svg>
+							{ d.Op.Payee }
+						</span>
+					}
+					if d.Op.Note != "" {
+						<span class="hstack gap-1">
+							<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/img/icons.svg#message-square"></use></svg>
+							{ d.Op.Note }
+						</span>
+					}
+				</small>
+			</div>
+			<div class="align-right">{ kit.OpAmount(ctx, d.Op) } <span class="text-light">{ money.CurrencySymbol(d.Op.Currency) }</span></div>
+		</div>
+		<form id="form-split" class="form-compact" method="post" action={ fmt.Sprintf("/operations/%d/split", d.Op.ID) } data-split-total={ d.Amount }>
 			@kit.FormError(v.Errors.Form("split"), "")
 			<p class="text-light">
 				{ kit.T(ctx, "Divide the saved amount between categories. Each part becomes an operation of its own.") }
-				if d.OriginID != 0 {
+				if d.Op.OriginID != 0 {
 					{ kit.T(ctx, "Part of a split. Splitting it again adds parts to the same split.") }
 				}
 			</p>
@@ -29,7 +54,7 @@ templ splitPage(v kit.Page, d opSplit) {
 					@splitRow(d.Categories, p, i == 0, i, v.Errors)
 				}
 			</div>
-			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
+			<button type="button" class="outline split-add" hx-get={ "/operations/split?type=" + string(d.Op.Type) } hx-target="#splits" hx-swap="beforeend" data-variant="secondary">+ { kit.T(ctx, "Add part") }</button>
 			<div class="hstack justify-end">
 				<button type="submit">{ kit.T(ctx, "Split") }</button>
 			</div>
@@ -60,25 +85,41 @@ templ splitRow(categories []domain.Category, s splitPart, first bool, index int,
 				<button type="button" class="outline small" data-split-remove data-variant="danger" aria-label={ kit.T(ctx, "Remove part") } title={ kit.T(ctx, "Remove part") }>✕</button>
 			}
 		</div>
-		@kit.Field("col-6", kit.T(ctx, "Category"), catErr, "", nil) {
-			@kit.CategorySelect("split_category", categories, s.CategoryID, nil, false, kit.Invalid(catErr, ""))
+		{{
+			catAttrs := templ.Attributes{"aria-label": kit.T(ctx, "Category"), "placeholder": kit.T(ctx, "Category")}
+			if catErr != "" {
+				catAttrs["aria-invalid"] = "true"
+			}
+		}}
+		@kit.Field("col-6", "", catErr, "", nil) {
+			@kit.CategorySelect("split_category", categories, s.CategoryID, nil, false, catAttrs)
 		}
-		@kit.Field("col-6", kit.T(ctx, "Amount"), amountErr, "", nil) {
-			<input
-				name="split_amount"
-				inputmode="decimal"
-				autocomplete="off"
-				value={ kit.AmountInput(ctx, s.Amount) }
-				if first {
-					readonly
-					aria-disabled="true"
-					tabindex="-1"
-				}
-				{ kit.Invalid(amountErr, "")... }
-			/>
-		}
-		@kit.Field("col-12", "", noteErr, "", nil) {
-			<input name="split_note" value={ s.Note } placeholder={ kit.T(ctx, "Note") } aria-label={ kit.T(ctx, "Note") } { kit.Invalid(noteErr, "")... }/>
-		}
+		<div
+			data-field
+			class="col-6"
+			if amountErr != "" || noteErr != "" {
+				aria-invalid="true"
+			}
+		>
+			<fieldset class="group">
+				<input
+					name="split_amount"
+					inputmode="decimal"
+					autocomplete="off"
+					value={ kit.AmountInput(ctx, s.Amount) }
+					placeholder={ kit.T(ctx, "Amount") }
+					aria-label={ kit.T(ctx, "Amount") }
+					if first {
+						readonly
+						aria-disabled="true"
+						tabindex="-1"
+					}
+					{ kit.Invalid(amountErr, "")... }
+				/>
+				<input name="split_note" value={ s.Note } placeholder={ kit.T(ctx, "Note") } aria-label={ kit.T(ctx, "Note") } { kit.Invalid(noteErr, "")... }/>
+			</fieldset>
+			@kit.FieldError(amountErr, "")
+			@kit.FieldError(noteErr, "")
+		</div>
 	</div>
 }

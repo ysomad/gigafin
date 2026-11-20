@@ -28,6 +28,13 @@ FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
 WHERE o.user_id = sqlc.arg(user_id) AND o.id IN (sqlc.slice(ids));
 
+-- name: ListOperationsByOrigin :many
+SELECT sqlc.embed(o), a.currency
+FROM operations AS o
+JOIN accounts AS a ON a.id = o.account_id
+WHERE o.user_id = ? AND o.origin_id = ?
+ORDER BY o.id;
+
 -- name: ListOperationsByPayees :many
 SELECT sqlc.embed(o), a.currency
 FROM operations AS o

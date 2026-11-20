@@ -990,7 +990,7 @@ func twoFactorCard(v kit.Page, d pageData, oob bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#check\"></use></svg></button></div><ul class=\"unstyled hstack gap-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#check\"></use></svg></button></div><ul class=\"unstyled hstack gap-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1266,7 +1266,7 @@ func twoFactorCard(v kit.Page, d pageData, oob bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#check\"></use></svg></button></fieldset></div><div><p><strong>2.</strong> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#check\"></use></svg></button></fieldset></div><div><p><strong>2.</strong> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2098,7 +2098,7 @@ func accessCard(v kit.Page, d pageData, oob bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/icons.svg#check\"></use></svg></button></fieldset></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "\"><svg data-icon=\"copy\" width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#copy\"></use></svg> <svg data-icon=\"check\" hidden width=\"16\" height=\"16\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#check\"></use></svg></button></fieldset></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

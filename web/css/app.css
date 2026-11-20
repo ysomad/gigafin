@@ -115,6 +115,10 @@ dialog[autofocus]:focus-visible {
   border: 1px solid var(--border);
   border-radius: var(--radius-medium);
   padding: var(--space-3);
+  /* in line with the amount and note group, which drops Oat's input top margin */
+  [role="combobox"] {
+    margin-block-start: 0;
+  }
 }
 .split-add {
   width: 100%;

@@ -219,12 +219,12 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 									{ kit.T(ctx, "No category") }
 								}
 								if r.Group != "" && !transfer {
-									<svg width="14" height="14" role="img" aria-label={ kit.T(ctx, "split %s", r.Group) }><title>{ kit.T(ctx, "split %s", r.Group) }</title><use href="/static/icons.svg#split"></use></svg>
+									<svg width="14" height="14" role="img" aria-label={ kit.T(ctx, "split %s", r.Group) }><title>{ kit.T(ctx, "split %s", r.Group) }</title><use href="/static/img/icons.svg#split"></use></svg>
 								}
 							</div>
 							<small class="hstack gap-2 text-light">
 								<span class="hstack gap-1">
-									<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+									<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/img/icons.svg#wallet"></use></svg>
 									{ r.Account }
 									if r.ToAccount != "" {
 										→ { r.ToAccount }
@@ -232,13 +232,13 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 								</span>
 								if r.Payee != "" {
 									<span class="hstack gap-1">
-										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/img/icons.svg#store"></use></svg>
 										{ r.Payee }
 									</span>
 								}
 								if r.Note != "" {
 									<span class="hstack gap-1">
-										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/img/icons.svg#message-square"></use></svg>
 										{ r.Note }
 									</span>
 								}
@@ -248,15 +248,15 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 						<td>
 							switch  {
 								case row.Status == domain.ImportRowDuplicate:
-									<svg class="text-light" width="16" height="16" role="img" aria-label={ kit.T(ctx, "duplicate") }><title>{ kit.T(ctx, "duplicate") }</title><use href="/static/icons.svg#copy"></use></svg>
+									<svg class="text-light" width="16" height="16" role="img" aria-label={ kit.T(ctx, "duplicate") }><title>{ kit.T(ctx, "duplicate") }</title><use href="/static/img/icons.svg#copy"></use></svg>
 								case row.OperationID != 0:
-									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }><svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "imported") }><title>{ kit.T(ctx, "imported") }</title><use href="/static/icons.svg#check"></use></svg></a>
+									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }><svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "imported") }><title>{ kit.T(ctx, "imported") }</title><use href="/static/img/icons.svg#check"></use></svg></a>
 								case row.PairID != 0 && p.Import.Status == domain.ImportStaged:
 									<form method="post" action={ fmt.Sprintf("%s/unpair/%d", base, row.ID) }>
 										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Not a transfer") }</button>
 									</form>
 								default:
-									<svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "new") }><title>{ kit.T(ctx, "new") }</title><use href="/static/icons.svg#plus"></use></svg>
+									<svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "new") }><title>{ kit.T(ctx, "new") }</title><use href="/static/img/icons.svg#plus"></use></svg>
 							}
 						</td>
 					</tr>
@@ -291,7 +291,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 								</div>
 								<small class="hstack gap-2 text-light">
 									<span class="hstack gap-1">
-										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+										<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Account") }><title>{ kit.T(ctx, "Account") }</title><use href="/static/img/icons.svg#wallet"></use></svg>
 										if r.Account != "" {
 											{ r.Account }
 										} else {
@@ -303,13 +303,13 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 									</span>
 									if r.Payee != "" {
 										<span class="hstack gap-1">
-											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Payee") }><title>{ kit.T(ctx, "Payee") }</title><use href="/static/img/icons.svg#store"></use></svg>
 											{ r.Payee }
 										</span>
 									}
 									if r.Note != "" {
 										<span class="hstack gap-1">
-											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+											<svg width="12" height="12" role="img" aria-label={ kit.T(ctx, "Note") }><title>{ kit.T(ctx, "Note") }</title><use href="/static/img/icons.svg#message-square"></use></svg>
 											{ r.Note }
 										</span>
 									}

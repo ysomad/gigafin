@@ -149,11 +149,14 @@ templ formPage(v kit.Page, d opForm) {
 				<div class="hstack">
 					<button type="submit">{ kit.T(ctx, "Save") }</button>
 					if editing && (d.Type == domain.OpExpense || d.Type == domain.OpIncome) {
-						@kit.LinkButton(fmt.Sprintf("/operations/%d/split", d.ID), "secondary", kit.T(ctx, "Split"))
+						<a class="button outline" href={ fmt.Sprintf("/operations/%d/split", d.ID) } data-variant="secondary" aria-label={ kit.T(ctx, "Split") } title={ kit.T(ctx, "Split") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#split"></use></svg></a>
+					}
+					if editing && d.OriginID != 0 {
+						<button type="submit" form="op-unsplit" class="outline" data-variant="secondary" aria-label={ kit.T(ctx, "Undo split") } title={ kit.T(ctx, "Undo split") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#merge"></use></svg></button>
 					}
 				</div>
 				if editing {
-					<button type="submit" form="op-delete" class="outline" data-variant="danger">{ kit.T(ctx, "Delete") }</button>
+					<button type="submit" form="op-delete" class="outline" data-variant="danger" aria-label={ kit.T(ctx, "Delete") } title={ kit.T(ctx, "Delete") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#trash"></use></svg></button>
 				}
 			</div>
 		</form>
@@ -161,6 +164,9 @@ templ formPage(v kit.Page, d opForm) {
 			<form id="op-delete" method="post" action={ fmt.Sprintf("/operations/%d/delete", d.ID) } hx-confirm={ kit.T(ctx, "Delete this operation?") }>
 				<input type="hidden" name="back" value={ d.Back }/>
 			</form>
+		}
+		if editing && d.OriginID != 0 {
+			<form id="op-unsplit" method="post" action={ fmt.Sprintf("/operations/%d/unsplit", d.ID) } hx-confirm={ kit.T(ctx, "Merge all parts of the split back into one operation?") }></form>
 		}
 	}
 }

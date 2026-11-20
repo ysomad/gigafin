@@ -46,7 +46,7 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 					<span class="badge" data-variant="success">{ kit.T(ctx, "Connected") }</span>
 					<span class="badge outline">{ redact.Tail(b.Conn.Login, 4) }</span>
 					if !b.Conn.LastSyncAt.IsZero() {
-						<span class="badge outline" title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, b.Conn.LastSyncAt, v.User)) }><svg width="12" height="12" aria-hidden="true"><use href="/static/icons.svg#refresh-cw"></use></svg> { kit.Datetime(ctx, b.Conn.LastSyncAt, v.User) }</span>
+						<span class="badge outline" title={ kit.T(ctx, "Last sync: %s", kit.Datetime(ctx, b.Conn.LastSyncAt, v.User)) }><svg width="12" height="12" aria-hidden="true"><use href="/static/img/icons.svg#refresh-cw"></use></svg> { kit.Datetime(ctx, b.Conn.LastSyncAt, v.User) }</span>
 					}
 				} else if b.Conn.Status != "" && b.Step == "" {
 					<span class="badge" data-variant="warning">{ kit.T(ctx, "Sign-in needed") }</span>

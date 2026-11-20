@@ -209,6 +209,46 @@ func (s *Operations) Split(
 	return ops, nil
 }
 
+// Unsplit merges the split operation id is a part of back into one operation and
+// returns it, see domain.UnsplitOperation. The other parts are deleted.
+func (s *Operations) Unsplit(ctx context.Context, userID, id int64) (domain.Operation, error) {
+	var op domain.Operation
+	err := s.store.InTx(ctx, func(r repository.Repos) error {
+		part, err := r.Operations.Get(ctx, userID, id)
+		if err != nil {
+			return err
+		}
+		if !part.IsSplit() {
+			return domain.NewError(errors.ErrInvalid, "the operation is not split")
+		}
+		parts, err := r.Operations.ByOrigin(ctx, userID, part.OriginID)
+		if err != nil {
+			return err
+		}
+		if op, err = domain.UnsplitOperation(parts); err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		if op, err = r.Operations.Update(ctx, userID, op, now); err != nil {
+			return err
+		}
+		for _, p := range parts {
+			if p.ID == op.ID {
+				continue
+			}
+			if err := r.Operations.Delete(ctx, userID, p.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return op, err
+	}
+	s.log.DebugContext(ctx, "operation unsplit", slog.Int64("user_id", userID), slog.Int64("operation_id", op.ID))
+	return op, nil
+}
+
 // Delete deletes an operation. Other parts of its split are kept.
 func (s *Operations) Delete(ctx context.Context, userID, id int64) error {
 	if err := s.store.Write().Operations.Delete(ctx, userID, id); err != nil {

@@ -184,14 +184,14 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><svg width=\"12\" height=\"12\" aria-hidden=\"true\"><use href=\"/static/icons.svg#refresh-cw\"></use></svg> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><svg width=\"12\" height=\"12\" aria-hidden=\"true\"><use href=\"/static/img/icons.svg#refresh-cw\"></use></svg> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(kit.Datetime(ctx, b.Conn.LastSyncAt, v.User))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 49, Col: 265}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `settings/banks.templ`, Line: 49, Col: 269}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {

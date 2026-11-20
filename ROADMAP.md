@@ -49,7 +49,8 @@
 - [x] pwa
 - [x] better categories ui/ux (icons, selectors)
 - [x] better operations search
-- [ ] operations tags filter
+- [x] infinite scroll navigation
+- [ ] unsplit
 - [ ] mobile first ui
 - [ ] sber sync
 - [ ] alfa sync

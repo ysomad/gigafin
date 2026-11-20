@@ -157,8 +157,8 @@ templ twoFactorCard(v kit.Page, d pageData, oob bool) {
 				<div class="hstack">
 					<p class="text-light">{ kit.T(ctx, "Save these recovery codes. Each works once. They won't be shown again.") }</p>
 					<button type="button" class="icon outline" data-copy={ strings.Join(d.RecoveryCodes, "\n") } aria-label={ kit.T(ctx, "Copy all codes") }>
-						<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg>
-						<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#check"></use></svg>
+						<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#copy"></use></svg>
+						<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#check"></use></svg>
 					</button>
 				</div>
 				<ul class="unstyled hstack gap-2">
@@ -211,8 +211,8 @@ templ twoFactorCard(v kit.Page, d pageData, oob bool) {
 							<fieldset class="group">
 								<input readonly value={ d.TOTPSetup.Key } aria-label={ kit.T(ctx, "Key") } autocomplete="off" spellcheck="false"/>
 								<button type="button" class="icon outline" data-copy={ d.TOTPSetup.Secret } aria-label={ kit.T(ctx, "Copy key") }>
-									<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg>
-									<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#check"></use></svg>
+									<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#copy"></use></svg>
+									<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#check"></use></svg>
 								</button>
 							</fieldset>
 						</div>
@@ -358,8 +358,8 @@ templ accessCard(v kit.Page, d pageData, oob bool) {
 				<fieldset class="group">
 					<input readonly value={ d.NewToken } aria-label={ kit.T(ctx, "API key") } autocomplete="off" spellcheck="false" autofocus/>
 					<button type="button" class="icon outline" data-copy={ d.NewToken } aria-label={ kit.T(ctx, "Copy key") }>
-						<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg>
-						<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#check"></use></svg>
+						<svg data-icon="copy" width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#copy"></use></svg>
+						<svg data-icon="check" hidden width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#check"></use></svg>
 					</button>
 				</fieldset>
 			</div>

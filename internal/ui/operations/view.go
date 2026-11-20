@@ -81,11 +81,10 @@ type opForm struct {
 // opSplit is the split page of a saved expense or income: its parts, the operation as
 // the first one until the page is posted.
 type opSplit struct {
-	ID         int64
-	OriginID   int64
-	Type       domain.OpType
+	Op         domain.Operation
+	CatNames   map[int64]string
+	AccByID    map[int64]domain.Account
 	Amount     string
-	Payee      string
 	Parts      []splitPart
 	Categories []domain.Category
 }

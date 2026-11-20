@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 	"time"
@@ -95,6 +96,12 @@ func (o Operation) Equal(other Operation) bool {
 // IsSplit reports whether the operation is a part of a split.
 func (o Operation) IsSplit() bool {
 	return o.OriginID != 0
+}
+
+// IsSplitOrigin reports whether the operation is the origin of its split, the
+// operation the split was made from.
+func (o Operation) IsSplitOrigin() bool {
+	return o.OriginID != 0 && o.ID == o.OriginID
 }
 
 // Kind returns the category kind of an expense or income.
@@ -292,8 +299,9 @@ func (o *Operation) setCategory(in OperationInput, cat *Category) error {
 	return nil
 }
 
-// SplitPart is one categorized part an expense or income is split into.
+// SplitPart is one part an expense or income is split into.
 type SplitPart struct {
+	// CategoryID is the category of the part, 0 leaves it uncategorized.
 	CategoryID int64
 	Amount     money.Amount
 	// Note is the note of the part, empty keeps the note of the operation.
@@ -322,18 +330,21 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 	sum := money.Amount{}
 	out := make([]Operation, len(parts))
 	for i, p := range parts {
-		c, ok := cats[p.CategoryID]
-		if !ok {
-			return nil, NewError(errors.ErrInvalid, "part %d: category not found", i+1)
-		}
-		if c.Kind != op.Kind() {
-			return nil, NewError(
-				errors.ErrInvalid,
-				"part %d: category %q is not an %s category",
-				i+1,
-				c.Name,
-				Msg(op.Kind()),
-			)
+		// 0 leaves the part uncategorized
+		if p.CategoryID != 0 {
+			c, ok := cats[p.CategoryID]
+			if !ok {
+				return nil, NewError(errors.ErrInvalid, "part %d: category not found", i+1)
+			}
+			if c.Kind != op.Kind() {
+				return nil, NewError(
+					errors.ErrInvalid,
+					"part %d: category %q is not an %s category",
+					i+1,
+					c.Name,
+					Msg(op.Kind()),
+				)
+			}
 		}
 		if _, err := p.Amount.ToMinor(op.Currency); err != nil {
 			return nil, NewError(errors.ErrInvalid, "part %d: not a valid amount in %s", i+1, op.Currency)
@@ -345,7 +356,7 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 		if i > 0 {
 			part.ID = 0
 		}
-		part.CategoryID, part.Amount, part.OriginID = c.ID, p.Amount, origin
+		part.CategoryID, part.Amount, part.OriginID = p.CategoryID, p.Amount, origin
 		if note := strings.TrimSpace(p.Note); note != "" {
 			if utf8.RuneCountInString(note) > MaxTextLen {
 				return nil, NewError(errors.ErrInvalid, "part %d: note too long", i+1)
@@ -364,6 +375,57 @@ func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([
 		)
 	}
 	return out, nil
+}
+
+// UnsplitOperation merges the parts of a split back into one operation and returns it:
+// the origin of the split, or the earliest part when the origin is deleted, with its
+// category, the amount and tags of all parts, their distinct notes joined after its
+// own, and out of the split. Parts must keep the type and account of the split.
+func UnsplitOperation(parts []Operation) (Operation, error) {
+	if len(parts) == 0 {
+		return Operation{}, NewError(errors.ErrNotFound, "split not found")
+	}
+	// the kept part first, the others in the order they were created
+	parts = slices.Clone(parts)
+	slices.SortFunc(parts, func(a, b Operation) int {
+		switch {
+		case a.IsSplitOrigin() && !b.IsSplitOrigin():
+			return -1
+		case !a.IsSplitOrigin() && b.IsSplitOrigin():
+			return 1
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	op := parts[0]
+	var (
+		sum   money.Amount
+		notes []string
+		tags  []string
+	)
+	for _, p := range parts {
+		if p.Type != op.Type || p.AccountID != op.AccountID {
+			return Operation{}, NewError(errors.ErrInvalid, "parts differ in type or account")
+		}
+		sum = sum.Add(p.Amount)
+		if p.Note != "" && !slices.Contains(notes, p.Note) {
+			notes = append(notes, p.Note)
+		}
+		for _, t := range p.Tags {
+			if !slices.ContainsFunc(tags, func(k string) bool { return strings.EqualFold(k, t) }) {
+				tags = append(tags, t)
+			}
+		}
+	}
+	op.Note = strings.Join(notes, "; ")
+	if utf8.RuneCountInString(op.Note) > MaxTextLen {
+		return Operation{}, NewError(errors.ErrInvalid, "note: notes of the parts are too long together")
+	}
+	if len(tags) > MaxTags {
+		return Operation{}, NewError(errors.ErrInvalid, "tags: parts have more than %d together", MaxTags)
+	}
+	slices.Sort(tags)
+	op.Amount, op.OriginID, op.Tags = sum, 0, tags
+	return op, nil
 }
 
 func parseDateTime(date time.Time, tm string) (time.Time, string, error) {

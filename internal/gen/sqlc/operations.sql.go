@@ -384,6 +384,67 @@ func (q *Queries) ListOperationsByIDs(ctx context.Context, arg ListOperationsByI
 	return items, nil
 }
 
+const listOperationsByOrigin = `-- name: ListOperationsByOrigin :many
+SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
+FROM operations AS o
+JOIN accounts AS a ON a.id = o.account_id
+WHERE o.user_id = ? AND o.origin_id = ?
+ORDER BY o.id
+`
+
+type ListOperationsByOriginParams struct {
+	UserID   int64
+	OriginID sql.NullInt64
+}
+
+type ListOperationsByOriginRow struct {
+	Operation Operation
+	Currency  string
+}
+
+func (q *Queries) ListOperationsByOrigin(ctx context.Context, arg ListOperationsByOriginParams) ([]ListOperationsByOriginRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOperationsByOrigin, arg.UserID, arg.OriginID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOperationsByOriginRow
+	for rows.Next() {
+		var i ListOperationsByOriginRow
+		if err := rows.Scan(
+			&i.Operation.ID,
+			&i.Operation.UserID,
+			&i.Operation.Type,
+			&i.Operation.AccountID,
+			&i.Operation.ToAccountID,
+			&i.Operation.CategoryID,
+			&i.Operation.OriginID,
+			&i.Operation.Amount,
+			&i.Operation.Date,
+			&i.Operation.Time,
+			&i.Operation.Payee,
+			&i.Operation.SourcePayee,
+			&i.Operation.Note,
+			&i.Operation.MCC,
+			&i.Operation.ImportID,
+			&i.Operation.ImportHash,
+			&i.Operation.CreatedAt,
+			&i.Operation.UpdatedAt,
+			&i.Currency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOperationsByPayees = `-- name: ListOperationsByPayees :many
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o

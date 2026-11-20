@@ -2,6 +2,7 @@ package operations
 
 import (
 	"cmp"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -28,19 +29,20 @@ func New(app *kit.App) *Handler { return &Handler{app: app} }
 // Routes returns the routes of the operations pages.
 func (h *Handler) Routes() map[string]kit.Handler {
 	return map[string]kit.Handler{
-		"GET /operations":              h.operations,
-		"GET /operations/search":       h.search,
-		"GET /operations/new":          h.newOperation,
-		"GET /operations/split":        h.operationSplit,
-		"POST /operations":             h.createOperation,
-		"POST /operations/fill":        h.fillOperation,
-		"POST /operations/rules":       h.categorizeOperations,
-		"POST /operations/sync":        h.syncBanks,
-		"GET /operations/{id}/edit":    h.editOperation,
-		"POST /operations/{id}":        h.updateOperation,
-		"POST /operations/{id}/delete": h.deleteOperation,
-		"GET /operations/{id}/split":   h.splitOperationPage,
-		"POST /operations/{id}/split":  h.splitOperation,
+		"GET /operations":               h.operations,
+		"GET /operations/search":        h.search,
+		"GET /operations/new":           h.newOperation,
+		"GET /operations/split":         h.operationSplit,
+		"POST /operations":              h.createOperation,
+		"POST /operations/fill":         h.fillOperation,
+		"POST /operations/rules":        h.categorizeOperations,
+		"POST /operations/sync":         h.syncBanks,
+		"GET /operations/{id}/edit":     h.editOperation,
+		"POST /operations/{id}":         h.updateOperation,
+		"POST /operations/{id}/delete":  h.deleteOperation,
+		"GET /operations/{id}/split":    h.splitOperationPage,
+		"POST /operations/{id}/split":   h.splitOperation,
+		"POST /operations/{id}/unsplit": h.unsplitOperation,
 	}
 }
 
@@ -427,17 +429,20 @@ func (h *Handler) renderSplit(
 	if err != nil {
 		return err
 	}
+	accounts, err := h.app.Svc.Accounts.List(r.Context(), user.ID)
+	if err != nil {
+		return err
+	}
 	amount := op.Amount.Fixed(op.Currency)
 	if len(parts) == 0 {
 		parts = []splitPart{{CategoryID: op.CategoryID, Amount: amount}, {}}
 	}
 	return kit.Render(h.app, w, r, status, splitPage, kit.Page{User: &user, Nav: "operations", Title: "Split"},
 		opSplit{
-			ID:         op.ID,
-			OriginID:   op.OriginID,
-			Type:       op.Type,
+			Op:         op,
+			CatNames:   domain.CategoryShortNames(tree),
+			AccByID:    domain.AccountsByID(accounts),
 			Amount:     amount,
-			Payee:      op.Payee,
 			Parts:      parts,
 			Categories: domain.ByKind(tree, kind),
 		}, kit.Failure{Err: splitErr, Form: "split"})
@@ -450,7 +455,7 @@ func (h *Handler) splitOperation(w http.ResponseWriter, r *http.Request, user do
 	}
 	// part rows are added client-side, so they come as parallel lists
 	var in struct {
-		Categories []int64  `form:"split_category"` // 0 is reported by validation
+		Categories []int64  `form:"split_category"` // 0 is uncategorized
 		Amounts    []string `form:"split_amount"`
 		Notes      []string `form:"split_note"`
 	}
@@ -473,9 +478,6 @@ func (h *Handler) splitOperation(w http.ResponseWriter, r *http.Request, user do
 	for i, row := range rows {
 		// keys index the rows as re-rendered, which drops the empty ones
 		n := "[" + strconv.Itoa(i) + "]"
-		if row.CategoryID == 0 {
-			errs["split_category"+n] = domain.NewError(errors.ErrInvalid, "required")
-		}
 		switch d, err := money.Parse(row.Amount); {
 		case err != nil:
 			errs["split_amount"+n] = domain.NewError(errors.ErrInvalid, "enter a number")
@@ -539,6 +541,21 @@ func (h *Handler) deleteOperation(w http.ResponseWriter, r *http.Request, user d
 		return err
 	}
 	kit.Redirect(w, r, cmp.Or(r.PostFormValue("back"), "/operations"))
+	return nil
+}
+
+// unsplitOperation merges the split operation id is a part of and opens the merged
+// operation.
+func (h *Handler) unsplitOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	id, err := kit.PathID(r, "id")
+	if err != nil {
+		return err
+	}
+	op, err := h.app.Svc.Operations.Unsplit(r.Context(), user.ID, id)
+	if err != nil {
+		return err
+	}
+	kit.Redirect(w, r, fmt.Sprintf("/operations/%d/edit", op.ID))
 	return nil
 }
 

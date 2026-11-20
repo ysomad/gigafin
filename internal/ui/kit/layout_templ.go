@@ -112,7 +112,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<link rel=\"manifest\" href=\"/static/manifest.json\"><link rel=\"apple-touch-icon\" href=\"/static/apple-touch-icon.png\"><link rel=\"icon\" href=\"/static/icon-192.png\"><meta name=\"htmx-config\" content='{\"defaultSwap\":\"innerHTML\"}'><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<link rel=\"manifest\" href=\"/static/manifest.json\"><link rel=\"apple-touch-icon\" href=\"/static/img/apple-touch-icon.png\"><link rel=\"icon\" href=\"/static/img/icon-192.png\"><meta name=\"htmx-config\" content='{\"defaultSwap\":\"innerHTML\"}'><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

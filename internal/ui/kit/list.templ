@@ -16,7 +16,7 @@ templ EmptyRow(colspan int, msg string) {
 templ BankLogo(bank domain.Bank, title string) {
 	switch bank {
 		case domain.BankTBank:
-			<img src="/static/banks/tbank.svg" width="16" height="16" alt={ title } title={ title }/>
+			<img src="/static/img/tbank.svg" width="16" height="16" alt={ title } title={ title }/>
 		default:
 			<span class="badge outline" title={ title }>{ T(ctx, bank.Name()) }</span>
 	}
@@ -102,7 +102,7 @@ templ Filter(action, query string, count int, reset string) {
 // set.
 templ FilterButton(count int) {
 	<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
-		<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#funnel"></use></svg>
+		<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg>
 		if count > 0 {
 			<span class="badge">{ count }</span>
 		}
@@ -156,23 +156,23 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 					<div class="hstack gap-1">
 						{ OpCategory(ctx, op, catNames) }
 						if op.IsSplit() {
-							<svg width="14" height="14" role="img" aria-label={ T(ctx, "Part of a split") }><title>{ T(ctx, "Part of a split") }</title><use href="/static/icons.svg#split"></use></svg>
+							<svg width="14" height="14" role="img" aria-label={ T(ctx, "Part of a split") }><title>{ T(ctx, "Part of a split") }</title><use href="/static/img/icons.svg#split"></use></svg>
 						}
 					</div>
 					<small class="flex flex-col text-light">
 						<span class="hstack gap-1">
-							<svg width="12" height="12" role="img" aria-label={ T(ctx, "Account") }><title>{ T(ctx, "Account") }</title><use href="/static/icons.svg#wallet"></use></svg>
+							<svg width="12" height="12" role="img" aria-label={ T(ctx, "Account") }><title>{ T(ctx, "Account") }</title><use href="/static/img/icons.svg#wallet"></use></svg>
 							{ OpAccounts(op, accByID) }
 						</span>
 						if op.Payee != "" {
 							<span class="hstack gap-1">
-								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Payee") }><title>{ T(ctx, "Payee") }</title><use href="/static/icons.svg#store"></use></svg>
+								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Payee") }><title>{ T(ctx, "Payee") }</title><use href="/static/img/icons.svg#store"></use></svg>
 								{ op.Payee }
 							</span>
 						}
 						if op.Note != "" {
 							<span class="hstack gap-1">
-								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Note") }><title>{ T(ctx, "Note") }</title><use href="/static/icons.svg#message-square"></use></svg>
+								<svg width="12" height="12" role="img" aria-label={ T(ctx, "Note") }><title>{ T(ctx, "Note") }</title><use href="/static/img/icons.svg#message-square"></use></svg>
 								{ op.Note }
 							</span>
 						}

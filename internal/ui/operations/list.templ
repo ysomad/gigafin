@@ -15,7 +15,7 @@ templ listPage(v kit.Page, d opList) {
 		<div class="hstack justify-between mb-4">
 			<ot-dropdown>
 				<menu class="buttons">
-					<li><a class="button" href="/operations/new">+ { kit.T(ctx, "New operation") }</a></li>
+					<li><a class="button" href="/operations/new">+ { kit.T(ctx, "Operation") }</a></li>
 					<li>
 						<button type="button" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }>▾</button>
 					</li>
@@ -42,7 +42,7 @@ templ listPage(v kit.Page, d opList) {
 				<menu class="buttons">
 					<li>
 						<a class="button outline" href="/operations/search" aria-label={ kit.T(ctx, "Search") }>
-							<svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#search"></use></svg>
+							<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#search"></use></svg>
 						</a>
 					</li>
 					if d.BankSync {
@@ -56,7 +56,7 @@ templ listPage(v kit.Page, d opList) {
 								if !d.BankSyncAt.IsZero() {
 									title={ kit.T(ctx, "Synced %s", kit.Datetime(ctx, d.BankSyncAt, v.User)) }
 								}
-							><svg width="16" height="16" aria-hidden="true"><use href="/static/icons.svg#refresh-cw"></use></svg></button>
+							><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#refresh-cw"></use></svg></button>
 						</li>
 					}
 					<li>

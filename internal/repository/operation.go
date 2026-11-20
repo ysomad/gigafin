@@ -241,6 +241,27 @@ func (r *Operations) ByIDs(ctx context.Context, userID int64, ids []int64) (map[
 	return byID, nil
 }
 
+// ByOrigin returns the parts of the split of originID, in the order they were created.
+func (r *Operations) ByOrigin(ctx context.Context, userID, originID int64) ([]domain.Operation, error) {
+	rows, err := r.q.ListOperationsByOrigin(ctx, sqlc.ListOperationsByOriginParams{
+		UserID:   userID,
+		OriginID: sql.NullInt64{Int64: originID, Valid: true},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list operations by origin: %w", err)
+	}
+	ops := make([]domain.Operation, len(rows))
+	for i, row := range rows {
+		if ops[i], err = operationFromRow(row.Operation, row.Currency); err != nil {
+			return nil, err
+		}
+	}
+	if err := r.loadTags(ctx, ops); err != nil {
+		return nil, err
+	}
+	return ops, nil
+}
+
 // ByPayees returns the operations with exactly one of payees, newest first, without
 // tags.
 func (r *Operations) ByPayees(ctx context.Context, userID int64, payees []string) ([]domain.Operation, error) {

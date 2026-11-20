@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -133,6 +134,14 @@ func TestSplitOperation(t *testing.T) {
 		assert.Equal(t, int64(3), p.ImportID)
 	}
 
+	// a part without a category is uncategorized
+	uncategorized, err := domain.SplitOperation(op, []domain.SplitPart{
+		{CategoryID: 10, Amount: money.FromInt(100)}, {Amount: money.MustParse("0.50")},
+	}, cats)
+	require.NoError(t, err)
+	assert.Equal(t, int64(10), uncategorized[0].CategoryID)
+	assert.Equal(t, int64(0), uncategorized[1].CategoryID)
+
 	// splitting a part keeps its split
 	parts, err = domain.SplitOperation(parts[1], []domain.SplitPart{
 		{CategoryID: 10, Amount: money.FromInt(30)}, {CategoryID: 11, Amount: money.FromInt(10)},
@@ -180,6 +189,67 @@ func TestSplitOperation(t *testing.T) {
 			require.ErrorIs(t, err, errors.ErrInvalid)
 		})
 	}
+}
+
+func TestUnsplitOperation(t *testing.T) {
+	t.Parallel()
+
+	part := func(id int64, amount string) domain.Operation {
+		return domain.Operation{
+			ID: id, OriginID: 7, Type: domain.OpExpense, AccountID: 1, Currency: "RUB",
+			Amount: money.MustParse(amount), CategoryID: id,
+		}
+	}
+
+	op, err := domain.UnsplitOperation([]domain.Operation{part(9, "10"), part(7, "60.50"), part(8, "30")})
+	require.NoError(t, err)
+	assert.Equal(t, int64(7), op.ID, "the origin is kept")
+	assert.Equal(t, int64(7), op.CategoryID)
+	assert.Equal(t, int64(0), op.OriginID)
+	assert.Equal(t, "100.50", op.Amount.Fixed("RUB"))
+
+	noted := []domain.Operation{part(9, "10"), part(7, "60.50"), part(8, "30"), part(10, "1")}
+	noted[0].Note, noted[0].Tags = "lamp", []string{"home", "Trip"}
+	noted[1].Note, noted[1].Tags = "weekly", []string{"trip"}
+	noted[2].Note = "weekly"
+	op, err = domain.UnsplitOperation(noted)
+	require.NoError(t, err)
+	assert.Equal(t, int64(7), op.CategoryID, "the category of the origin is kept")
+	assert.Equal(t, "weekly; lamp", op.Note, "distinct notes after the note of the origin")
+	assert.Equal(t, []string{"home", "trip"}, op.Tags)
+
+	op, err = domain.UnsplitOperation([]domain.Operation{part(9, "10"), part(8, "30")})
+	require.NoError(t, err)
+	assert.Equal(t, int64(8), op.ID, "the earliest part is kept without the origin")
+	assert.Equal(t, "40.00", op.Amount.Fixed("RUB"))
+
+	_, err = domain.UnsplitOperation(nil)
+	require.ErrorIs(t, err, errors.ErrNotFound)
+
+	moved := part(8, "30")
+	moved.AccountID = 2
+	_, err = domain.UnsplitOperation([]domain.Operation{part(7, "10"), moved})
+	require.ErrorIs(t, err, errors.ErrInvalid)
+
+	long := part(8, "30")
+	long.Note = strings.Repeat("a", domain.MaxTextLen)
+	other := part(9, "1")
+	other.Note = "b"
+	_, err = domain.UnsplitOperation([]domain.Operation{part(7, "10"), long, other})
+	require.ErrorIs(t, err, errors.ErrInvalid, "notes over the limit together")
+
+	tagged := []domain.Operation{part(7, "10"), part(8, "30")}
+	for i := range domain.MaxTags {
+		tagged[i%2].Tags = append(tagged[i%2].Tags, fmt.Sprintf("t%d", i))
+	}
+	tagged[1].Tags = append(tagged[1].Tags, "extra")
+	_, err = domain.UnsplitOperation(tagged)
+	require.ErrorIs(t, err, errors.ErrInvalid, "tags over the limit together")
+
+	income := part(8, "30")
+	income.Type = domain.OpIncome
+	_, err = domain.UnsplitOperation([]domain.Operation{part(7, "10"), income})
+	require.ErrorIs(t, err, errors.ErrInvalid)
 }
 
 func TestBuildOperationTags(t *testing.T) {

@@ -185,6 +185,54 @@ func TestSplitOperation(t *testing.T) {
 	assert.True(t, ops[0].IsSplit())
 }
 
+func TestUnsplitOperation(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	ctx := t.Context()
+
+	op, err := f.svc.Operations.Create(ctx, f.userID, domain.OperationInput{
+		Type:       domain.OpExpense,
+		AccountID:  f.card.ID,
+		CategoryID: f.groceries.ID,
+		Amount:     dec("1040"),
+		Date:       day(t, "2026-10-05"),
+		Payee:      "Market",
+		Note:       "weekly",
+		Tags:       []string{"food"},
+	})
+	require.NoError(t, err)
+
+	_, err = f.svc.Operations.Unsplit(ctx, f.userID, op.ID)
+	require.ErrorIs(t, err, errors.ErrInvalid, "an operation that is not split")
+
+	parts, err := f.svc.Operations.Split(ctx, f.userID, op.ID, []domain.SplitPart{
+		{CategoryID: f.groceries.ID, Amount: dec("700")}, {CategoryID: f.cafe.ID, Amount: dec("340")},
+	})
+	require.NoError(t, err)
+	_, err = f.svc.Operations.Split(ctx, f.userID, parts[1].ID, []domain.SplitPart{
+		{CategoryID: f.cafe.ID, Amount: dec("300"), Note: "coffee"}, {CategoryID: f.cafe.ID, Amount: dec("40")},
+	})
+	require.NoError(t, err)
+
+	merged, err := f.svc.Operations.Unsplit(ctx, f.userID, parts[1].ID)
+	require.NoError(t, err)
+	assert.Equal(t, op.ID, merged.ID)
+	assert.False(t, merged.IsSplit())
+	assert.Equal(t, "1040.00", merged.Amount.Fixed("RUB"))
+	merged, err = f.svc.Operations.Get(ctx, f.userID, merged.ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.groceries.ID, merged.CategoryID)
+	assert.Equal(t, "weekly; coffee", merged.Note)
+	assert.Equal(t, []string{"food"}, merged.Tags)
+	assert.Equal(t, "-1040.00", f.balance(t, f.card.ID))
+
+	ops, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
+	require.NoError(t, err)
+	require.Len(t, ops, 1)
+	assert.Equal(t, op.ID, ops[0].ID)
+}
+
 func TestListOrder(t *testing.T) {
 	t.Parallel()
 
