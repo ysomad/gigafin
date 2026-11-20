@@ -152,8 +152,7 @@ templ formPage(v kit.Page, d opForm) {
 						@kit.LinkButton(fmt.Sprintf("/operations/%d/split", d.ID), "secondary", kit.T(ctx, "Split"))
 					}
 					if editing {
-						// back to the list, scrolled to the operation
-						<a class="button outline" href={ d.returnURL() } hx-swap={ fmt.Sprintf("innerHTML show:top showTarget:#op-%d", d.ID) } data-variant="secondary">{ kit.T(ctx, "Cancel") }</a>
+						@kit.LinkButton(d.Back, "secondary", kit.T(ctx, "Cancel"))
 					}
 				</div>
 				if editing {

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -184,14 +183,9 @@ func (h *Handler) renderAccount(
 	if fail.Form != "balance" {
 		d.Balance = balanceForm{Target: a.Balance.Fixed(a.Currency), Date: timex.FormatDate(h.app.Svc.Today(user))}
 	}
-	// the first page of the operations, through the one the page is returned to at; the
-	// operations list serves the next ones
+	// the first page of the operations; the operations list serves the next ones
 	f := domain.Filter{AccountID: a.ID}
-	var at int64
-	if n, err := strconv.ParseInt(r.URL.Query().Get("at"), 10, 64); err == nil {
-		at = n
-	}
-	ops, next, err := h.app.Svc.Operations.ListThrough(ctx, user.ID, f, pagination.NewParams(pagination.Cursor{}, 20), at)
+	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.NewParams(pagination.Cursor{}, 20))
 	if err != nil {
 		return err
 	}

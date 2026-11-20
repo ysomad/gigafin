@@ -360,18 +360,13 @@ func (a *App) takeFlash(w http.ResponseWriter, r *http.Request, name string) str
 // Redirect sends the browser to a local path after a form post. htmx follows
 // HX-Location with an ajax request, plain browsers get 303. A redirect to the page the
 // post came from replaces its history entry, as browsers do, so Back leaves the page
-// instead of reloading it. htmx scrolls to the element of the fragment of path, which
-// stays out of the URL.
+// instead of reloading it.
 func Redirect(w http.ResponseWriter, r *http.Request, path string) {
 	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.HasPrefix(path, "/\\") {
 		path = "/"
 	}
 	if IsHTMX(r) {
-		path, frag, _ := strings.Cut(path, "#")
 		loc := map[string]string{"path": path}
-		if frag != "" {
-			loc["swap"] = "innerHTML show:top showTarget:#" + frag
-		}
 		if cur, err := url.Parse(r.Header.Get("HX-Current-URL")); err == nil && cur.Host == r.Host &&
 			cur.RequestURI() == path {
 			loc["replace"] = "true"

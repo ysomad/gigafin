@@ -1,8 +1,6 @@
 package operations
 
 import (
-	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -78,18 +76,6 @@ type opForm struct {
 	Categories []domain.Category
 	// AllTags are the user's tags to pick from.
 	AllTags []string
-}
-
-// returnURL is Back at the operation, its list running through it.
-func (f opForm) returnURL() string {
-	u, err := url.Parse(f.Back)
-	if err != nil || f.Back == "" {
-		u = &url.URL{Path: "/operations"}
-	}
-	q := u.Query()
-	q.Set("at", strconv.FormatInt(f.ID, 10))
-	u.RawQuery = q.Encode()
-	return u.String()
 }
 
 // opSplit is the split page of a saved expense or income: its parts, the operation as

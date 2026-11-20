@@ -57,13 +57,7 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 		}
 	}
 	p := pagination.NewParams(after, 0)
-	// at is the operation the list is returned to, which the first page runs through
-	var at int64
-	if n, err := strconv.ParseInt(q.Get("at"), 10, 64); err == nil {
-		at = n
-	}
-	q.Del("at")
-	ops, next, err := h.app.Svc.Operations.ListThrough(r.Context(), user.ID, f, p, at)
+	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, f, p)
 	if err != nil {
 		return err
 	}
@@ -97,7 +91,6 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	run := r.URL.Query()
 	run.Del("cursor")
 	run.Del("changed")
-	run.Del("at")
 	d.RunURL = "/operations/rules?" + run.Encode()
 	if !next.IsZero() {
 		q.Set("cursor", next.String())
@@ -140,11 +133,7 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request, user domain.Use
 		}
 	}
 	p := pagination.NewParams(after, 0)
-	var at int64
-	if n, err := strconv.ParseInt(q.Get("at"), 10, 64); err == nil {
-		at = n
-	}
-	ops, next, err := h.app.Svc.Operations.ListThrough(r.Context(), user.ID, domain.Filter{Query: d.Query}, p, at)
+	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, domain.Filter{Query: d.Query}, p)
 	if err != nil {
 		return err
 	}
@@ -528,8 +517,7 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 	if err != nil {
 		return err
 	}
-	// back to the list, scrolled to the operation
-	kit.Redirect(w, r, f.returnURL()+"#op-"+r.PathValue("id"))
+	kit.Redirect(w, r, cmp.Or(f.Back, "/operations"))
 	return nil
 }
 

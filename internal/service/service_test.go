@@ -443,20 +443,6 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, next)
 	assert.Equal(t, day(t, "2026-10-06"), next.Date)
-
-	all, _, err := f.svc.Operations.List(ctx, f.userID, domain.Filter{}, pagination.NewParams(pagination.Cursor{}, 0))
-	require.NoError(t, err)
-	require.Len(t, all, 6)
-	page, next, err = f.svc.Operations.ListThrough(ctx, f.userID, domain.Filter{},
-		pagination.NewParams(pagination.Cursor{}, 2), all[4].ID)
-	require.NoError(t, err)
-	assert.Len(t, page, 6, "pages run on through the operation")
-	assert.Zero(t, next)
-	page, next, err = f.svc.Operations.ListThrough(ctx, f.userID, domain.Filter{},
-		pagination.NewParams(pagination.Cursor{}, 2), all[1].ID)
-	require.NoError(t, err)
-	assert.Len(t, page, 2, "the operation on the first page")
-	assert.NotZero(t, next)
 }
 
 func TestSearchOperations(t *testing.T) {

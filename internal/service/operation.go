@@ -287,23 +287,6 @@ func (s *Operations) List(
 	return ops, next, nil
 }
 
-// ListThrough is List with the page running on through operation id, so a list returned
-// to at the operation, as after editing it, shows it. It stops at maxThrough operations,
-// as the operation may no longer match f.
-func (s *Operations) ListThrough(
-	ctx context.Context, userID int64, f domain.Filter, p pagination.Params, id int64,
-) ([]domain.Operation, pagination.Cursor, error) {
-	const maxThrough = 1000
-	ops, next, err := s.List(ctx, userID, f, p)
-	for err == nil && id != 0 && !next.IsZero() && len(ops) < maxThrough &&
-		!slices.ContainsFunc(ops, func(op domain.Operation) bool { return op.ID == id }) {
-		var more []domain.Operation
-		more, next, err = s.List(ctx, userID, f, pagination.NewParams(next, p.PageSize))
-		ops = append(ops, more...)
-	}
-	return ops, next, err
-}
-
 // createOperation validates in against refs and stores it.
 func createOperation(
 	ctx context.Context, r repository.Repos, refs *opRefs, userID int64, in domain.OperationInput,

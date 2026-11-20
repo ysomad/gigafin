@@ -138,7 +138,7 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 			<li class="day text-light mt-4">{ DayTitle(ctx, day.Date) }</li>
 		}
 		for _, op := range day.Ops {
-			<li id={ fmt.Sprintf("op-%d", op.ID) } class="card compact hstack justify-between">
+			<li class="card compact hstack justify-between">
 				<a href={ fmt.Sprintf("/operations/%d/edit", op.ID) }>
 					<div class="hstack gap-1">
 						{ OpCategory(ctx, op, catNames) }
