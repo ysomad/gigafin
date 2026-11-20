@@ -716,15 +716,17 @@ func fromOperationInput(req *ogen.OperationInput) (domain.OperationInput, error)
 func fromOperationFilter(req ogen.OperationFilter) (domain.Filter, error) {
 	f := domain.Filter{
 		AccountID:     req.AccountID.Or(0),
-		CategoryID:    req.CategoryID.Or(0),
+		CategoryIDs:   req.CategoryIds,
 		Uncategorized: req.IsUncategorized.Or(false),
 		Type:          domain.OpType(req.Type.Or("")),
 		DateFrom:      req.DateFrom.Or(time.Time{}),
 		DateTo:        req.DateTo.Or(time.Time{}),
 		Query:         req.Query.Or(""),
 	}
-	if tag, ok := req.Tag.Get(); ok && tag != "" {
-		f.Tags = []string{tag}
+	for _, tag := range req.Tags {
+		if tag != "" {
+			f.Tags = append(f.Tags, tag)
+		}
 	}
 	if v, ok := req.AmountMin.Get(); ok {
 		d, err := money.Parse(string(v))

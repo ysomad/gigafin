@@ -177,7 +177,7 @@ func (h *Handler) renderCategory(
 	d.Parents, d.ParentName = domain.ParentChoices(tree, c)
 	// the first page of the operations; the operations list serves the next ones
 	ctx := r.Context()
-	filter := domain.Filter{CategoryID: c.ID}
+	filter := domain.Filter{CategoryIDs: []int64{c.ID}}
 	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, filter, pagination.NewParams(pagination.Cursor{}, 20))
 	if err != nil {
 		return err
@@ -191,7 +191,7 @@ func (h *Handler) renderCategory(
 		return err
 	}
 	if !next.IsZero() {
-		d.MoreURL = fmt.Sprintf("/operations?category=%d&cursor=%s", c.ID, url.QueryEscape(next.String()))
+		d.MoreURL = fmt.Sprintf("/operations?cat=%d&cursor=%s", c.ID, url.QueryEscape(next.String()))
 	}
 	return kit.Render(h.app, w, r, status, categoryPage, kit.Page{
 		User: &user, Nav: "settings", Title: "%s", TitleArgs: []any{c.Name},

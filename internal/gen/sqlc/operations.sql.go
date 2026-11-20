@@ -174,6 +174,7 @@ WITH sort AS (
         cast(?21 AS INTEGER) AS ascending,
         cast(?22 AS INTEGER) AS by_amount
 )
+
 SELECT o.id, o.user_id, o.type, o.account_id, o.to_account_id, o.category_id, o.origin_id, o.amount, o.date, o.time, o.payee, o.source_payee, o.note, o.mcc, o.import_id, o.import_hash, o.created_at, o.updated_at, a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
@@ -186,14 +187,19 @@ WHERE
     AND (o.type = ?3 OR ?3 IS NULL)
     AND (o.date >= ?4 OR ?4 IS NULL)
     AND (o.date <= ?5 OR ?5 IS NULL)
+    -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
+    -- their nested categories, or no category when uncategorized is set
     AND (
-        o.category_id = ?6
-        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
-        OR ?6 IS NULL
-    )
-    AND (
-        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
-        OR NOT cast(?7 AS INTEGER)
+        (?6 IS NULL AND NOT cast(?7 AS INTEGER))
+        OR instr(?6, ',' || o.category_id || ',') > 0
+        OR o.category_id IN (
+            SELECT c.id FROM categories AS c
+            WHERE c.user_id = ?1 AND instr(?6, ',' || c.parent_id || ',') > 0
+        )
+        OR (
+            cast(?7 AS INTEGER)
+            AND o.type IN ('expense', 'income') AND o.category_id IS NULL
+        )
     )
     AND (
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
@@ -264,7 +270,7 @@ type ListOperationsParams struct {
 	Type          sql.NullString
 	DateFrom      sql.NullString
 	DateTo        sql.NullString
-	CategoryID    sql.NullInt64
+	Categories    interface{}
 	Uncategorized int64
 	Query         sql.NullString
 	NumberQuery   sql.NullString
@@ -296,7 +302,7 @@ func (q *Queries) ListOperations(ctx context.Context, arg ListOperationsParams) 
 		arg.Type,
 		arg.DateFrom,
 		arg.DateTo,
-		arg.CategoryID,
+		arg.Categories,
 		arg.Uncategorized,
 		arg.Query,
 		arg.NumberQuery,
@@ -667,14 +673,19 @@ WHERE
     AND (o.type = ?3 OR ?3 IS NULL)
     AND (o.date >= ?4 OR ?4 IS NULL)
     AND (o.date <= ?5 OR ?5 IS NULL)
+    -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
+    -- their nested categories, or no category when uncategorized is set
     AND (
-        o.category_id = ?6
-        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = ?6)
-        OR ?6 IS NULL
-    )
-    AND (
-        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
-        OR NOT cast(?7 AS INTEGER)
+        (?6 IS NULL AND NOT cast(?7 AS INTEGER))
+        OR instr(?6, ',' || o.category_id || ',') > 0
+        OR o.category_id IN (
+            SELECT c.id FROM categories AS c
+            WHERE c.user_id = ?1 AND instr(?6, ',' || c.parent_id || ',') > 0
+        )
+        OR (
+            cast(?7 AS INTEGER)
+            AND o.type IN ('expense', 'income') AND o.category_id IS NULL
+        )
     )
     AND (
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH ?8)
@@ -706,7 +717,7 @@ type SumFilteredOperationsParams struct {
 	Type          sql.NullString
 	DateFrom      sql.NullString
 	DateTo        sql.NullString
-	CategoryID    sql.NullInt64
+	Categories    interface{}
 	Uncategorized int64
 	Query         sql.NullString
 	NumberQuery   sql.NullString
@@ -732,7 +743,7 @@ func (q *Queries) SumFilteredOperations(ctx context.Context, arg SumFilteredOper
 		arg.Type,
 		arg.DateFrom,
 		arg.DateTo,
-		arg.CategoryID,
+		arg.Categories,
 		arg.Uncategorized,
 		arg.Query,
 		arg.NumberQuery,

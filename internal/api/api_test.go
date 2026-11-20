@@ -167,7 +167,7 @@ func TestAPI(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, tagged)
 	assert.Equal(t, []any{"trip"}, tagged["tags"])
 	assert.Contains(t, tagged, "updated_at")
-	status, list = c.do("QUERY", "/operations", readKey, `{"filter":{"tag":"trip"}}`)
+	status, list = c.do("QUERY", "/operations", readKey, `{"filter":{"tags":["trip","none"]}}`)
 	require.Equal(t, http.StatusOK, status, list)
 	assert.Len(t, list["items"], 1)
 	status, list = c.do("QUERY", "/operations", readKey, `{"filter":{"amount_min":"5"}}`)

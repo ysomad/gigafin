@@ -756,9 +756,9 @@ func (s *Operation) SetUpdatedAt(val OptDateTime) {
 // Ref: #/components/schemas/OperationFilter
 type OperationFilter struct {
 	AccountID OptInt64 `json:"account_id"`
-	// A root category also matches its nested categories.
-	CategoryID OptInt64 `json:"category_id"`
-	// Only expenses and income without a category; not with category_id.
+	// Categories, any of them; a root category also matches its nested categories.
+	CategoryIds []int64 `json:"category_ids"`
+	// Expenses and income without a category; with category_ids, those as well.
 	IsUncategorized OptBool          `json:"is_uncategorized"`
 	Type            OptOperationType `json:"type"`
 	DateFrom        OptDate          `json:"date_from"`
@@ -766,8 +766,8 @@ type OperationFilter struct {
 	// Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a
 	// tag; a number may match the absolute amount instead, whole units any fraction of them.
 	Query OptString `json:"query"`
-	// Tag name, matched exactly.
-	Tag OptString `json:"tag"`
+	// Tag names, matched exactly; an operation matches any of them.
+	Tags []string `json:"tags"`
 	// Least absolute amount, inclusive, in the currency of each operation.
 	AmountMin OptAmount `json:"amount_min"`
 	// Greatest absolute amount, inclusive, in the currency of each operation.
@@ -779,9 +779,9 @@ func (s *OperationFilter) GetAccountID() OptInt64 {
 	return s.AccountID
 }
 
-// GetCategoryID returns the value of CategoryID.
-func (s *OperationFilter) GetCategoryID() OptInt64 {
-	return s.CategoryID
+// GetCategoryIds returns the value of CategoryIds.
+func (s *OperationFilter) GetCategoryIds() []int64 {
+	return s.CategoryIds
 }
 
 // GetIsUncategorized returns the value of IsUncategorized.
@@ -809,9 +809,9 @@ func (s *OperationFilter) GetQuery() OptString {
 	return s.Query
 }
 
-// GetTag returns the value of Tag.
-func (s *OperationFilter) GetTag() OptString {
-	return s.Tag
+// GetTags returns the value of Tags.
+func (s *OperationFilter) GetTags() []string {
+	return s.Tags
 }
 
 // GetAmountMin returns the value of AmountMin.
@@ -829,9 +829,9 @@ func (s *OperationFilter) SetAccountID(val OptInt64) {
 	s.AccountID = val
 }
 
-// SetCategoryID sets the value of CategoryID.
-func (s *OperationFilter) SetCategoryID(val OptInt64) {
-	s.CategoryID = val
+// SetCategoryIds sets the value of CategoryIds.
+func (s *OperationFilter) SetCategoryIds(val []int64) {
+	s.CategoryIds = val
 }
 
 // SetIsUncategorized sets the value of IsUncategorized.
@@ -859,9 +859,9 @@ func (s *OperationFilter) SetQuery(val OptString) {
 	s.Query = val
 }
 
-// SetTag sets the value of Tag.
-func (s *OperationFilter) SetTag(val OptString) {
-	s.Tag = val
+// SetTags sets the value of Tags.
+func (s *OperationFilter) SetTags(val []string) {
+	s.Tags = val
 }
 
 // SetAmountMin sets the value of AmountMin.

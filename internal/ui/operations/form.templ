@@ -144,7 +144,7 @@ templ formPage(v kit.Page, d opForm) {
 			@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
 				<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
 			}
-			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Enter or comma"), d.AllTags, v.Errors.Get("tags"), "")
+			@tagsField("operation-tags-"+typ, "all-tags-"+typ, d.Tags, kit.T(ctx, "Enter or comma"), d.AllTags, v.Errors.Get("tags"), "", false)
 			<div class="hstack justify-between">
 				<div class="hstack">
 					<button type="submit">{ kit.T(ctx, "Save") }</button>
@@ -184,11 +184,13 @@ templ accountOptions(accounts []domain.Account, selected int64, editing bool) {
 }
 
 // tagsField is the tags input of id, completed from all by the datalist of listID,
-// with the comma separated tags of value, posted as tags, and the message err.
-templ tagsField(id, listID, value, placeholder string, all []string, err, class string) {
+// with the comma separated tags of value, posted as tags, or each as tag when repeat
+// is set, and the message err.
+templ tagsField(id, listID, value, placeholder string, all []string, err, class string, repeat bool) {
 	<div
 		data-field
 		data-operation-tags
+		data-repeat?={ repeat }
 		if class != "" {
 			class={ class }
 		}
@@ -201,7 +203,11 @@ templ tagsField(id, listID, value, placeholder string, all []string, err, class 
 			<input id={ id } list={ listID } autocomplete="off" placeholder={ placeholder }/>
 			<datalist id={ listID }></datalist>
 		</ot-taginput>
-		<input type="hidden" name="tags" value={ value }/>
+		if repeat {
+			<input type="hidden" name="tag" value={ value }/>
+		} else {
+			<input type="hidden" name="tags" value={ value }/>
+		}
 		<template data-tag-suggestions>
 			for _, tag := range all {
 				<option value={ tag }></option>

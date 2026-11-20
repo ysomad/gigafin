@@ -1,7 +1,9 @@
 package kit
 
 import (
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/ysomad/gigafin/internal/domain"
 )
@@ -145,6 +147,77 @@ templ CategorySelect(name string, tree []domain.Category, selected int64, choice
 							data-child
 						>{ c.Name }</li>
 					}
+				}
+			}
+		</ul>
+	</div>
+}
+
+// CategoryMultiSelect is CategorySelect picking any of choices and categories of tree,
+// archived ones too: each option is a checkbox name, checked when its value is one of
+// selected. The search input lists the picked ones by their own names, or placeholder
+// when none is; attrs are added to it.
+templ CategoryMultiSelect(
+	name string, tree []domain.Category, selected []int64, choices []CategoryChoice, placeholder string,
+	attrs templ.Attributes,
+) {
+	{{
+		var labels []string
+		picked := func(value string) bool {
+			id, err := strconv.ParseInt(value, 10, 64)
+			return err == nil && slices.Contains(selected, id)
+		}
+		for _, c := range choices {
+			if picked(c.Value) {
+				labels = append(labels, c.Label)
+			}
+		}
+		for _, parent := range tree {
+			if slices.Contains(selected, parent.ID) {
+				labels = append(labels, parent.Name)
+			}
+			for _, c := range parent.Children {
+				if slices.Contains(selected, c.ID) {
+					labels = append(labels, c.Name)
+				}
+			}
+		}
+		grouped := len(tree) > 0 && tree[0].Kind != tree[len(tree)-1].Kind
+	}}
+	<div data-category-select data-multiple>
+		<input
+			type="text"
+			role="combobox"
+			aria-autocomplete="list"
+			aria-expanded="false"
+			autocomplete="off"
+			value={ strings.Join(labels, ", ") }
+			placeholder={ placeholder }
+			{ attrs... }
+		/>
+		<ul role="listbox" aria-multiselectable="true" popover="manual">
+			for _, c := range choices {
+				<li role="option" data-value={ c.Value } data-label={ c.Label }>
+					<input type="checkbox" name={ name } value={ c.Value } checked?={ picked(c.Value) } tabindex="-1"/> { c.Label }
+				</li>
+			}
+			for i, parent := range tree {
+				if grouped && (i == 0 || tree[i-1].Kind != parent.Kind) {
+					<li role="presentation" data-group>{ KindLabel(ctx, parent.Kind) }</li>
+				}
+				<li role="option" data-value={ parent.ID } data-kind={ string(parent.Kind) } data-label={ parent.Name }>
+					<input type="checkbox" name={ name } value={ parent.ID } checked?={ slices.Contains(selected, parent.ID) } tabindex="-1"/> { parent.Name }
+				</li>
+				for _, c := range parent.Children {
+					<li
+						role="option"
+						data-value={ c.ID }
+						data-kind={ string(parent.Kind) }
+						data-label={ domain.FullName(parent.Name, c.Name) }
+						data-child
+					>
+						<input type="checkbox" name={ name } value={ c.ID } checked?={ slices.Contains(selected, c.ID) } tabindex="-1"/> { c.Name }
+					</li>
 				}
 			}
 		</ul>

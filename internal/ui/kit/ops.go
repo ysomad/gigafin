@@ -3,6 +3,7 @@ package kit
 import (
 	"context"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -68,27 +69,35 @@ const NoCategory int64 = -1
 // FilterFromQuery returns the operations filter of the query q of the operations list.
 func (a *App) FilterFromQuery(q url.Values) (domain.Filter, error) {
 	var in struct {
-		Query    string `form:"q"`
-		From     string `form:"from"`
-		To       string `form:"to"`
-		Account  int64  `form:"account"`  // 0 means all
-		Category int64  `form:"category"` // 0 means all, NoCategory none
-		Type     string `form:"type"`
-		Min      string `form:"min"`
-		Max      string `form:"max"`
-		Tags     string `form:"tags"` // comma-separated
-		Sort     string `form:"sort"` // empty is the default
+		Query      string   `form:"q"`
+		From       string   `form:"from"`
+		To         string   `form:"to"`
+		Account    int64    `form:"account"` // 0 means all
+		Categories []int64  `form:"cat"`     // none means all, NoCategory no category
+		Type       string   `form:"type"`
+		Min        string   `form:"min"`
+		Max        string   `form:"max"`
+		Tags       []string `form:"tag"`
+		Sort       string   `form:"sort"` // empty is the default
 	}
 	if err := a.Decoder.Decode(&in, q); err != nil {
 		return domain.Filter{}, domain.NewError(errors.ErrInvalid, "invalid filter")
 	}
-	f := domain.Filter{Query: in.Query, AccountID: in.Account, CategoryID: in.Category, Sort: domain.OpSort(in.Sort)}
-	if in.Category == NoCategory {
-		f.CategoryID, f.Uncategorized = 0, true
+	f := domain.Filter{Query: in.Query, AccountID: in.Account, Sort: domain.OpSort(in.Sort)}
+	for _, id := range in.Categories {
+		switch {
+		case id == NoCategory:
+			f.Uncategorized = true
+		case id > 0 && !slices.Contains(f.CategoryIDs, id):
+			f.CategoryIDs = append(f.CategoryIDs, id)
+		}
 	}
-	for tag := range strings.SplitSeq(in.Tags, ",") {
-		if tag = strings.TrimSpace(tag); tag != "" {
-			f.Tags = append(f.Tags, tag)
+	// a tag is posted with the others separated by commas before the tags script syncs
+	for _, tags := range in.Tags {
+		for tag := range strings.SplitSeq(tags, ",") {
+			if tag = strings.TrimSpace(tag); tag != "" && !slices.Contains(f.Tags, tag) {
+				f.Tags = append(f.Tags, tag)
+			}
 		}
 	}
 	var err error

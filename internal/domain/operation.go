@@ -471,9 +471,11 @@ func (s OpSort) Ascending() bool { return s == SortOldestFirst || s == SortSmall
 
 // Filter selects operations. Zero fields match everything.
 type Filter struct {
-	AccountID  int64
-	CategoryID int64
-	// Uncategorized selects expenses and income without a category.
+	AccountID int64
+	// CategoryIDs are categories, a root one with its nested ones; an operation
+	// matches any of them.
+	CategoryIDs []int64
+	// Uncategorized selects expenses and income without a category too.
 	Uncategorized bool
 	Type          OpType
 	// DateFrom and DateTo are inclusive calendar days, zero when unset.
@@ -492,7 +494,7 @@ type Filter struct {
 
 // Filtered reports whether any field is set.
 func (f Filter) Filtered() bool {
-	return f.AccountID != 0 || f.CategoryID != 0 || f.Uncategorized || f.Type != "" || !f.DateFrom.IsZero() ||
+	return f.AccountID != 0 || len(f.CategoryIDs) > 0 || f.Uncategorized || f.Type != "" || !f.DateFrom.IsZero() ||
 		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || len(f.Tags) > 0
 }
 
@@ -500,7 +502,7 @@ func (f Filter) Filtered() bool {
 func (f Filter) Count() int {
 	var n int
 	for _, set := range []bool{
-		f.AccountID != 0, f.CategoryID != 0 || f.Uncategorized, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
+		f.AccountID != 0, len(f.CategoryIDs) > 0 || f.Uncategorized, f.Type != "", !f.DateFrom.IsZero(), !f.DateTo.IsZero(),
 		f.AmountMin.Valid, f.AmountMax.Valid, len(f.Tags) > 0,
 	} {
 		if set {
@@ -520,9 +522,6 @@ func (f Filter) Validate() error {
 	}
 	if f.AmountMin.Valid && f.AmountMax.Valid && f.AmountMin.Amount.Cmp(f.AmountMax.Amount) > 0 {
 		return NewError(errors.ErrInvalid, "amount min: must not be above max")
-	}
-	if f.Uncategorized && f.CategoryID != 0 {
-		return NewError(errors.ErrInvalid, "category: choose a category or no category")
 	}
 	if f.Sort != "" && !slices.Contains(OpSorts(), f.Sort) {
 		return NewError(errors.ErrInvalid, "sort: must be newest_first, oldest_first, largest_first or smallest_first")

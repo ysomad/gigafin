@@ -1616,9 +1616,13 @@ func (s *OperationFilter) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.CategoryID.Set {
-			e.FieldStart("category_id")
-			s.CategoryID.Encode(e)
+		if s.CategoryIds != nil {
+			e.FieldStart("category_ids")
+			e.ArrStart()
+			for _, elem := range s.CategoryIds {
+				e.Int64(elem)
+			}
+			e.ArrEnd()
 		}
 	}
 	{
@@ -1652,9 +1656,13 @@ func (s *OperationFilter) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Tag.Set {
-			e.FieldStart("tag")
-			s.Tag.Encode(e)
+		if s.Tags != nil {
+			e.FieldStart("tags")
+			e.ArrStart()
+			for _, elem := range s.Tags {
+				e.Str(elem)
+			}
+			e.ArrEnd()
 		}
 	}
 	{
@@ -1673,13 +1681,13 @@ func (s *OperationFilter) encodeFields(e *jx.Encoder) {
 
 var jsonFieldsNameOfOperationFilter = [10]string{
 	0: "account_id",
-	1: "category_id",
+	1: "category_ids",
 	2: "is_uncategorized",
 	3: "type",
 	4: "date_from",
 	5: "date_to",
 	6: "query",
-	7: "tag",
+	7: "tags",
 	8: "amount_min",
 	9: "amount_max",
 }
@@ -1702,15 +1710,24 @@ func (s *OperationFilter) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"account_id\"")
 			}
-		case "category_id":
+		case "category_ids":
 			if err := func() error {
-				s.CategoryID.Reset()
-				if err := s.CategoryID.Decode(d); err != nil {
+				s.CategoryIds = make([]int64, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem int64
+					v, err := d.Int64()
+					elem = int64(v)
+					if err != nil {
+						return err
+					}
+					s.CategoryIds = append(s.CategoryIds, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"category_id\"")
+				return errors.Wrap(err, "decode field \"category_ids\"")
 			}
 		case "is_uncategorized":
 			if err := func() error {
@@ -1762,15 +1779,24 @@ func (s *OperationFilter) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"query\"")
 			}
-		case "tag":
+		case "tags":
 			if err := func() error {
-				s.Tag.Reset()
-				if err := s.Tag.Decode(d); err != nil {
+				s.Tags = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.Tags = append(s.Tags, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"tag\"")
+				return errors.Wrap(err, "decode field \"tags\"")
 			}
 		case "amount_min":
 			if err := func() error {

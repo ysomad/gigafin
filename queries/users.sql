@@ -29,7 +29,8 @@ UPDATE users SET totp_pending_secret = NULL, updated_at = ? WHERE id = ?;
 
 -- name: EnableUserTOTP :execrows
 UPDATE users
-SET totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = sqlc.arg(step),
+SET
+    totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = sqlc.arg(step),
     totp_enabled_at = sqlc.arg(now), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND totp_secret IS NULL AND totp_pending_secret = sqlc.arg(pending);
 

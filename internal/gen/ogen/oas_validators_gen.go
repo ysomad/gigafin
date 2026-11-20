@@ -531,6 +531,25 @@ func (s *OperationFilter) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if s.CategoryIds == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.CategoryIds)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category_ids",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Type.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -579,7 +598,19 @@ func (s *OperationFilter) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Tag.Get(); ok {
+		if s.Tags == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    100,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Tags)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Tags {
 			if err := func() error {
 				if err := (validate.String{
 					MinLength:     0,
@@ -593,18 +624,24 @@ func (s *OperationFilter) Validate() error {
 					MinNumericSet: false,
 					MaxNumeric:    0,
 					MaxNumericSet: false,
-				}).Validate(string(value)); err != nil {
+				}).Validate(string(elem)); err != nil {
 					return errors.Wrap(err, "string")
 				}
 				return nil
 			}(); err != nil {
-				return err
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
 			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "tag",
+			Name:  "tags",
 			Error: err,
 		})
 	}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -297,7 +298,7 @@ func (r *Operations) List(
 	params := sqlc.ListOperationsParams{
 		UserID:        fp.UserID,
 		AccountID:     fp.AccountID,
-		CategoryID:    fp.CategoryID,
+		Categories:    fp.Categories,
 		Uncategorized: fp.Uncategorized,
 		Type:          fp.Type,
 		DateFrom:      fp.DateFrom,
@@ -449,10 +450,14 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 	if f.Uncategorized {
 		uncategorized = 1
 	}
+	var categories strings.Builder
+	for _, id := range f.CategoryIDs {
+		categories.WriteString("," + strconv.FormatInt(id, 10))
+	}
 	return sqlc.SumFilteredOperationsParams{
 		UserID:        userID,
 		AccountID:     sql.NullInt64{Int64: f.AccountID, Valid: f.AccountID != 0},
-		CategoryID:    sql.NullInt64{Int64: f.CategoryID, Valid: f.CategoryID != 0},
+		Categories:    sql.NullString{String: categories.String() + ",", Valid: len(f.CategoryIDs) > 0},
 		Uncategorized: uncategorized,
 		Type:          sql.NullString{String: string(f.Type), Valid: f.Type != ""},
 		DateFrom:      sql.NullString{String: timex.FormatDate(f.DateFrom), Valid: !f.DateFrom.IsZero()},
@@ -461,7 +466,7 @@ func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsPara
 		NumberQuery:   sql.NullString{String: numberQuery, Valid: numberQuery != ""},
 		NumberMin:     numBounds[0],
 		NumberMax:     numBounds[1],
-		Tags:         sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
+		Tags:          sql.NullString{String: "," + strings.Join(f.Tags, ",") + ",", Valid: len(f.Tags) > 0},
 		AmountMin:     bounds[0],
 		AmountMax:     bounds[1],
 	}, nil

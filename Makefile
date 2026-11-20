@@ -6,7 +6,7 @@ ADDR ?= $(or $(HTTP_ADDR),127.0.0.1:8080)
 TOOL = go tool
 GOOSE = $(TOOL) goose -dir migrations sqlite3 $(DB)
 
-.PHONY: tools generate bundle build build-app build-cli run dev test lint vuln locales migrate-up migrate-down migrate-status migrate-create \
+.PHONY: tools generate bundle build build-app build-cli run dev test lint vuln locales sql migrate-up migrate-down migrate-status migrate-create \
 	user-add user-passwd user-role user-2fa-off clean
 
 tools:
@@ -38,8 +38,12 @@ dev:
 test:
 	go test -race ./...
 
-lint: vuln locales
+lint: vuln locales sql
 	golangci-lint run ./...
+
+# sql lints the queries and migrations, see .sqruff
+sql:
+	sqruff lint queries migrations
 
 # locales validates the UI dictionaries against their JSON schema
 locales:

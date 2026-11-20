@@ -50,7 +50,9 @@
 - [x] better categories ui/ux (icons, selectors)
 - [x] better operations search
 - [x] infinite scroll navigation
-- [ ] operations sorting
+- [x] operations sorting
+- [x] operations multi tag / category filtering
+- [ ] rules pagination
 - [ ] unsplit
 - [ ] mobile first ui
 - [ ] sber sync

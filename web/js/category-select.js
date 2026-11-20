@@ -1,5 +1,7 @@
 // A [data-category-select] picks a category by typing: its search input filters the
 // list of categories in a popover under it, and its hidden input holds the picked value.
+// A [data-multiple] one picks any number of them, each option holding a checkbox; its
+// search input lists the picked ones while the list is closed.
 (() => {
   let seq = 0;
 
@@ -64,6 +66,17 @@
     list.style.bottom = up ? `${innerHeight - r.top + 4}px` : 'auto';
   }
 
+  const isMultiple = picker => picker.hasAttribute('data-multiple');
+
+  // summary lists the own names of the checked options of a multiple picker, a cat2
+  // without its cat1.
+  function summary(picker) {
+    return [...parts(picker).list.querySelectorAll('[role=option]')]
+      .filter(o => o.querySelector('input').checked)
+      .map(o => o.textContent.trim())
+      .join(', ');
+  }
+
   function open(picker) {
     const { value, input, list } = parts(picker);
     if (list.matches(':popover-open')) return;
@@ -73,7 +86,7 @@
     list.showPopover();
     input.setAttribute('aria-expanded', 'true');
     place(picker);
-    setActive(picker, visibleOptions(list).find(o => o.dataset.value === value.value));
+    setActive(picker, visibleOptions(list).find(o => isMultiple(picker) || o.dataset.value === value.value));
   }
 
   // close hides the list, putting the label of the picked value back in the input. An
@@ -83,6 +96,10 @@
     if (list.matches(':popover-open')) list.hidePopover();
     input.setAttribute('aria-expanded', 'false');
     setActive(picker, null);
+    if (isMultiple(picker)) {
+      input.value = summary(picker);
+      return;
+    }
     if (input.value.trim() === '') {
       value.value = list.querySelector('[role=option]:not([data-kind])')?.dataset.value ?? '';
     }
@@ -92,6 +109,12 @@
 
   function pick(picker, li) {
     const { value, input } = parts(picker);
+    if (isMultiple(picker)) {
+      const box = li.querySelector('input');
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
     value.value = li.dataset.value;
     // an empty input would unpick it on close
     input.value = li.dataset.label;
@@ -168,10 +191,20 @@
       return;
     }
     if (!e.target.closest('[role=listbox]')) return;
+    // a checkbox toggles itself
+    if (e.target.type === 'checkbox') return;
     // the picker is in a label, which would pass the click on to the input
     e.preventDefault();
     const li = e.target.closest('[role=option]');
     if (li) pick(picker, li);
+  });
+
+  // A checkbox changed while the list is closed, such as by the type filter, is listed.
+  document.addEventListener('change', e => {
+    const picker = pickerOf(e.target);
+    if (picker && isMultiple(picker) && !parts(picker).list.matches(':popover-open')) {
+      parts(picker).input.value = summary(picker);
+    }
   });
 
   for (const type of ['scroll', 'resize']) {

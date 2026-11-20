@@ -1,13 +1,9 @@
 [sqruff]
 dialect = sqlite
-max_line_length = 120
-# sqlc macros and the FTS5 MATCH in queries/operations.sql do not parse; fix the rest
-fix_even_unparsable = True
-# AL03: sqlc names result fields after the expression, aliases would rename them
-# RF01: sqlc.arg and sqlc.narg read as references to an unknown table
-exclude_rules = AL03, RF01
+# sqlc macros, such as sqlc.embed(o) and sqlc.narg(x), read as columns of unknown tables
+exclude_rules = AL03,RF01
 
-# column types and constraints are aligned within CREATE TABLE
+# column definitions are aligned
 [sqruff:layout:type:data_type]
 spacing_before = align
 align_within = create_table_statement

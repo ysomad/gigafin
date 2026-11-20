@@ -128,7 +128,7 @@ templ categoryPage(v kit.Page, d categoryData) {
 		@kit.ArchiveDeleteForms("category", base, c.Archived, kit.T(ctx, "Delete category %s?", c.Name))
 		<div class="hstack justify-between">
 			<h2>{ kit.T(ctx, "Operations") }</h2>
-			<a class="button outline" href={ fmt.Sprintf("/operations?category=%d", c.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg></a>
+			<a class="button outline" href={ fmt.Sprintf("/operations?cat=%d", c.ID) } aria-label={ kit.T(ctx, "Filter") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg></a>
 		</div>
 		if len(d.Days) > 0 {
 			<ul class="unstyled vstack gap-1">

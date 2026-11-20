@@ -237,7 +237,6 @@
     "category: adjustments have no category": "Категория: у корректировок нет категории",
     "category: category %q is not an %s category": "Категория: %q не относится к типу %s",
     "category: category not found": "Категория: категория не найдена",
-    "category: choose a category or no category": "Категория: выберите категорию или без категории",
     "category: transfers have no category": "Категория: у переводов нет категории",
     "choose a CSV file or paste its content": "выберите CSV-файл или вставьте его содержимое",
     "choose from the list": "выберите из списка",

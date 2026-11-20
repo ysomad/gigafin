@@ -516,15 +516,20 @@ func TestListOperationsFiltersAndPages(t *testing.T) {
 	assert.Zero(t, next)
 	assert.Equal(t, day(t, "2026-10-01"), page[1].Date)
 
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ParentID},
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryIDs: []int64{f.cafe.ParentID}},
 		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 5, "cat1 filter matches its children")
 
-	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryID: f.cafe.ID},
+	page, _, err = f.svc.Operations.List(ctx, f.userID, domain.Filter{CategoryIDs: []int64{f.cafe.ID}},
 		pagination.NewParams(pagination.Cursor{}, 0))
 	require.NoError(t, err)
 	assert.Len(t, page, 2)
+
+	page, _, err = f.svc.Operations.List(ctx, f.userID,
+		domain.Filter{CategoryIDs: []int64{f.cafe.ID, f.cafe.ParentID}}, pagination.NewParams(pagination.Cursor{}, 0))
+	require.NoError(t, err)
+	assert.Len(t, page, 5, "categories match any of them, an operation once")
 
 	page, _, err = f.svc.Operations.List(ctx, f.userID,
 		domain.Filter{Query: "shop 3", DateFrom: day(t, "2026-10-02")}, pagination.NewParams(pagination.Cursor{}, 0))
@@ -1291,8 +1296,9 @@ func TestSumMatchesList(t *testing.T) {
 	}{
 		{name: "none"},
 		{name: "account", give: domain.Filter{AccountID: cash.ID}},
-		{name: "category", give: domain.Filter{CategoryID: food.ID}},
+		{name: "category", give: domain.Filter{CategoryIDs: []int64{food.ID}}},
 		{name: "uncategorized", give: domain.Filter{Uncategorized: true}},
+		{name: "category or uncategorized", give: domain.Filter{CategoryIDs: []int64{food.ID}, Uncategorized: true}},
 		{name: "type", give: domain.Filter{Type: domain.OpExpense}},
 		{name: "dates", give: domain.Filter{DateFrom: day(t, "2026-10-05"), DateTo: day(t, "2026-10-15")}},
 		{name: "query", give: domain.Filter{Query: "coffee"}},

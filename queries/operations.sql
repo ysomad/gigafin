@@ -52,6 +52,7 @@ WITH sort AS (
         cast(sqlc.arg(ascending) AS INTEGER) AS ascending,
         cast(sqlc.arg(by_amount) AS INTEGER) AS by_amount
 )
+
 SELECT sqlc.embed(o), a.currency
 FROM operations AS o
 JOIN accounts AS a ON a.id = o.account_id
@@ -64,14 +65,19 @@ WHERE
     AND (o.type = sqlc.narg(type) OR sqlc.narg(type) IS NULL)
     AND (o.date >= sqlc.narg(date_from) OR sqlc.narg(date_from) IS NULL)
     AND (o.date <= sqlc.narg(date_to) OR sqlc.narg(date_to) IS NULL)
+    -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
+    -- their nested categories, or no category when uncategorized is set
     AND (
-        o.category_id = sqlc.narg(category_id)
-        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = sqlc.narg(category_id))
-        OR sqlc.narg(category_id) IS NULL
-    )
-    AND (
-        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
-        OR NOT cast(sqlc.arg(uncategorized) AS INTEGER)
+        (sqlc.narg(categories) IS NULL AND NOT cast(sqlc.arg(uncategorized) AS INTEGER))
+        OR instr(sqlc.narg(categories), ',' || o.category_id || ',') > 0
+        OR o.category_id IN (
+            SELECT c.id FROM categories AS c
+            WHERE c.user_id = sqlc.arg(user_id) AND instr(sqlc.narg(categories), ',' || c.parent_id || ',') > 0
+        )
+        OR (
+            cast(sqlc.arg(uncategorized) AS INTEGER)
+            AND o.type IN ('expense', 'income') AND o.category_id IS NULL
+        )
     )
     AND (
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (query))
@@ -80,9 +86,9 @@ WHERE
     -- the numbers of the query match the text as the query does, or the absolute amount
     -- within bounds as amount_min and amount_max below
     AND (
-        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (number_query))
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg(number_query))
         OR abs(o.amount) BETWEEN (sqlc.narg(number_min) ->> a.currency) AND (sqlc.narg(number_max) ->> a.currency)
-        OR sqlc.narg (number_query) IS NULL
+        OR sqlc.narg(number_query) IS NULL
     )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
     AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)
@@ -149,14 +155,19 @@ WHERE
     AND (o.type = sqlc.narg(type) OR sqlc.narg(type) IS NULL)
     AND (o.date >= sqlc.narg(date_from) OR sqlc.narg(date_from) IS NULL)
     AND (o.date <= sqlc.narg(date_to) OR sqlc.narg(date_to) IS NULL)
+    -- categories are ids wrapped in commas, ",1,2,"; an operation matches any of them,
+    -- their nested categories, or no category when uncategorized is set
     AND (
-        o.category_id = sqlc.narg(category_id)
-        OR o.category_id IN (SELECT c.id FROM categories AS c WHERE c.parent_id = sqlc.narg(category_id))
-        OR sqlc.narg(category_id) IS NULL
-    )
-    AND (
-        (o.type IN ('expense', 'income') AND o.category_id IS NULL)
-        OR NOT cast(sqlc.arg(uncategorized) AS INTEGER)
+        (sqlc.narg(categories) IS NULL AND NOT cast(sqlc.arg(uncategorized) AS INTEGER))
+        OR instr(sqlc.narg(categories), ',' || o.category_id || ',') > 0
+        OR o.category_id IN (
+            SELECT c.id FROM categories AS c
+            WHERE c.user_id = sqlc.arg(user_id) AND instr(sqlc.narg(categories), ',' || c.parent_id || ',') > 0
+        )
+        OR (
+            cast(sqlc.arg(uncategorized) AS INTEGER)
+            AND o.type IN ('expense', 'income') AND o.category_id IS NULL
+        )
     )
     AND (
         o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (query))
@@ -165,9 +176,9 @@ WHERE
     -- the numbers of the query match the text as the query does, or the absolute amount
     -- within bounds as amount_min and amount_max below
     AND (
-        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg (number_query))
+        o.id IN (SELECT f.rowid FROM operations_fts AS f WHERE f.body MATCH sqlc.narg(number_query))
         OR abs(o.amount) BETWEEN (sqlc.narg(number_min) ->> a.currency) AND (sqlc.narg(number_max) ->> a.currency)
-        OR sqlc.narg (number_query) IS NULL
+        OR sqlc.narg(number_query) IS NULL
     )
     -- amount bounds are JSON objects of minor units by currency, see Operations.List
     AND (abs(o.amount) >= (sqlc.narg(amount_min) ->> a.currency) OR sqlc.narg(amount_min) IS NULL)

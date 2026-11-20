@@ -59,20 +59,22 @@ document.addEventListener('htmx:response:error', e => {
 });
 
 // The category filter lists only the categories of the picked type, and is hidden for
-// types without categories. A category of another kind is unselected.
+// types without categories. Categories of another kind are unpicked.
 function filterCategories(typeSelect) {
   const field = typeSelect.form.querySelector('[data-category-field]');
-  const value = field.querySelector('input[type=hidden]');
-  const input = field.querySelector('[role=combobox]');
   const type = typeSelect.value;
   const options = [...field.querySelectorAll('[role=option][data-kind]')];
-  for (const o of options) o.toggleAttribute('data-off', type !== '' && o.dataset.kind !== type);
-  field.hidden = type !== '' && options.every(o => o.hasAttribute('data-off'));
-  value.disabled = input.disabled = field.hidden;
-  if (field.hidden || options.find(o => o.dataset.value === value.value)?.hasAttribute('data-off')) {
-    value.value = '';
-    input.value = field.querySelector('[role=option][data-value=""]')?.dataset.label ?? '';
+  for (const o of options) {
+    const off = type !== '' && o.dataset.kind !== type;
+    o.toggleAttribute('data-off', off);
+    const box = o.querySelector('input');
+    if (off && box.checked) {
+      box.checked = false;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
+  field.hidden = type !== '' && options.every(o => o.hasAttribute('data-off'));
+  for (const input of field.querySelectorAll('input')) input.disabled = field.hidden;
 }
 document.addEventListener('change', e => {
   if (e.target.matches('[data-category-type]')) filterCategories(e.target);

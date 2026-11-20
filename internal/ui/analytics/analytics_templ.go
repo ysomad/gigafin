@@ -292,9 +292,9 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var16 string
-					templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?category=%d&from=%s&to=%s", s.Category.ID, d.From, d.To)).ResolveURL(ctx)
+					templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", s.Category.ID, d.From, d.To)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 68, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 68, Col: 98}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 					if templ_7745c5c3_Err != nil {
@@ -307,7 +307,7 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(s.Category.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 68, Col: 123}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 68, Col: 118}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -563,9 +563,9 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var31 string
-							templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?category=%d&from=%s&to=%s", ct.Category.ID, timex.FormatDate(d.An.TrendMonths[i].First()), timex.FormatDate(d.An.TrendMonths[i].Last()))).ResolveURL(ctx)
+							templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", ct.Category.ID, timex.FormatDate(d.An.TrendMonths[i].First()), timex.FormatDate(d.An.TrendMonths[i].Last()))).ResolveURL(ctx)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 127, Col: 182}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 127, Col: 177}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 							if templ_7745c5c3_Err != nil {
@@ -578,7 +578,7 @@ func analyticsPage(v kit.Page, d analyticsData) templ.Component {
 							var templ_7745c5c3_Var32 string
 							templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(kit.Money(ctx, amount, ct.Currency))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 127, Col: 222}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `analytics/analytics.templ`, Line: 127, Col: 217}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 							if templ_7745c5c3_Err != nil {

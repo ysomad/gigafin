@@ -629,13 +629,14 @@ components:
       description: Selects operations; unset fields match everything.
       properties:
         account_id: {type: integer, format: int64}
-        category_id:
-          type: integer
-          format: int64
-          description: A root category also matches its nested categories.
+        category_ids:
+          type: array
+          maxItems: 100
+          items: {type: integer, format: int64}
+          description: Categories, any of them; a root category also matches its nested categories.
         is_uncategorized:
           type: boolean
-          description: Only expenses and income without a category; not with category_id.
+          description: Expenses and income without a category; with category_ids, those as well.
         type: {$ref: "#/components/schemas/OperationType"}
         date_from: {type: string, format: date}
         date_to: {type: string, format: date}
@@ -643,10 +644,11 @@ components:
           type: string
           maxLength: 200
           description: Words each matching the start of a word of the payee, bank payee, note, MCC, account, category or a tag; a number may match the absolute amount instead, whole units any fraction of them.
-        tag:
-          type: string
-          maxLength: 50
-          description: Tag name, matched exactly.
+        tags:
+          type: array
+          maxItems: 100
+          items: {type: string, maxLength: 50}
+          description: Tag names, matched exactly; an operation matches any of them.
         amount_min:
           allOf: [{$ref: "#/components/schemas/Amount"}]
           description: Least absolute amount, inclusive, in the currency of each operation.

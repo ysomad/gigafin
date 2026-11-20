@@ -311,7 +311,8 @@ func (q *Queries) DisableUserTOTP(ctx context.Context, arg DisableUserTOTPParams
 
 const enableUserTOTP = `-- name: EnableUserTOTP :execrows
 UPDATE users
-SET totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = ?1,
+SET
+    totp_secret = totp_pending_secret, totp_pending_secret = NULL, totp_last_step = ?1,
     totp_enabled_at = ?2, updated_at = ?2
 WHERE id = ?3 AND totp_secret IS NULL AND totp_pending_secret = ?4
 `

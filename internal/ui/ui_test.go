@@ -390,10 +390,10 @@ func TestPagesAndFlows(t *testing.T) {
 	status, body = b.get(opPath + "/edit")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, `value="food, trip"`)
-	status, body = b.get("/operations?tags=trip,+nope")
+	status, body = b.get("/operations?tag=trip&tag=nope")
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "100.25")
-	assert.Contains(t, body, `<input type="hidden" name="tags" value="trip, nope">`)
+	assert.Contains(t, body, `<input type="hidden" name="tag" value="trip, nope">`)
 
 	status, body = b.get("/?month=2026-10")
 	require.Equal(t, http.StatusOK, status)

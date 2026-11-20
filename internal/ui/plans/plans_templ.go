@@ -894,9 +894,9 @@ func planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) templ.Co
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var48 string
-		templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?category=%d&from=%s&to=%s", row.Category.ID, d.From, d.To)).ResolveURL(ctx)
+		templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `plans/plans.templ`, Line: 153, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `plans/plans.templ`, Line: 153, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 		if templ_7745c5c3_Err != nil {
@@ -909,7 +909,7 @@ func planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) templ.Co
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Operations"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `plans/plans.templ`, Line: 153, Col: 125}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `plans/plans.templ`, Line: 153, Col: 120}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {

@@ -150,7 +150,7 @@ templ planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) {
 				{ kit.Invalid(e, "")... }
 			/>
 			<label><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Repeat every month") }</label>
-			<a href={ fmt.Sprintf("/operations?category=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }>{ kit.T(ctx, "Operations") } →</a>
+			<a href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }>{ kit.T(ctx, "Operations") } →</a>
 		</form>
 		@kit.FieldError(e, "")
 	</div>

@@ -1,13 +1,25 @@
-// Oat manages chips; the adapter preserves the server's comma-separated field.
+// Oat manages chips; the adapter preserves the server's comma-separated field, or
+// posts each tag in a field of the same name when it is [data-repeat].
 (() => {
   function synchronize(field) {
     const component = field.querySelector('ot-taginput');
     const input = component.querySelector('input');
     const tags = [...new Set([...(component.value || []), ...input.value.split(',')]
       .map(tag => tag.trim()).filter(Boolean))];
-    const value = tags.join(', ');
-    field.querySelector('[name="tags"]').value = value;
-    return value;
+    field.querySelector('input[type=hidden]').value = tags.join(', ');
+    return tags;
+  }
+
+  // fill sets the tags of field in data, form data or search params.
+  function fill(field, data) {
+    const name = field.querySelector('input[type=hidden]').name;
+    const tags = synchronize(field);
+    if (!field.hasAttribute('data-repeat')) {
+      data.set(name, tags.join(', '));
+      return;
+    }
+    data.delete(name);
+    for (const tag of tags) data.append(name, tag);
   }
 
   for (const event of ['input', 'change']) {
@@ -54,12 +66,12 @@
 
   document.addEventListener('formdata', e => {
     const field = e.target.querySelector('[data-operation-tags]');
-    if (field) e.formData.set('tags', synchronize(field));
+    if (field) fill(field, e.formData);
   }, true);
 
   document.addEventListener('htmx:config:request', e => {
     const request = e.detail.ctx.request;
     const field = request.form?.querySelector('[data-operation-tags]');
-    if (field) request.body.set('tags', synchronize(field));
+    if (field) fill(field, request.body);
   });
 })();

@@ -172,19 +172,20 @@ templ filterFields(d opList) {
 			}
 		</select>
 	}
-	@kit.Field("col-12", kit.T(ctx, "Category"), "", "", templ.Attributes{"data-category-field": true}) {
+	// a root category also matches its nested ones
+	// not a kit.Field: the checkboxes in a label would lay it out as one of theirs
+	<div data-field class="col-12" data-category-field>
+		<label for="filter-category">{ kit.T(ctx, "Categories") }</label>
 		{{
-			selected := d.Filter.CategoryID
+			selected := d.Filter.CategoryIDs
 			if d.Filter.Uncategorized {
-				selected = kit.NoCategory
-			}
-			choices := []kit.CategoryChoice{
-				{Value: "", Label: kit.T(ctx, "All")},
-				{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")},
+				selected = append([]int64{kit.NoCategory}, selected...)
 			}
 		}}
-		@kit.CategorySelect("category", d.Categories, selected, choices, true, nil)
-	}
+		@kit.CategoryMultiSelect("cat", d.Categories, selected, []kit.CategoryChoice{
+			{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")},
+		}, kit.T(ctx, "All"), templ.Attributes{"id": "filter-category"})
+	</div>
 	<div data-field class="col-12">
 		<label for="filter-from">{ kit.T(ctx, "Date") }</label>
 		<fieldset class="group">
@@ -224,6 +225,6 @@ templ filterFields(d opList) {
 		</fieldset>
 	</div>
 	if len(d.Tags) > 0 {
-		@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12")
+		@tagsField("filter-tags", "filter-tag-list", strings.Join(d.Filter.Tags, ", "), kit.T(ctx, "All"), d.Tags, "", "col-12", true)
 	}
 }
