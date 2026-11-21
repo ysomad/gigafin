@@ -94,7 +94,7 @@ func (h *Handler) renderPlans(
 		d.Sections = append(d.Sections, sec)
 	}
 	return kit.Render(h.app, w, r, status, plansPage, kit.Page{
-		User: &user, Nav: "plans", Title: "Plans %s", TitleArgs: []any{month},
+		User: &user, Nav: "plans", Title: "Plans %s", TitleArgs: []any{kit.T(r.Context(), month.First().Format("January")) + " " + month.First().Format("2006")},
 	}, d, kit.Failure{Err: viewErr, Form: "plan"})
 }
 

@@ -127,6 +127,6 @@ func (h *Handler) analytics(w http.ResponseWriter, r *http.Request, user domain.
 		User:      &user,
 		Nav:       "analytics",
 		Title:     "Analytics %s",
-		TitleArgs: []any{month},
+		TitleArgs: []any{kit.T(r.Context(), month.First().Format("January")) + " " + month.First().Format("2006")},
 	}, d, kit.Failure{})
 }

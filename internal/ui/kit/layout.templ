@@ -40,7 +40,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png"/>
 			<link rel="icon" href="/static/img/icon-192.png"/>
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
-			<title>{ v.Title } · gigafin</title>
+			<title>{ v.Title }</title>
 			// ?v= makes browsers load the files anew once they change, see web.Version
 			<link rel="stylesheet" href={ "/static/dist/app.min.css?v=" + web.Version }/>
 			<script src={ "/static/lib/htmx.min.js?v=" + web.Version } defer></script>
