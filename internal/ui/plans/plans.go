@@ -95,7 +95,8 @@ func (h *Handler) renderPlans(
 		d.Sections = append(d.Sections, sec)
 	}
 	return kit.Render(h.app, w, r, status, plansPage, kit.Page{
-		User: &user, Nav: "plans", Title: "Plans %s", TitleArgs: []any{kit.T(r.Context(), month.First().Format("January")) + " " + month.First().Format("2006")},
+		User: &user, Nav: "plans", Title: "Plans %s",
+		TitleArgs: []any{kit.T(r.Context(), month.First().Format("January")) + " " + month.First().Format("2006")},
 	}, d, kit.Failure{Err: viewErr, Form: "plan"})
 }
 
@@ -128,7 +129,8 @@ func (h *Handler) renderPlanForm(
 		return err
 	}
 	d.Currencies = domain.AccountCurrencies(accounts)
-	if d.Months, err = h.app.Svc.Operations.Months(r.Context(), user.ID, timex.MonthOf(today).Next(), d.Month); err != nil {
+	d.Months, err = h.app.Svc.Operations.Months(r.Context(), user.ID, timex.MonthOf(today).Next(), d.Month)
+	if err != nil {
 		return err
 	}
 	return kit.Render(h.app, w, r, status, newPlanPage, kit.Page{User: &user, Nav: "plans", Title: "New plan"}, d,

@@ -6,11 +6,8 @@ ADDR ?= $(or $(HTTP_ADDR),127.0.0.1:8080)
 TOOL = go tool
 GOOSE = $(TOOL) goose -dir migrations sqlite3 $(DB)
 
-.PHONY: tools generate bundle build run dev test lint vuln locales sql migrate-up migrate-down migrate-status migrate-create \
+.PHONY: generate bundle build run dev test lint vuln locales sql migrate-up migrate-down migrate-status migrate-create \
 	user-add user-passwd user-role user-2fa-off clean
-
-tools:
-	go mod download
 
 generate:
 	$(TOOL) sqlc generate -f .sqlc.yaml

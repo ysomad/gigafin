@@ -16,7 +16,7 @@ Self-hosted personal finance manager. Go + SQLite, server-rendered UI (templ + h
 
 ## Quick start
 ```sh
-make tools
+go mod download
 make user-add login=me role=admin
 make run            # serves gigafin.db on 127.0.0.1:8080
 ```

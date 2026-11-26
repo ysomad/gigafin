@@ -118,6 +118,9 @@ linters:
         linters: [gosec, promlinter]
       - path: internal/api/
         linters: [nilerr]
+      # templ components take the context when rendered, not when built
+      - path: internal/ui/
+        linters: [contextcheck]
       - linters: [errcheck]
         text: (?i)Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*print(f|ln)?|os\.(Un)?Setenv). is not checked
 formatters:

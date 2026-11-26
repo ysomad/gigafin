@@ -132,7 +132,10 @@ func (r *Operations) addTags(ctx context.Context, userID, id int64, tags []strin
 		if err != nil {
 			return fmt.Errorf("upsert tag: %w", err)
 		}
-		if err := r.q.CreateOperationTag(ctx, sqlc.CreateOperationTagParams{OperationID: id, TagID: tagID}); err != nil {
+		if err := r.q.CreateOperationTag(
+			ctx,
+			sqlc.CreateOperationTagParams{OperationID: id, TagID: tagID},
+		); err != nil {
 			return fmt.Errorf("create operation tag: %w", err)
 		}
 	}
@@ -366,60 +369,78 @@ func (r *Operations) Sum(ctx context.Context, userID int64, f domain.Filter) ([]
 	return out, nil
 }
 
-// filterParams converts f to the conditions shared by ListOperations and
-// SumFilteredOperations.
-func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsParams, error) {
-	// every word of the query must match the start of a word of the text of
-	// operation_search; words are quoted so FTS5 syntax in them is taken literally, and ё
-	// is е as in the index. Numbers may match the absolute amount instead: whole units
-	// any fraction of them, so 679 is 679.00 to 679.99, and all numbers the same amount.
+// _searchFold folds ё to е, as the operation_search index does.
+var _searchFold = strings.NewReplacer("ё", "е", "Ё", "Е")
+
+// searchParams converts the search query q to the FTS5 query of its words, the FTS5 query
+// of its numbers and the bounds of the amounts the numbers match, as JSON objects of
+// minor units by currency.
+//
+// Every word must match the start of a word of operation_search; it is quoted, so FTS5
+// syntax in it is taken literally. A number may match the absolute amount instead: a
+// whole number any fraction of it, so 679 is 679.00 to 679.99, and all numbers of q
+// the same amount.
+func searchParams(q string) (string, string, [2]sql.NullString, error) {
 	var words, numbers []string
-	var numMin, numMax map[string]int64
-	for w := range strings.FieldsSeq(strings.NewReplacer("ё", "е", "Ё", "Е").Replace(f.Query)) {
-		quoted := `"` + strings.ReplaceAll(w, `"`, `""`) + `"*`
+	var lows, highs map[string]int64
+	for w := range strings.FieldsSeq(_searchFold.Replace(q)) {
+		quoted := fmt.Sprintf(`"%s"*`, strings.ReplaceAll(w, `"`, `""`))
 		n, err := money.Parse(w)
 		if err != nil || !strings.ContainsAny(w, "0123456789") {
 			words = append(words, quoted)
 			continue
 		}
 		numbers = append(numbers, quoted)
-		n = n.Abs()
-		if numMin == nil {
-			numMin, numMax = make(map[string]int64), make(map[string]int64)
+		if lows == nil {
+			lows, highs = make(map[string]int64), make(map[string]int64)
 		}
+		n = n.Abs()
+		whole := !strings.ContainsAny(w, ".,")
 		for _, cur := range money.Currencies() {
 			lo, err := n.CeilMinor(cur)
 			if err != nil {
-				return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+				return "", "", [2]sql.NullString{}, fmt.Errorf("query number: %w", err)
 			}
-			hi, err := n.FloorMinor(cur)
-			if !strings.ContainsAny(w, ".,") {
+			var hi int64
+			if whole {
 				hi, err = n.Add(money.FromInt(1)).CeilMinor(cur)
 				hi--
+			} else {
+				hi, err = n.FloorMinor(cur)
 			}
 			if err != nil {
-				return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+				return "", "", [2]sql.NullString{}, fmt.Errorf("query number: %w", err)
 			}
-			if old, ok := numMin[cur]; !ok || lo > old {
-				numMin[cur] = lo
+			// all numbers match one amount, so their ranges intersect
+			if old, ok := lows[cur]; !ok || lo > old {
+				lows[cur] = lo
 			}
-			if old, ok := numMax[cur]; !ok || hi < old {
-				numMax[cur] = hi
+			if old, ok := highs[cur]; !ok || hi < old {
+				highs[cur] = hi
 			}
 		}
 	}
-	query := strings.Join(words, " ")
-	numberQuery := strings.Join(numbers, " ")
-	var numBounds [2]sql.NullString
-	for i, m := range []map[string]int64{numMin, numMax} {
+
+	var bounds [2]sql.NullString
+	for i, m := range []map[string]int64{lows, highs} {
 		if m == nil {
 			continue
 		}
 		js, err := json.Marshal(m)
 		if err != nil {
-			return sqlc.SumFilteredOperationsParams{}, fmt.Errorf("query number: %w", err)
+			return "", "", [2]sql.NullString{}, fmt.Errorf("query number: %w", err)
 		}
-		numBounds[i] = sql.NullString{String: string(js), Valid: true}
+		bounds[i] = sql.NullString{String: string(js), Valid: true}
+	}
+	return strings.Join(words, " "), strings.Join(numbers, " "), bounds, nil
+}
+
+// filterParams converts f to the conditions shared by ListOperations and
+// SumFilteredOperations.
+func filterParams(userID int64, f domain.Filter) (sqlc.SumFilteredOperationsParams, error) {
+	query, numberQuery, numBounds, err := searchParams(f.Query)
+	if err != nil {
+		return sqlc.SumFilteredOperationsParams{}, err
 	}
 	// amounts are minor units of each account currency, so a bound becomes minor units
 	// of every currency, as a JSON object by code; min rounds up and max down
