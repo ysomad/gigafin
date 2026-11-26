@@ -1,5 +1,8 @@
 # gigafin
 
+[![ci](https://github.com/ysomad/gigafin/actions/workflows/ci.yml/badge.svg)](https://github.com/ysomad/gigafin/actions/workflows/ci.yml)
+![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ysomad/gigafin/badges/coverage.json)
+
 Self-hosted personal finance manager. Go + SQLite, server-rendered UI (templ + htmx), English and Russian.
 
 ## Features

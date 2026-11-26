@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -16,8 +18,22 @@ jobs:
       - name: generated code is up to date
         run: make generate && git diff --exit-code
       - run: make build
-      - run: go test -v -race -vet=off -covermode=atomic ./...
+      - run: go test -v -race -vet=off -covermode=atomic -coverprofile=cover.out ./...
       - run: go tool govulncheck ./...
+      - name: coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          grep -vE '/internal/gen/|_templ\.go:' cover.out > cover.filtered.out
+          pct=$(go tool cover -func=cover.filtered.out | awk '/^total:/ {sub("%", "", $3); print $3}')
+          color=$(awk -v p="$pct" 'BEGIN { print (p >= 80 ? "brightgreen" : p >= 60 ? "green" : p >= 40 ? "yellow" : "red") }')
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git checkout --orphan badges
+          git rm -rfq .
+          printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' "$pct" "$color" > coverage.json
+          git add coverage.json
+          git commit -qm "coverage $pct%"
+          git push -f origin badges
 
   lint:
     runs-on: ubuntu-latest
