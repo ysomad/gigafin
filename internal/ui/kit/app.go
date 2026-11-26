@@ -282,7 +282,7 @@ func Render[T any](
 			w.Header().Set("HX-Reselect", sel)
 			w.Header().Set("HX-Reswap", "outerHTML show:none")
 		} else {
-			w.Header().Set("HX-Reswap", "innerHTML show:none")
+			w.Header().Set("HX-Reswap", "outerSync show:none")
 		}
 	}
 

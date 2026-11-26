@@ -49,8 +49,10 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<script src={ "/static/lib/oat.min.js?v=" + web.Version } defer></script>
 			<script src={ "/static/dist/app.min.js?v=" + web.Version } defer></script>
 		</head>
-		<body id="top" hx-boost:inherited="true">
-			<header data-topnav>
+		// boosted links and forms swap only main and the nav, keeping the body, its header
+		// and listeners; the page scrolls to the top as it did when the body was swapped
+		<body id="top" hx-boost:inherited='{"swap":"outerSync show:top showTarget:body","target":"#main","select":"#main","selectOOB":"#topnav"}'>
+			<header id="topnav" data-topnav>
 				<nav class="container hstack justify-between">
 					<a href="/" class="unstyled brand"><strong>GIGAFIN</strong></a>
 					if v.User != nil {
@@ -64,7 +66,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 					}
 				</nav>
 			</header>
-			<main class="container mb-8">
+			<main id="main" class="container mb-8">
 				if v.BankSync {
 					<div id="bank-sync" hx-post="/settings/banks/autosync" hx-trigger="load" hx-swap="outerHTML"></div>
 				}

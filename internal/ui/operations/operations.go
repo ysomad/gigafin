@@ -57,7 +57,7 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 			return domain.NewError(errors.ErrInvalid, "invalid page link")
 		}
 	}
-	p := pagination.NewParams(after, 0)
+	p := pagination.NewParams(after, 20)
 	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, f, p)
 	if err != nil {
 		return err

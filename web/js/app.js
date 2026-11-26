@@ -79,11 +79,11 @@ function filterCategories(typeSelect) {
 document.addEventListener('change', e => {
   if (e.target.matches('[data-category-type]')) filterCategories(e.target);
 });
-function filterAllCategories() {
-  for (const select of document.querySelectorAll('[data-category-type]')) filterCategories(select);
+function filterAllCategories(root) {
+  for (const select of root.querySelectorAll('[data-category-type]')) filterCategories(select);
 }
-document.addEventListener('DOMContentLoaded', filterAllCategories);
-document.addEventListener('htmx:after:settle', filterAllCategories);
+document.addEventListener('DOMContentLoaded', () => filterAllCategories(document));
+document.addEventListener('htmx:after:settle', e => filterAllCategories(e.target));
 
 // In the split form the first part, the operation itself, keeps what the other parts
 // leave of the total, so typing a part's amount takes it from the first one. It counts

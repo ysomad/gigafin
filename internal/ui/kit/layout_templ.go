@@ -203,7 +203,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" defer></script></head><body id=\"top\" hx-boost:inherited=\"true\"><header data-topnav><nav class=\"container hstack justify-between\"><a href=\"/\" class=\"unstyled brand\"><strong>GIGAFIN</strong></a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" defer></script></head><body id=\"top\" hx-boost:inherited='{\"swap\":\"outerSync show:top showTarget:body\",\"target\":\"#main\",\"select\":\"#main\",\"selectOOB\":\"#topnav\"}'><header id=\"topnav\" data-topnav><nav class=\"container hstack justify-between\"><a href=\"/\" class=\"unstyled brand\"><strong>GIGAFIN</strong></a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -237,7 +237,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</nav></header><main class=\"container mb-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</nav></header><main id=\"main\" class=\"container mb-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -259,7 +259,7 @@ func Layout(v Page, toTop bool, toasts templ.Component) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "Scroll to top")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 73, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 75, Col: 110}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
@@ -310,7 +310,7 @@ func navLink(href string, current bool, label string) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(href).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 84, Col: 13}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 86, Col: 13}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 			if templ_7745c5c3_Err != nil {
@@ -361,7 +361,7 @@ func navLink(href string, current bool, label string) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 89, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 91, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -459,7 +459,7 @@ func Toast(variant, msg string) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(variant).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 116, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 118, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -472,7 +472,7 @@ func Toast(variant, msg string) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 116, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 118, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -523,7 +523,7 @@ func NotFound(v Page, _ struct{}) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "Not found"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 122, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 124, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -536,7 +536,7 @@ func NotFound(v Page, _ struct{}) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "Back to analytics"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 123, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `kit/layout.templ`, Line: 125, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {

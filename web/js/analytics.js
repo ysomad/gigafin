@@ -93,7 +93,18 @@
   }
 
   document.addEventListener('DOMContentLoaded', render);
-  document.addEventListener('htmx:after:settle', render);
+  // a swap without charts, such as a toast, keeps the drawn ones; those it removed
+  // from the page are destroyed
+  document.addEventListener('htmx:after:settle', (e) => {
+    if (e.target.querySelector?.('figure.trend')) {
+      render();
+      return;
+    }
+    charts = charts.filter((c) => {
+      if (!c.root.isConnected) c.destroy();
+      return c.root.isConnected;
+    });
+  });
   // colors are read from CSS once per render: redraw when the OS theme flips
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => {
