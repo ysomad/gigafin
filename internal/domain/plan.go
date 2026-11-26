@@ -19,8 +19,7 @@ type Plan struct {
 	Repeating  bool
 }
 
-// NewPlan validates a plan. A zero amount means no plan; a repeating one also
-// stops carrying an earlier repeating plan.
+// NewPlan validates a plan.
 func NewPlan(
 	categoryID int64, month timex.Month, currency string, amount money.Amount, repeating bool,
 ) (Plan, error) {
@@ -34,16 +33,21 @@ func NewPlan(
 	if _, err := amount.ToMinor(cur); err != nil {
 		return Plan{}, NewError(errors.ErrInvalid, "amount: not a valid amount in %s", cur)
 	}
-	if amount.IsNegative() {
-		return Plan{}, NewError(errors.ErrInvalid, "amount: must not be negative")
+	if !amount.IsPositive() {
+		return Plan{}, NewError(errors.ErrInvalid, "amount: must be positive")
 	}
 	return Plan{CategoryID: categoryID, Month: month, Currency: cur, Amount: amount, Repeating: repeating}, nil
 }
 
+// PlanOf returns the plan of a category for a month and currency, without an amount,
+// to find the stored one by.
+func PlanOf(categoryID int64, month timex.Month, currency string) Plan {
+	return Plan{CategoryID: categoryID, Month: month, Currency: strings.ToUpper(strings.TrimSpace(currency))}
+}
+
 // CarryPlans returns the plans to carry into month to: for every category and
-// currency, the latest repeating plan before to, unless its amount is zero, which
-// stops carrying. A plan that is not repeating changes only its own month, so it is
-// not carried.
+// currency, the latest repeating plan before to. A plan that is not repeating changes
+// only its own month, so it is not carried.
 func CarryPlans(repeating []Plan, to timex.Month) []Plan {
 	latest := make(map[catCur]Plan, len(repeating))
 	var keys []catCur
@@ -60,12 +64,9 @@ func CarryPlans(repeating []Plan, to timex.Month) []Plan {
 			latest[k] = b
 		}
 	}
-	var out []Plan
+	out := make([]Plan, 0, len(keys))
 	for _, k := range keys {
 		b := latest[k]
-		if b.Amount.IsZero() {
-			continue
-		}
 		b.Month = to
 		out = append(out, b)
 	}
@@ -203,10 +204,7 @@ func newReport(tree []Category, sums []CategorySum, plans []Plan) report {
 		}
 	}
 	for _, b := range plans {
-		// a zero plan only stops a repeating one, there is nothing to report
-		if !b.Amount.IsZero() {
-			r.plan[catCur{id: b.CategoryID, cur: b.Currency}] = b
-		}
+		r.plan[catCur{id: b.CategoryID, cur: b.Currency}] = b
 	}
 	return r
 }

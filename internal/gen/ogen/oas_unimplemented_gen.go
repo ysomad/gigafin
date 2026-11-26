@@ -180,8 +180,8 @@ func (UnimplementedHandler) RunRules(ctx context.Context, req *OperationFilter) 
 
 // SetPlan implements setPlan operation.
 //
-// The latest repeating plan before a month is copied into it when the month starts. Amount "0" with
-// is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+// The latest repeating plan before a month is copied into it when the month starts. Amount must be
+// positive.
 //
 // PUT /plans
 func (UnimplementedHandler) SetPlan(ctx context.Context, req *Plan) error {

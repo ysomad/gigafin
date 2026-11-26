@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/errors"
@@ -47,8 +46,7 @@ func (s *Plans) Report(
 
 // Set sets the plan of a category for a month and currency. The latest repeating
 // plan before a month is carried into it once, so a change to a month that is already
-// carried past does not reach the months after it. A zero repeating plan stops
-// carrying, and a zero one that is not repeating removes the month's plan.
+// carried past does not reach the months after it.
 func (s *Plans) Set(
 	ctx context.Context, userID, categoryID int64, month timex.Month, currency string, amount money.Amount,
 	repeating bool,
@@ -61,19 +59,22 @@ func (s *Plans) Set(
 	if _, err := r.Categories.Get(ctx, userID, categoryID); err != nil {
 		return err
 	}
-	if b.Amount.IsZero() && !b.Repeating {
-		if err := r.Plans.Delete(ctx, userID, b); err != nil {
-			return err
-		}
-		s.log.DebugContext(ctx, "plan removed", slog.Int64("user_id", userID), slog.Int64("category_id", categoryID),
-			slog.String("month", month.String()))
-		return nil
-	}
 	if err := r.Plans.Set(ctx, userID, b); err != nil {
 		return err
 	}
 	s.log.DebugContext(ctx, "plan set", slog.Int64("user_id", userID), slog.Int64("category_id", categoryID),
 		slog.String("month", month.String()), slog.Bool("repeating", repeating))
+	return nil
+}
+
+// Delete removes the plan of a category for a month and currency, if any. A repeating
+// plan of an earlier month is still carried into the months after it.
+func (s *Plans) Delete(ctx context.Context, userID, categoryID int64, month timex.Month, currency string) error {
+	if err := s.store.Write().Plans.Delete(ctx, userID, domain.PlanOf(categoryID, month, currency)); err != nil {
+		return err
+	}
+	s.log.DebugContext(ctx, "plan removed", slog.Int64("user_id", userID), slog.Int64("category_id", categoryID),
+		slog.String("month", month.String()))
 	return nil
 }
 
@@ -149,11 +150,7 @@ func carryPlans(ctx context.Context, r repository.Repos, userID int64, month tim
 	return n, nil
 }
 
-// List returns plans set for month, without zero ones that only stop carrying.
+// List returns plans set for month.
 func (s *Plans) List(ctx context.Context, userID int64, month timex.Month) ([]domain.Plan, error) {
-	plans, err := s.store.Read().Plans.List(ctx, userID, month)
-	if err != nil {
-		return nil, err
-	}
-	return slices.DeleteFunc(plans, func(b domain.Plan) bool { return b.Amount.IsZero() }), nil
+	return s.store.Read().Plans.List(ctx, userID, month)
 }

@@ -678,8 +678,7 @@ func TestPlanReport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), n)
 
-	require.NoError(t, f.svc.Plans.Set(
-		ctx, f.userID, f.cafe.ID, month(t, "2026-11"), "RUB", money.Amount{}, false /* repeating */))
+	require.NoError(t, f.svc.Plans.Delete(ctx, f.userID, f.cafe.ID, month(t, "2026-11"), "RUB"))
 	plans, err := f.svc.Plans.List(ctx, f.userID, month(t, "2026-11"))
 	require.NoError(t, err)
 	assert.Len(t, plans, 1)
@@ -716,10 +715,11 @@ func TestPlanCarry(t *testing.T) {
 	require.NoError(t, svc.Plans.Set(ctx, uid, cafe.ID, month(t, "2026-10"), "RUB", dec("500"), true /* repeating */))
 	// a change of one month is not carried
 	require.NoError(t, svc.Plans.Set(ctx, uid, food.ID, month(t, "2026-11"), "RUB", dec("15000"), false /* repeating */))
-	// a zero repeating plan stops carrying
-	require.NoError(t, svc.Plans.Set(
-		ctx, uid, cafe.ID, month(t, "2026-11"), "RUB", money.Amount{}, true /* repeating */))
-	assert.Equal(t, map[int64]string{food.ID: "15000"}, amounts("2026-11"), "zero plan is not listed")
+	// a plan that is no longer repeating stops carrying
+	require.NoError(t, svc.Plans.Set(ctx, uid, cafe.ID, month(t, "2026-10"), "RUB", dec("500"), false /* repeating */))
+	assert.Equal(t, map[int64]string{food.ID: "15000"}, amounts("2026-11"))
+	require.Error(t, svc.Plans.Set(ctx, uid, cafe.ID, month(t, "2026-11"), "RUB", money.Amount{}, true /* repeating */),
+		"zero plan is invalid")
 
 	n, err := svc.Plans.CarryAll(ctx)
 	require.NoError(t, err)
@@ -727,8 +727,7 @@ func TestPlanCarry(t *testing.T) {
 	assert.Equal(t, map[int64]string{food.ID: "10000"}, amounts("2026-12"))
 
 	// a plan removed after the carry stays removed
-	require.NoError(t, svc.Plans.Set(
-		ctx, uid, food.ID, month(t, "2026-12"), "RUB", money.Amount{}, false /* repeating */))
+	require.NoError(t, svc.Plans.Delete(ctx, uid, food.ID, month(t, "2026-12"), "RUB"))
 	n, err = svc.Plans.CarryAll(ctx)
 	require.NoError(t, err)
 	assert.Zero(t, n)

@@ -2,6 +2,7 @@ package plans
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/ysomad/gigafin/internal/domain"
@@ -37,7 +38,7 @@ templ plansPage(v kit.Page, d plansData) {
 			for _, sec := range d.Sections {
 				{{ inc := sec.Kind == domain.KindIncome }}
 				<section class="mb-6">
-					<h2>{ kit.KindLabel(ctx, sec.Kind) }</h2>
+					<h2 class="kind">{ kit.KindLabel(ctx, sec.Kind) }</h2>
 					for _, tot := range sec.Totals {
 						<div class="card p-4 vstack gap-2 mb-2">
 							<div class="hstack justify-between">
@@ -182,26 +183,43 @@ templ planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) {
 		<input type="hidden" name="month" value={ d.Month.String() }/>
 		<input type="hidden" name="category" value={ row.Category.ID }/>
 		<input type="hidden" name="currency" value={ row.Currency }/>
-		<fieldset class="row items-center">
-			@kit.Field("col-6", "", e, "", nil) {
-				<input
-					name="amount"
-					inputmode="decimal"
-					if e != "" {
-						value={ d.Posted.Amount }
-					} else {
-						value={ kit.AmountInput(ctx, row.Plan.Fixed(row.Currency)) }
-					}
-					placeholder={ kit.T(ctx, "Amount") }
-					title={ kit.T(ctx, "Clear the amount to remove it for this month.") }
-					aria-label={ kit.T(ctx, "Plan for %s", row.Category.Name) }
-					{ kit.Invalid(e, "")... }
-				/>
-			}
-			<div class="col-6 hstack justify-between">
-				<label title={ kit.T(ctx, "Repeat every month") }><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Monthly") }</label>
-				<a class="button outline small" href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }><svg width="14" height="14" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg> { kit.T(ctx, "Operations") }</a>
-			</div>
-		</fieldset>
+		<div class="hstack justify-between">
+			<span class="hstack">
+				@kit.Field("", "", e, "", nil) {
+					<input
+						name="amount"
+						inputmode="decimal"
+						size="8"
+						if e != "" {
+							value={ d.Posted.Amount }
+						} else {
+							value={ kit.AmountInput(ctx, row.Plan.Fixed(row.Currency)) }
+						}
+						placeholder={ kit.T(ctx, "Amount") }
+						aria-label={ kit.T(ctx, "Plan for %s", row.Category.Name) }
+						{ kit.Invalid(e, "")... }
+					/>
+				}
+				<label title={ kit.T(ctx, "Repeat every month") }><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating } aria-label={ kit.T(ctx, "Repeat every month") }/> <svg width="14" height="14" aria-hidden="true"><use href="/static/img/icons.svg#refresh-cw"></use></svg></label>
+			</span>
+			<span class="hstack gap-1">
+				<a class="button outline small" href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) } aria-label={ kit.T(ctx, "Operations") } title={ kit.T(ctx, "Operations") }><svg width="14" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg></a>
+				<button
+					type="button"
+					class="outline small"
+					data-variant="danger"
+					hx-delete={ "/plans?" + url.Values{"month": {d.Month.String()}, "category": {strconv.FormatInt(row.Category.ID, 10)}, "currency": {row.Currency}}.Encode() }
+					hx-confirm={ kit.T(ctx, "Delete the plan for %s this month?", row.Category.Name) }
+					hx-target="main"
+					hx-select="main"
+					hx-swap="outerHTML"
+					aria-label={ kit.T(ctx, "Delete") }
+					title={ kit.T(ctx, "Delete") }
+				><svg width="14" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#trash"></use></svg></button>
+			</span>
+		</div>
+		if row.Repeating {
+			<small class="text-light">{ kit.T(ctx, "Repeats every month") }</small>
+		}
 	</form>
 }

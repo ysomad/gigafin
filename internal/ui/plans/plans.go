@@ -29,6 +29,7 @@ func (h *Handler) Routes() map[string]kit.Handler {
 	return map[string]kit.Handler{
 		"GET /plans":       h.plans,
 		"POST /plans":      h.setPlan,
+		"DELETE /plans":    h.deletePlan,
 		"GET /plans/new":   h.newPlan,
 		"POST /plans/fill": h.fillPlans,
 	}
@@ -154,20 +155,14 @@ func (h *Handler) setPlan(w http.ResponseWriter, r *http.Request, user domain.Us
 			errs["currency"] = domain.NewError(errors.ErrInvalid, "choose from the list")
 		}
 	}
-	// an empty amount removes only the month's plan; "0" with repeating stops carrying
 	amount := money.Amount{}
 	f.Amount = strings.TrimSpace(f.Amount)
-	switch {
-	case f.Amount == "" && f.New:
+	if f.Amount == "" {
 		errs[amountKey] = domain.NewError(errors.ErrInvalid, "required")
-	case f.Amount == "":
-		f.Repeating = false
-	default:
-		if amount, err = money.Parse(f.Amount); err != nil {
-			errs[amountKey] = domain.NewError(errors.ErrInvalid, "enter a number")
-		} else if amount.IsNegative() {
-			errs[amountKey] = domain.NewError(errors.ErrInvalid, "must not be negative")
-		}
+	} else if amount, err = money.Parse(f.Amount); err != nil {
+		errs[amountKey] = domain.NewError(errors.ErrInvalid, "enter a number")
+	} else if !amount.IsPositive() {
+		errs[amountKey] = domain.NewError(errors.ErrInvalid, "must be positive")
 	}
 	if len(errs) > 0 && f.New {
 		return h.renderPlanForm(w, r, user, http.StatusUnprocessableEntity, f, errs)
@@ -190,6 +185,24 @@ func (h *Handler) setPlan(w http.ResponseWriter, r *http.Request, user domain.Us
 	// a plan row saved in place stays open, as a redirect would close it; setting it
 	// again on a resubmit is harmless
 	return h.renderPlans(w, r, user, http.StatusOK, f, nil)
+}
+
+// deletePlan removes the plan of a row for its month, taken from the query as a DELETE
+// has no form body.
+func (h *Handler) deletePlan(w http.ResponseWriter, r *http.Request, user domain.User) error {
+	q := r.URL.Query()
+	month, err := timex.ParseMonth(q.Get("month"))
+	if err != nil {
+		return domain.NewError(errors.ErrInvalid, "%s: %q must be YYYY-MM", domain.Msg("Month"), q.Get("month"))
+	}
+	category, err := strconv.ParseInt(q.Get("category"), 10, 64)
+	if err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
+	if err := h.app.Svc.Plans.Delete(r.Context(), user.ID, category, month, q.Get("currency")); err != nil {
+		return err
+	}
+	return h.renderPlans(w, r, user, http.StatusOK, planPost{Month: q.Get("month")}, nil)
 }
 
 func (h *Handler) fillPlans(w http.ResponseWriter, r *http.Request, user domain.User) error {

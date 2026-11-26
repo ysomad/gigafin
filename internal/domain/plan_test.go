@@ -85,11 +85,6 @@ func TestCarryPlans(t *testing.T) {
 			expect: []domain.Plan{plan(1, "2026-12", "RUB", 100, true)},
 		},
 		{
-			name: "zero stops carrying",
-			in:   []domain.Plan{plan(1, "2026-10", "RUB", 100, true), plan(1, "2026-11", "RUB", 0, true)},
-			to:   "2026-12",
-		},
-		{
 			name: "currencies carry separately",
 			in:   []domain.Plan{plan(1, "2026-10", "RUB", 100, true), plan(1, "2026-11", "USD", 5, true)},
 			to:   "2026-12",
@@ -98,9 +93,10 @@ func TestCarryPlans(t *testing.T) {
 			},
 		},
 		{
-			name: "plans of month and later are ignored",
-			in:   []domain.Plan{plan(1, "2026-12", "RUB", 100, true), plan(2, "2027-01", "RUB", 5, true)},
-			to:   "2026-12",
+			name:   "plans of month and later are ignored",
+			in:     []domain.Plan{plan(1, "2026-12", "RUB", 100, true), plan(2, "2027-01", "RUB", 5, true)},
+			to:     "2026-12",
+			expect: []domain.Plan{},
 		},
 	}
 	for _, tt := range tests {

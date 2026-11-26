@@ -90,8 +90,9 @@ td.nowrap {
   :is(input, select, textarea) {
     font-size: 16px;
   }
-  /* the day of the operations under it stays in view while they scroll */
-  li.day {
+  /* the day of the operations, or the kind of the plans, under it stays in view while
+     they scroll */
+  :is(li.day, h2.kind) {
     position: sticky;
     top: 0;
     z-index: 1;
@@ -262,11 +263,12 @@ menu[popover] > small {
   }
 }
 
-/* Oat hovers a summary with the color of a progress track, as on plan rows; keep the
-   track visible. */
-summary:hover progress {
+/* Oat hovers a summary with the color of a progress or meter track, as on plan rows;
+   keep the track visible. */
+summary:hover :is(progress, meter) {
   background-color: var(--border);
-  &::-webkit-progress-bar {
+  &::-webkit-progress-bar,
+  &::-webkit-meter-bar {
     background-color: var(--border);
   }
 }

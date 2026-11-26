@@ -236,7 +236,7 @@ paths:
       tags: [Plans]
       summary: Set a plan
       description: >-
-        The latest repeating plan before a month is copied into it when the month starts. Amount "0" with is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+        The latest repeating plan before a month is copied into it when the month starts. Amount must be positive.
       requestBody:
         required: true
         content:

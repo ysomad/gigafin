@@ -371,12 +371,24 @@ func TestPagesAndFlows(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, "149.75", "left of food plan")
-	// an empty amount removes only the month's plan, it does not stop carrying
 	status, body = b.post("/plans", url.Values{
-		"month": {"2026-11"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
-		"amount": {""}, "repeating": {"true"},
+		"month": {"2026-11"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"}, "amount": {"0"},
+	})
+	require.Equal(t, http.StatusUnprocessableEntity, status, body)
+	assert.Contains(t, body, "must be positive")
+	// a delete removes only the month's plan, it does not stop carrying
+	status, body = b.post("/plans", url.Values{
+		"month": {"2026-11"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"}, "amount": {"500"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodDelete, b.srv.URL+"/plans?"+url.Values{
+		"month": {"2026-11"}, "category": {strconv.FormatInt(food.ID, 10)}, "currency": {"RUB"},
+	}.Encode(), nil)
+	require.NoError(t, err)
+	req.Header.Set("Referer", b.srv.URL+"/plans")
+	status, body = b.do(req)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.NotContains(t, body, `value="500`, "food plan of 2026-11 deleted")
 	status, body = b.post("/plans/fill", url.Values{"month": {"2026-11"}})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Contains(t, body, `value="300`, "food plan carried into 2026-11")

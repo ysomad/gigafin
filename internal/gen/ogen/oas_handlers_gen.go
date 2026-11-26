@@ -2515,8 +2515,8 @@ func (s *Server) handleRunRulesRequest(args [0]string, argsEscaped bool, w http.
 
 // handleSetPlanRequest handles setPlan operation.
 //
-// The latest repeating plan before a month is copied into it when the month starts. Amount "0" with
-// is_repeating stops an earlier repeating plan; amount "0" without it removes the month's plan.
+// The latest repeating plan before a month is copied into it when the month starts. Amount must be
+// positive.
 //
 // PUT /plans
 func (s *Server) handleSetPlanRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
