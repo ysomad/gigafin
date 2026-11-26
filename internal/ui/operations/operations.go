@@ -145,15 +145,16 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 		if conn.Status == domain.BankConnected {
 			d.BankSync = true
 		}
-		if conn.LastSyncAt.After(d.BankSyncAt) {
-			d.BankSyncAt = conn.LastSyncAt
-		}
 	}
 	bankAccounts, err := h.app.Svc.Banks.Accounts(ctx, user.ID)
 	if err != nil {
 		return err
 	}
 	for _, t := range bankAccounts {
+		// a failed sync leaves the synced period as it was, so it dates the last successful one
+		if slices.Contains(enabled, t.Bank) && t.SyncedUntil.After(d.BankSyncAt) {
+			d.BankSyncAt = t.SyncedUntil
+		}
 		if t.Mismatch(d.AccByID[t.AccountID]) {
 			d.Mismatched = append(d.Mismatched, t)
 		}
@@ -166,9 +167,9 @@ func (h *Handler) syncBanks(w http.ResponseWriter, r *http.Request, user domain.
 	ctx := r.Context()
 	res, err := h.app.Svc.Banks.SyncAll(ctx, user.ID, user.Location(), true /* force */)
 	if err != nil {
-		// a failing bank is not a fault of this server
+		// a failing bank is not a fault of this server; the alert names it
 		h.app.Log.WarnContext(ctx, "sync banks", slog.Any("error", err))
-		h.app.SetNotice(w, kit.T(ctx, "Sync failed. Try again later"))
+		h.app.SetAlert(w, kit.SyncNotice(ctx, res))
 	} else {
 		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
 	}

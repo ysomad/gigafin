@@ -530,6 +530,7 @@ func (s *Banks) SyncAll(
 		res, err := s.Sync(ctx, userID, bank, loc, force)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", bank.Name(), err))
+			all.Failed = append(all.Failed, bank)
 		}
 		all.NeedsLogin = append(all.NeedsLogin, res.NeedsLogin...)
 		all.Operations += res.Operations

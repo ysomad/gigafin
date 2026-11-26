@@ -58,6 +58,10 @@ td.nowrap {
   body {
     padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
+  /* Oat leaves room above main for the top nav, which is at the bottom here */
+  main {
+    padding-block-start: calc(var(--space-4) + env(safe-area-inset-top));
+  }
   .to-top {
     bottom: calc(4.5rem + var(--space-2) + env(safe-area-inset-bottom));
   }

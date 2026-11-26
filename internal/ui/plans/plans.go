@@ -203,8 +203,14 @@ func (h *Handler) fillPlans(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		return domain.NewError(errors.ErrInvalid, "%s: %q must be YYYY-MM", domain.Msg("Month"), f.Month)
 	}
-	if _, err := h.app.Svc.Plans.Fill(r.Context(), user.ID, month); err != nil {
+	n, err := h.app.Svc.Plans.Fill(r.Context(), user.ID, month)
+	if err != nil {
 		return err
+	}
+	if n > 0 {
+		h.app.SetNotice(w, kit.T(r.Context(), "Repeated %d plans", n))
+	} else {
+		h.app.SetNotice(w, kit.T(r.Context(), "Nothing to repeat"))
 	}
 	kit.Redirect(w, r, "/plans?"+url.Values{"month": {f.Month}}.Encode())
 	return nil

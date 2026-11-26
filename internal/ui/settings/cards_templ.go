@@ -3128,8 +3128,8 @@ func toasts(d pageData) templ.Component {
 				}
 			}
 		}
-		if d.Banks.SyncFailed {
-			templ_7745c5c3_Err = kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later")).Render(ctx, templ_7745c5c3_Buffer)
+		if d.Banks.SyncFailed != "" {
+			templ_7745c5c3_Err = kit.Toast("danger", d.Banks.SyncFailed).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

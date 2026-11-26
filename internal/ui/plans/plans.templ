@@ -6,6 +6,7 @@ import (
 
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/money"
+	"github.com/ysomad/gigafin/internal/timex"
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
@@ -14,51 +15,78 @@ templ plansPage(v kit.Page, d plansData) {
 		<div class="hstack justify-between mb-4">
 			<div class="hstack">
 				@kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan"))
-				<form method="post" action="/plans/fill">
-					<input type="hidden" name="month" value={ d.Month.String() }/>
-					<button type="submit" class="outline" title={ kit.T(ctx, "Repeat plans") } data-tooltip-placement="right"><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#refresh-cw"></use></svg></button>
-				</form>
+				@fillButton(d.Month, false)
 			</div>
 			@kit.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
 		</div>
-		for _, sec := range d.Sections {
-			{{ inc := sec.Kind == domain.KindIncome }}
-			<section class="mb-6">
-				<h2>{ kit.KindLabel(ctx, sec.Kind) }</h2>
-				for _, tot := range sec.Totals {
-					<div class="card p-4 vstack gap-2 mb-2">
-						<div class="hstack justify-between">
-							<strong>{ kit.T(ctx, "Total") }</strong>
-							<span class="text-light">{ kit.T(ctx, "%d%% of plan", tot.Percent()) }</span>
+		{{
+			empty := true
+			for _, sec := range d.Sections {
+				empty = empty && len(sec.Planned) == 0
+			}
+		}}
+		if empty {
+			<div class="card p-4 vstack gap-2 items-center align-center">
+				<p class="text-light">{ kit.T(ctx, "No plans this month.") }</p>
+				<div class="hstack justify-center">
+					@fillButton(d.Month, true)
+					<a class="button outline" href={ "/plans/new?month=" + d.Month.String() }>+ { kit.T(ctx, "Plan") }</a>
+				</div>
+			</div>
+		} else {
+			for _, sec := range d.Sections {
+				{{ inc := sec.Kind == domain.KindIncome }}
+				<section class="mb-6">
+					<h2>{ kit.KindLabel(ctx, sec.Kind) }</h2>
+					for _, tot := range sec.Totals {
+						<div class="card p-4 vstack gap-2 mb-2">
+							<div class="hstack justify-between">
+								<strong>{ kit.T(ctx, "Total") }</strong>
+								<span class="text-light">{ kit.T(ctx, "%d%% of plan", tot.Percent()) }</span>
+							</div>
+							@planProgress(tot, inc, money.CurrencySymbol(tot.Currency))
 						</div>
-						@planProgress(tot, inc, money.CurrencySymbol(tot.Currency))
-					</div>
-				}
-				for _, it := range sec.Planned {
-					<details open?={ d.Open == fmt.Sprintf("%d:%s", it.Row.Category.ID, it.Row.Currency) }>
-						<summary>
-							<span class="vstack gap-2 w-100">
-								<span class="hstack gap-1">
-									if it.Parent != "" {
-										<span class="text-light">{ it.Parent } ›</span>
-									}
-									{ it.Row.Category.Name }
-									if it.Row.Repeating {
-										<svg width="12" height="12" class="text-light" role="img" aria-label={ kit.T(ctx, "Repeat every month") }><title>{ kit.T(ctx, "Repeat every month") }</title><use href="/static/img/icons.svg#refresh-cw"></use></svg>
-									}
+					}
+					for _, it := range sec.Planned {
+						<details open?={ d.Open == fmt.Sprintf("%d:%s", it.Row.Category.ID, it.Row.Currency) }>
+							<summary>
+								<span class="vstack gap-2 w-100">
+									<span class="hstack gap-1">
+										if it.Parent != "" {
+											<span class="text-light">{ it.Parent } ›</span>
+										}
+										{ it.Row.Category.Name }
+										if it.Row.Repeating {
+											<svg width="12" height="12" class="text-light" role="img" aria-label={ kit.T(ctx, "Repeat every month") }><title>{ kit.T(ctx, "Repeat every month") }</title><use href="/static/img/icons.svg#refresh-cw"></use></svg>
+										}
+									</span>
+									@planProgress(it.Row, inc, money.CurrencySymbol(it.Row.Currency))
 								</span>
-								@planProgress(it.Row, inc, "")
-							</span>
-						</summary>
-						@planRowForm(it.Row, d, v.Errors)
-					</details>
-				}
-				if len(sec.Planned) == 0 {
-					<p class="text-light">{ kit.T(ctx, "No plans this month.") }</p>
-				}
-			</section>
+							</summary>
+							@planRowForm(it.Row, d, v.Errors)
+						</details>
+					}
+					if len(sec.Planned) == 0 {
+						<p class="text-light">{ kit.T(ctx, "No plans this month.") }</p>
+					}
+				</section>
+			}
 		}
 	}
+}
+
+// fillButton copies the repeating plans of the months before month into it, with a
+// text label if labeled, else as an icon.
+templ fillButton(month timex.Month, labeled bool) {
+	<form method="post" action="/plans/fill">
+		<input type="hidden" name="month" value={ month.String() }/>
+		<button type="submit" class="outline" title={ kit.T(ctx, "Copy repeating plans from previous months") } aria-label={ kit.T(ctx, "Repeat plans") }>
+			<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#copy"></use></svg>
+			if labeled {
+				{ kit.T(ctx, "Repeat plans") }
+			}
+		</button>
+	</form>
 }
 
 // planProgress is the meter of row against its plan, colored by how it goes for an
@@ -90,16 +118,16 @@ templ planProgress(row domain.PlanRow, inc bool, symbol string) {
 		<span>
 			{ kit.Money(ctx, left.Abs(), row.Currency) }
 			<span class="text-light">
-			switch {
-				case left.IsNegative() && inc:
-					{ kit.T(ctx, "above plan") }
-				case left.IsNegative():
-					{ kit.T(ctx, "over") }
-				case inc:
-					{ kit.T(ctx, "to go") }
-				default:
-					{ kit.T(ctx, "left") }
-			}
+				switch  {
+					case left.IsNegative() && inc:
+						{ kit.T(ctx, "above plan") }
+					case left.IsNegative():
+						{ kit.T(ctx, "over") }
+					case inc:
+						{ kit.T(ctx, "to go") }
+					default:
+						{ kit.T(ctx, "left") }
+				}
 			</span>
 		</span>
 	</small>
@@ -171,7 +199,7 @@ templ planRowForm(row domain.PlanRow, d plansData, errs *kit.FormErrors) {
 				/>
 			}
 			<div class="col-6 hstack justify-between">
-				<label><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Repeat every month") }</label>
+				<label title={ kit.T(ctx, "Repeat every month") }><input type="checkbox" role="switch" name="repeating" value="true" checked?={ row.Repeating }/> { kit.T(ctx, "Monthly") }</label>
 				<a class="button outline small" href={ fmt.Sprintf("/operations?cat=%d&from=%s&to=%s", row.Category.ID, d.From, d.To) }><svg width="14" height="14" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg> { kit.T(ctx, "Operations") }</a>
 			</div>
 		</fieldset>

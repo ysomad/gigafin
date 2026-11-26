@@ -88,6 +88,12 @@ func (a *App) SetNotice(w http.ResponseWriter, msg string) {
 	http.SetCookie(w, a.Cookie(noticeCookie, url.QueryEscape(msg), 60))
 }
 
+// SetAlert sets msg to be shown as an error toast on the next page rendered, after a
+// redirect.
+func (a *App) SetAlert(w http.ResponseWriter, msg string) {
+	http.SetCookie(w, a.Cookie(flashCookie, url.QueryEscape(msg), 60))
+}
+
 // IsHTMX reports whether r is made by htmx.
 func IsHTMX(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
@@ -343,7 +349,7 @@ func (a *App) redirectBack(w http.ResponseWriter, r *http.Request, msg string) {
 }
 
 // takeFlash returns the message of the flash cookie name, set by redirectBack for
-// flashCookie or SetNotice for noticeCookie, and clears it.
+// or SetAlert for flashCookie or SetNotice for noticeCookie, and clears it.
 func (a *App) takeFlash(w http.ResponseWriter, r *http.Request, name string) string {
 	c, err := r.Cookie(a.cookieName(name))
 	if err != nil {

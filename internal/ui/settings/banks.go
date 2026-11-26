@@ -173,7 +173,7 @@ func (h *Handler) syncReply(w http.ResponseWriter, r *http.Request, user domain.
 	if err != nil {
 		// a failing bank is not a fault of this server; the card shows it too
 		h.app.Log.WarnContext(r.Context(), "sync bank", slog.Any("error", err))
-		d.Notice, d.Banks.SyncFailed = "", true
+		d.Notice, d.Banks.SyncFailed = "", kit.T(r.Context(), "Sync failed. Try again later")
 	}
 	if !kit.IsHTMX(r) && d.Notice != "" {
 		h.app.SetNotice(w, d.Notice)
@@ -234,11 +234,15 @@ func (h *Handler) banksAutoSync(w http.ResponseWriter, r *http.Request, user dom
 	case len(res.NeedsLogin) > 0 && (urlErr != nil || current.Path != "/settings"):
 		return h.app.Fragment(w, r, http.StatusOK, bankLoginAlert(kit.SyncNotice(ctx, res)))
 	case res.Operations > 0:
-		h.app.SetNotice(w, kit.SyncNotice(ctx, res))
+		if err != nil {
+			h.app.SetAlert(w, kit.SyncNotice(ctx, res))
+		} else {
+			h.app.SetNotice(w, kit.SyncNotice(ctx, res))
+		}
 		w.Header().Set("HX-Refresh", "true")
 		return nil
 	case err != nil:
-		d := pageData{Banks: banksData{SyncFailed: true}}
+		d := pageData{Banks: banksData{SyncFailed: kit.SyncNotice(ctx, res)}}
 		return h.app.Fragment(w, r, http.StatusOK, kit.Toasts(kit.Page{User: &user}, true, toasts(d)))
 	}
 	// an empty answer removes the placeholder

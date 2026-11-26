@@ -9,8 +9,8 @@ import (
 
 // opList is the operations page: a page of operations matching Filter.
 type opList struct {
-	// BankSync is set when the user syncs a bank, to sync it from the list, last at
-	// BankSyncAt, zero before the first sync.
+	// BankSync is set when the user syncs a bank, to sync it from the list, last
+	// successfully at BankSyncAt, zero before the first successful sync.
 	BankSync   bool
 	BankSyncAt time.Time
 	// Mismatched are the bank accounts whose balance differs from the account each

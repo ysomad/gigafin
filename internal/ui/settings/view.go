@@ -60,9 +60,9 @@ type banksData struct {
 	// picked first, 0 for a new account.
 	Choices   map[int64][]domain.Account
 	Suggested map[int64]int64
-	// SyncFailed marks a failed sync of an htmx post, shown as a toast; the error is
-	// logged, not shown, as it may carry what the bank answered.
-	SyncFailed bool
+	// SyncFailed is the toast of a failed sync of an htmx post, empty when none; the
+	// error is logged, not shown, as it may carry what the bank answered.
+	SyncFailed string
 }
 
 // bankData is the state of the section of a bank in the banks card.

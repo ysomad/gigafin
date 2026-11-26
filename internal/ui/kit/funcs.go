@@ -215,6 +215,16 @@ func OpAmount(ctx context.Context, op domain.Operation) string {
 // SyncNotice describes the outcome of a bank sync.
 func SyncNotice(ctx context.Context, res domain.BankSync) string {
 	switch {
+	case len(res.Failed) > 0:
+		names := make([]string, len(res.Failed))
+		for i, b := range res.Failed {
+			names[i] = T(ctx, b.Name())
+		}
+		msg := T(ctx, "Sync failed: %s. Try again later", strings.Join(names, ", "))
+		if res.Operations > 0 {
+			msg += ". " + T(ctx, "Synced operations: %d", res.Operations)
+		}
+		return msg
 	case len(res.NeedsLogin) > 0:
 		names := make([]string, len(res.NeedsLogin))
 		for i, b := range res.NeedsLogin {

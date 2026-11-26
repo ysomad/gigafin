@@ -509,7 +509,7 @@ templ toasts(d pageData) {
 			@kit.Toast("danger", kit.T(ctx, "Some failed:")+" "+kit.ErrMsg(ctx, d.RatesSync.Err))
 		}
 	}
-	if d.Banks.SyncFailed {
-		@kit.Toast("danger", kit.T(ctx, "Sync failed. Try again later"))
+	if d.Banks.SyncFailed != "" {
+		@kit.Toast("danger", d.Banks.SyncFailed)
 	}
 }

@@ -123,6 +123,8 @@ func (t BankAccount) Mismatch(a Account) bool {
 type BankSync struct {
 	// NeedsLogin are the banks the user must sign in to again.
 	NeedsLogin []Bank
+	// Failed are the banks whose sync failed.
+	Failed []Bank
 	// Operations is the number of operations created.
 	Operations int
 }

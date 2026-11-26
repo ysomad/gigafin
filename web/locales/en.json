@@ -1,7 +1,8 @@
 {
   "$schema": "./schema.json",
   "common": {
-    "Matches %d operations, the latest:": {"one": "Matches %d operation, the latest:", "other": "Matches %d operations, the latest:"}
+    "Matches %d operations, the latest:": {"one": "Matches %d operation, the latest:", "other": "Matches %d operations, the latest:"},
+    "Repeated %d plans": {"one": "Repeated %d plan", "other": "Repeated %d plans"}
   },
   "errors": {
     "account has %d operations, archive it instead": {"one": "account has %d operation, archive it instead", "other": "account has %d operations, archive it instead"},
