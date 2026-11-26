@@ -142,10 +142,10 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 										{ t.Name }
 									</div>
 								</td>
-								<td class="align-right nowrap">{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></td>
+								<td class="align-right nowrap"><span data-amount>{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></span></td>
 								<td class="align-right nowrap">
 									if !t.CreditLimit.IsZero() {
-										{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span>
+										<span data-amount>{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></span>
 									}
 								</td>
 								<td>

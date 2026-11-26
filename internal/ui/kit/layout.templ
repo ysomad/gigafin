@@ -42,6 +42,8 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 			<meta name="htmx-config" content='{"defaultSwap":"innerHTML"}'/>
 			<title>{ v.Title }</title>
 			// ?v= makes browsers load the files anew once they change, see web.Version
+			// not deferred: it hides amounts before they are drawn
+			<script src={ "/static/js/privacy.js?v=" + web.Version }></script>
 			<link rel="stylesheet" href={ "/static/dist/app.min.css?v=" + web.Version }/>
 			<script src={ "/static/lib/htmx.min.js?v=" + web.Version } defer></script>
 			<script src={ "/static/lib/hx-history-cache.min.js?v=" + web.Version } defer></script>
@@ -61,6 +63,10 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 							@navLink("/operations", v.Nav == "operations", T(ctx, "Operations"))
 							@navLink("/accounts", v.Nav == "accounts", T(ctx, "Accounts"))
 							@navLink("/plans", v.Nav == "plans", T(ctx, "Plans"))
+							<button type="button" class="button small ghost" data-privacy-toggle aria-pressed="false" aria-label={ T(ctx, "Hide amounts") }>
+								<svg data-icon="eye" width="18" height="18" aria-hidden="true"><use href="/static/img/icons.svg#eye"></use></svg>
+								<svg data-icon="eye-off" width="18" height="18" aria-hidden="true"><use href="/static/img/icons.svg#eye-off"></use></svg>
+							</button>
 							@navLink("/settings", v.Nav == "settings", "...")
 						</div>
 					}

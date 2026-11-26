@@ -4,16 +4,17 @@ import "github.com/ysomad/gigafin/internal/ui/kit"
 
 templ page(v kit.Page, d pageData) {
 	@kit.Layout(v, false, toasts(d)) {
+		// the menu wraps under the login on phones
 		<div class="hstack justify-between mb-4">
+			<form method="post" action="/logout" class="hstack">
+				<span>{ kit.T(ctx, "Signed in as") } <strong>{ v.User.Login }</strong></span>
+				<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Sign out") }</button>
+			</form>
 			<div class="hstack">
 				@kit.LinkButton("/categories", "secondary", kit.T(ctx, "Categories"))
 				@kit.LinkButton("/rules", "secondary", kit.T(ctx, "Rules"))
 				@kit.LinkButton("/imports", "secondary", kit.T(ctx, "Import"))
 			</div>
-			<form method="post" action="/logout" class="hstack">
-				<span>{ kit.T(ctx, "Signed in as") } <strong>{ v.User.Login }</strong></span>
-				<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Sign out") }</button>
-			</form>
 		</div>
 		// Settings are one form, saved as a whole on change. An htmx form gets back the
 		// cards showing what it changes and the toasts, swapped in out of band. Every

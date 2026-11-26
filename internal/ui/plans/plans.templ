@@ -115,9 +115,9 @@ templ planProgress(row domain.PlanRow, inc bool, symbol string) {
 		<meter value={ min(max(row.Percent(), 0), 101) } max="101" low="80" high="100" optimum="0" aria-label={ kit.T(ctx, "%d%% of plan", row.Percent()) }>{ row.Percent() }%</meter>
 	}
 	<small class="hstack justify-between">
-		<span>{ kit.Money(ctx, row.Spent, row.Currency) } <span class="text-light">{ kit.T(ctx, "of") } { kit.Money(ctx, row.Plan, row.Currency) } { symbol }</span></span>
+		<span><span data-amount>{ kit.Money(ctx, row.Spent, row.Currency) }</span> <span class="text-light">{ kit.T(ctx, "of") } <span data-amount>{ kit.Money(ctx, row.Plan, row.Currency) } { symbol }</span></span></span>
 		<span>
-			{ kit.Money(ctx, left.Abs(), row.Currency) }
+			<span data-amount>{ kit.Money(ctx, left.Abs(), row.Currency) }</span>
 			<span class="text-light">
 				switch  {
 					case left.IsNegative() && inc:

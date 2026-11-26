@@ -108,10 +108,15 @@ td.nowrap {
     .brand {
       display: none;
     }
+    /* tabs are narrower than Oat's small buttons, so all fit the width of a phone */
     nav > div {
       width: 100%;
       flex-wrap: nowrap;
       justify-content: space-around;
+      gap: 0;
+      > * {
+        padding-inline: var(--space-1);
+      }
     }
   }
 }
@@ -297,4 +302,15 @@ summary:hover :is(progress, meter) {
   &:hover {
     background-color: transparent;
   }
+}
+
+/* Privacy mode, toggled in the nav, blurs amounts and the charts drawing them. An amount
+   input shows its value while focused, to edit it. */
+html.private :is([data-amount], figure.trend, input[inputmode="decimal"]:not(:focus)) {
+  filter: blur(0.4em);
+}
+/* The toggle shows an open eye while amounts show, a closed one while they are blurred. */
+html.private [data-privacy-toggle] [data-icon="eye"],
+html:not(.private) [data-privacy-toggle] [data-icon="eye-off"] {
+  display: none;
 }

@@ -132,3 +132,23 @@ document.addEventListener('change', e => {
   field.hidden = e.target.value !== 'credit';
   if (!row) field.querySelector('input').disabled = field.hidden;
 });
+
+// Privacy mode blurs amounts, see web/static/js/privacy.js, which turns it on before the
+// page is drawn. The toggle is in the nav, swapped with every boosted page, so its
+// pressed state is set anew after each swap.
+function syncPrivacy() {
+  const on = document.documentElement.classList.contains('private');
+  for (const button of document.querySelectorAll('[data-privacy-toggle]')) {
+    button.setAttribute('aria-pressed', String(on));
+  }
+}
+document.addEventListener('DOMContentLoaded', syncPrivacy);
+document.addEventListener('htmx:after:settle', syncPrivacy);
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-privacy-toggle]')) return;
+  const on = document.documentElement.classList.toggle('private');
+  try {
+    localStorage.setItem('privacy', on ? '1' : '0');
+  } catch {}
+  syncPrivacy();
+});

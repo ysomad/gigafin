@@ -55,7 +55,8 @@
 - [x] unsplit
 - [x] consistent split / rules ui
 - [x] better plans ui/ux
-- [ ] privacy mode
+- [x] privacy mode
+- [ ] demo
 - [ ] remove useless slop comments
 - [ ] refactor helpers (move short helpers into domain if needed)
 - [ ] refactor tests

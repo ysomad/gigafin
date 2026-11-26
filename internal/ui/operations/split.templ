@@ -40,7 +40,7 @@ templ splitPage(v kit.Page, d opSplit) {
 					}
 				</small>
 			</div>
-			<div class="align-right">{ kit.OpAmount(ctx, d.Op) } <span class="text-light">{ money.CurrencySymbol(d.Op.Currency) }</span></div>
+			<div class="align-right"><span data-amount>{ kit.OpAmount(ctx, d.Op) } <span class="text-light">{ money.CurrencySymbol(d.Op.Currency) }</span></span></div>
 		</div>
 		<form id="form-split" class="form-compact" method="post" action={ fmt.Sprintf("/operations/%d/split", d.Op.ID) } data-split-total={ d.Amount }>
 			@kit.FormError(v.Errors.Form("split"), "")

@@ -32,7 +32,7 @@ templ BankBadge(t domain.BankAccount, a domain.Account) {
 			diff = "+" + diff
 		}
 	}}
-	<span class="badge" data-variant="warning" title={ T(ctx, "Bank balance: %s", t.Balance.Format(t.Currency)) }>{ diff }</span>
+	<span class="badge" data-variant="warning" data-amount title={ T(ctx, "Bank balance: %s", t.Balance.Format(t.Currency)) }>{ diff }</span>
 }
 
 templ ArchivedBadge() {
@@ -192,7 +192,7 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 								net = "+" + net
 							}
 						}}
-						<span>{ net } { money.CurrencySymbol(fl.Currency) }</span>
+						<span data-amount>{ net } { money.CurrencySymbol(fl.Currency) }</span>
 					}
 				</span>
 			</li>
@@ -226,7 +226,7 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 					</small>
 				</a>
 				<div class="align-right">
-					{ OpAmount(ctx, op) } <span class="text-light">{ money.CurrencySymbol(op.Currency) }</span>
+					<span data-amount>{ OpAmount(ctx, op) } <span class="text-light">{ money.CurrencySymbol(op.Currency) }</span></span>
 					if day.Date.IsZero() {
 						<div><small class="text-light">{ DayTitle(ctx, op.Date) }</small></div>
 					}

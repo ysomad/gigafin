@@ -246,7 +246,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 								}
 							</small>
 						</td>
-						<td class="align-right nowrap">{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span></td>
+						<td class="align-right nowrap"><span data-amount>{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span></span></td>
 						<td>
 							switch  {
 								case row.Status == domain.ImportRowDuplicate:
@@ -319,7 +319,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 							</td>
 							<td class="align-right nowrap">
 								if r.Currency != "" {
-									{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span>
+									<span data-amount>{ kit.Money(ctx, r.Amount, r.Currency) } <span class="text-light">{ money.CurrencySymbol(r.Currency) }</span></span>
 								} else {
 									—
 								}

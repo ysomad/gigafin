@@ -32,7 +32,7 @@ templ accountsPage(v kit.Page, d accountsData) {
 							</div>
 							<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
 						</a>
-						<div class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+						<div class="align-right"><span data-amount>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></div>
 					</li>
 				}
 			</ul>
@@ -55,9 +55,9 @@ templ accountsPage(v kit.Page, d accountsData) {
 							<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
 						</a>
 						<div class="align-right">
-							<div>{ kit.Money(ctx, a.Owed(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+							<div><span data-amount>{ kit.Money(ctx, a.Owed(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></div>
 							if !a.CreditLimit.IsZero() {
-								<small class="text-light">{ kit.T(ctx, "Available") } { kit.Money(ctx, a.Available(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></small>
+								<small class="text-light">{ kit.T(ctx, "Available") } <span data-amount>{ kit.Money(ctx, a.Available(), a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></small>
 							}
 						</div>
 					</li>
@@ -79,7 +79,7 @@ templ accountsPage(v kit.Page, d accountsData) {
 								</div>
 								<small class="text-light">{ kit.T(ctx, string(a.Kind)) }</small>
 							</a>
-							<div class="align-right">{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></div>
+							<div class="align-right"><span data-amount>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></div>
 						</li>
 					}
 				</ul>
@@ -109,15 +109,15 @@ templ accountPage(v kit.Page, d accountData) {
 				if d.Linked.Mismatch(a) {
 					@kit.BankBadge(d.Linked, a)
 				}
-				<h2 aria-label={ kit.T(ctx, "Balance") }>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></h2>
+				<h2 aria-label={ kit.T(ctx, "Balance") }><span data-amount>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></h2>
 			</div>
 		</div>
 		if !a.CreditLimit.IsZero() {
 			<div class="mb-4">
 				<progress value={ a.Owed().Fixed(a.Currency) } max={ a.CreditLimit.Fixed(a.Currency) } aria-label={ kit.T(ctx, "Owed") }></progress>
 				<div class="hstack justify-between text-light">
-					<span>{ kit.T(ctx, "owed %s", kit.Money(ctx, a.Owed(), a.Currency)) }</span>
-					<span>{ kit.T(ctx, "available %s of %s", kit.Money(ctx, a.Available(), a.Currency), kit.Money(ctx, a.CreditLimit, a.Currency)) }</span>
+					<span data-amount>{ kit.T(ctx, "owed %s", kit.Money(ctx, a.Owed(), a.Currency)) }</span>
+					<span data-amount>{ kit.T(ctx, "available %s of %s", kit.Money(ctx, a.Available(), a.Currency), kit.Money(ctx, a.CreditLimit, a.Currency)) }</span>
 				</div>
 			</div>
 		}
