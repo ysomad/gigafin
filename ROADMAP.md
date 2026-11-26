@@ -56,7 +56,7 @@
 - [x] consistent split / rules ui
 - [x] better plans ui/ux
 - [x] privacy mode
-- [ ] demo
+- [ ] archive / unarchive account - back - account state is not shown on page
 - [ ] remove useless slop comments
 - [ ] refactor helpers (move short helpers into domain if needed)
 - [ ] refactor tests

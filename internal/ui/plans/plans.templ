@@ -27,13 +27,7 @@ templ plansPage(v kit.Page, d plansData) {
 			}
 		}}
 		if empty {
-			<div class="card p-4 vstack gap-2 items-center align-center">
-				<p class="text-light">{ kit.T(ctx, "No plans this month.") }</p>
-				<div class="hstack justify-center">
-					@fillButton(d.Month, true)
-					<a class="button outline" href={ "/plans/new?month=" + d.Month.String() }>+ { kit.T(ctx, "Plan") }</a>
-				</div>
-			</div>
+			<p class="text-light">{ kit.T(ctx, "No plans this month.") }</p>
 		} else {
 			for _, sec := range d.Sections {
 				{{ inc := sec.Kind == domain.KindIncome }}
