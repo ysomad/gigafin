@@ -55,6 +55,11 @@
 - [x] unsplit
 - [x] consistent split / rules ui
 - [x] better plans ui/ux
+- [ ] privacy mode
+- [ ] remove useless slop comments
+- [ ] refactor helpers (move short helpers into domain if needed)
+- [ ] refactor tests
+- [ ] first release
 - [ ] sber sync
 - [ ] alfa sync
 - [ ] raiifaizen sync

@@ -8,8 +8,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/pressly/goose/v3"
+
 	"github.com/ysomad/gigafin/internal/errors"
 	"github.com/ysomad/gigafin/internal/gen/sqlc"
+	"github.com/ysomad/gigafin/migrations"
 )
 
 const _pragmas = "_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)" +
@@ -40,8 +43,20 @@ type Store struct {
 	r *sql.DB
 }
 
-// Open opens the database at path. Migrations are applied separately with goose.
+// Open opens the database at path, creating it if missing, and applies pending migrations.
 func Open(ctx context.Context, path string) (*Store, error) {
+	m, err := open(ctx, path, "" /* extra */, 1 /* conns */)
+	if err != nil {
+		return nil, err
+	}
+	p, err := goose.NewProvider(goose.DialectSQLite3, m, migrations.FS)
+	if err == nil {
+		_, err = p.Up(ctx)
+	}
+	if err := errors.Join(err, m.Close()); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+
 	w, err := open(ctx, path, "&_txlock=immediate", 1 /* conns */)
 	if err != nil {
 		return nil, err

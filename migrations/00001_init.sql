@@ -5,7 +5,6 @@ CREATE TABLE users (
     password_hash       TEXT    NOT NULL,
     timezone            TEXT    NOT NULL,
     role                TEXT    NOT NULL,
-    -- TOTP two-factor authentication, NULL when off; secrets are encrypted
     totp_secret         BLOB,
     totp_pending_secret BLOB,
     totp_last_step      INTEGER,
@@ -140,7 +139,6 @@ CREATE TABLE operations (
     UNIQUE (user_id, import_hash)
 ) STRICT;
 
--- the order of ListOperations: newest first by date and time, parts of a split together
 CREATE INDEX operations_user_order_idx ON operations (
     user_id, date DESC, coalesce(time, '') DESC, coalesce(origin_id, id) DESC, id DESC
 );
@@ -195,8 +193,6 @@ CREATE TABLE operation_tags (
 
 CREATE INDEX operation_tags_tag_idx ON operation_tags (tag_id);
 
--- the text the operations search looks in: payee, bank payee, note, MCC, the names of
--- the accounts, the category and its parent, and the tags; ё is е as in the query
 CREATE VIEW operation_search AS
 SELECT
     o.id,
@@ -291,8 +287,6 @@ CREATE TABLE import_rows (
     status       TEXT    NOT NULL,
     pair_row_id  INTEGER REFERENCES import_rows(id) ON DELETE SET NULL,
     operation_id INTEGER REFERENCES operations(id) ON DELETE SET NULL,
-    -- the id of the operation at the source, for sources that have one: rows stay
-    -- duplicates after the source changes their other fields
     external_id  TEXT
 ) STRICT;
 
@@ -348,15 +342,12 @@ CREATE TABLE bank_accounts (
     credit_limit INTEGER NOT NULL,
     account_id   INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
     synced_until INTEGER,
-    -- where the sync of the linked account starts: operations before it are in gigafin
-    -- already, so no overlap goes back past it
     synced_from  INTEGER,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER,
     UNIQUE (user_id, bank, external_id)
 ) STRICT;
 
--- an account syncs with one bank account at most
 CREATE UNIQUE INDEX bank_accounts_account_idx ON bank_accounts (account_id);
 
 CREATE TABLE rules (

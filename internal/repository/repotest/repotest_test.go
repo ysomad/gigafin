@@ -2,14 +2,14 @@ package repotest_test
 
 import (
 	"database/sql"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 
-	"github.com/ysomad/gigafin/internal/repository/repotest"
+	"github.com/ysomad/gigafin/migrations"
 )
 
 func TestMigrationsUpDownUp(t *testing.T) {
@@ -19,7 +19,7 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, raw.Close()) })
 
-	p, err := goose.NewProvider(goose.DialectSQLite3, raw, os.DirFS(repotest.MigrationsDir(t)))
+	p, err := goose.NewProvider(goose.DialectSQLite3, raw, migrations.FS)
 	require.NoError(t, err)
 	ctx := t.Context()
 	_, err = p.Up(ctx)

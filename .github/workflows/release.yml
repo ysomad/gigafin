@@ -1,0 +1,30 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: make bundle
+      - name: build
+        run: |
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os=${t%/*} arch=${t#*/} ext=
+            [ "$os" = windows ] && ext=.exe
+            dir=dist/gigafin_${os}_${arch}
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags='-s -w' -o "$dir/gigafin$ext" .
+            tar -czf "$dir.tar.gz" -C "$dir" "gigafin$ext"
+          done
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes dist/*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}

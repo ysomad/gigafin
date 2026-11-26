@@ -2,8 +2,9 @@ root = "."
 tmp_dir = "bin/tmp"
 
 [build]
-cmd = "go tool templ generate -path internal/ui && make build-app migrate-up && ./bin/fw-allow.sh"
+cmd = "go tool templ generate -path internal/ui && make build && ./bin/fw-allow.sh"
 entrypoint = ["./bin/gigafin"]
+args_bin = ["serve"]
 include_ext = ["go", "templ", "css", "js", "sql", "yaml"]
 exclude_dir = ["bin", ".playwright-mcp", "internal/gen", "web/static/dist"]
 exclude_regex = ["_test\\.go$", "_templ\\.go$"]
