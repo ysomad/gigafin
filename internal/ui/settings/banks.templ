@@ -37,7 +37,7 @@ templ banksCard(v kit.Page, d banksData, oob bool) {
 templ bankSection(v kit.Page, d banksData, b bankData) {
 	{{ name := kit.T(ctx, b.Bank.Name()) }}
 	{{ base := "/settings/banks/" + string(b.Bank) }}
-	{{ connected := b.Conn.Connected() && b.Step == "" }}
+	{{ connected := b.Conn.IsConnected() && b.Step == "" }}
 	<section class="form-compact">
 		<div class="hstack justify-between">
 			<div class="hstack">
@@ -56,7 +56,7 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 				{{ link := base + "/link" }}
 				<div class="hstack">
 					// posts the account table of the bank, linking the accounts not synced yet
-					if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && !t.Linked() }) {
+					if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && !t.IsLinked() }) {
 						<button type="submit" form={ "form-" + string(b.Bank) + "-link" } formaction={ link } hx-post={ link } hx-swap="none" hx-disable="this" class="outline small">{ kit.T(ctx, "Sync all accounts") }</button>
 					}
 					<form method="post" action={ base + "/disconnect" } hx-post={ base + "/disconnect" } hx-swap="none" hx-confirm={ kit.T(ctx, "Disconnect %s? Synced operations stay.", name) }>
@@ -129,7 +129,7 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 		@kit.FormError(v.Errors.Form(string(bank)+"-link"), "")
 		<div class="table">
 			<table>
-				<thead><tr><th>{ kit.T(ctx, "Account") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th><th class="align-right">{ kit.T(ctx, "Credit limit") }</th><th>{ kit.T(ctx, "Syncs with") }</th></tr></thead>
+				<thead><tr><th>{ kit.T(ctx, "Account") }</th><th class="align-right">{ kit.T(ctx, "Balance") }</th><th>{ kit.T(ctx, "Link") }</th></tr></thead>
 				<tbody>
 					{{ n := 0 }}
 					for _, t := range d.Accounts {
@@ -140,21 +140,20 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 									<div class="hstack gap-1">
 										@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 										{ t.Name }
+										<span class="text-light">{ money.CurrencySymbol(t.Currency) }</span>
 									</div>
 								</td>
-								<td class="align-right nowrap"><span data-amount>{ kit.Money(ctx, t.Balance, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></span></td>
-								<td class="align-right nowrap">
+								// in the currency by the name, the credit limit, if any, under the balance
+								<td class="align-right">
+									<div class="nowrap"><span data-amount>{ kit.Money(ctx, t.Balance, t.Currency) }</span></div>
 									if !t.CreditLimit.IsZero() {
-										<span data-amount>{ kit.Money(ctx, t.CreditLimit, t.Currency) } <span class="text-light">{ money.CurrencySymbol(t.Currency) }</span></span>
+										<small class="text-light">{ kit.T(ctx, "limit") } <span class="nowrap" data-amount>{ kit.Money(ctx, t.CreditLimit, t.Currency) }</span></small>
 									}
 								</td>
 								<td>
 									if a, ok := d.Linked[t.AccountID]; ok {
 										<div class="hstack gap-1">
 											<a class="badge" data-variant="success" href={ fmt.Sprintf("/accounts/%d", a.ID) }>✓ { a.Name }</a>
-											if t.Mismatch(a) {
-												@kit.BankBadge(t, a)
-											}
 										</div>
 									} else {
 										{{ id := strconv.FormatInt(t.ID, 10) }}
@@ -170,7 +169,7 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 						}
 					}
 					if n == 0 {
-						@kit.EmptyRow(4, kit.T(ctx, "No accounts yet."))
+						@kit.EmptyRow(3, kit.T(ctx, "No accounts yet."))
 					}
 				</tbody>
 			</table>
@@ -178,14 +177,17 @@ templ bankAccounts(v kit.Page, d banksData, bank domain.Bank) {
 	</form>
 }
 
-// bankLoginAlert shows msg, that banks ask to sign in again, linking to the banks card
-// of the settings page; it tops the pages opened while a bank does not accept the
-// session.
-templ bankLoginAlert(msg string) {
+// bankLoginAlert shows msg, that banks ask to sign in again, with their logos, linking
+// to the banks card of the settings page; it tops the pages opened while a bank does
+// not accept the session.
+templ bankLoginAlert(banks []domain.Bank, msg string) {
 	<div role="alert" data-variant="warning" class="mb-4">
-		<span>
+		<span class="hstack gap-1">
+			for _, b := range banks {
+				@kit.BankLogo(b, kit.T(ctx, b.Name()))
+			}
 			{ msg }
-			<a href="/settings#settings-banks">{ kit.T(ctx, "Sign in") }</a>
+			<a href="/settings#settings-banks"><strong>{ kit.T(ctx, "Sign in") }</strong></a>
 		</span>
 	</div>
 }

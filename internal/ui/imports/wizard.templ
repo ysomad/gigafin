@@ -13,7 +13,7 @@ templ wizardPage(v kit.Page, d wizardData) {
 	{{
 		preview := d.Preview
 		base := fmt.Sprintf("/imports/%d", preview.Import.ID)
-		staged := preview.Import.Staged()
+		staged := preview.Import.IsStaged()
 	}}
 	@kit.Layout(v, true, nil) {
 		<h1>{ kit.T(ctx, "Import #%d", preview.Import.ID) }</h1>
@@ -58,7 +58,7 @@ templ wizardPage(v kit.Page, d wizardData) {
 							@discardButton(base, kit.T(ctx, "Cancel"))
 							@kit.LinkButton(base+"/categories", "secondary", kit.T(ctx, "Back"))
 							<form method="post" action={ base + "/commit" } hx-disable="find button">
-								<button type="submit" disabled?={ !preview.Ready() }>{ kit.T(ctx, "Import %d rows", preview.Import.RowsNew) }</button>
+								<button type="submit" disabled?={ !preview.IsReady() }>{ kit.T(ctx, "Import %d rows", preview.Import.RowsNew) }</button>
 							</form>
 						case domain.ImportCommitted:
 							<form method="post" action={ base + "/undo" } hx-confirm={ kit.T(ctx, "Delete all operations created by this import?") }>
@@ -68,10 +68,10 @@ templ wizardPage(v kit.Page, d wizardData) {
 							@discardButton(base, kit.T(ctx, "Delete from history"))
 					}
 				</div>
-				if staged && !preview.AccountsMapped() {
+				if staged && !preview.HasAccountsMapped() {
 					<p role="alert" data-variant="warning">{ kit.T(ctx, "Some accounts are not mapped yet.") } <a href={ base + "/accounts" }>{ kit.T(ctx, "Map accounts") }</a></p>
 				}
-				if staged && !preview.CategoriesMapped() {
+				if staged && !preview.HasCategoriesMapped() {
 					<p role="alert" data-variant="warning">{ kit.T(ctx, "Some categories are not mapped yet.") } <a href={ base + "/categories" }>{ kit.T(ctx, "Map categories") }</a></p>
 				}
 				@rows(preview, base, v.User)
@@ -253,7 +253,7 @@ templ rows(p domain.Preview, base string, user *domain.User) {
 									<svg class="text-light" width="16" height="16" role="img" aria-label={ kit.T(ctx, "duplicate") }><title>{ kit.T(ctx, "duplicate") }</title><use href="/static/img/icons.svg#copy"></use></svg>
 								case row.OperationID != 0:
 									<a href={ fmt.Sprintf("/operations/%d/edit", row.OperationID) }><svg width="16" height="16" role="img" aria-label={ kit.T(ctx, "imported") }><title>{ kit.T(ctx, "imported") }</title><use href="/static/img/icons.svg#check"></use></svg></a>
-								case row.PairID != 0 && p.Import.Staged():
+								case row.PairID != 0 && p.Import.IsStaged():
 									<form method="post" action={ fmt.Sprintf("%s/unpair/%d", base, row.ID) }>
 										<button type="submit" class="outline small" data-variant="secondary">{ kit.T(ctx, "Not a transfer") }</button>
 									</form>

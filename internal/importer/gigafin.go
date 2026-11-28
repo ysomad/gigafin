@@ -173,7 +173,7 @@ func parseGigaFinRow(get func(column string) string, loc *time.Location) (domain
 // back as expense or income without a category.
 func WriteGigaFin(w io.Writer, ops []domain.Operation, accounts, categories map[int64]string) error {
 	split := func(op domain.Operation) bool {
-		return op.IsSplit() && op.Type.Categorized()
+		return op.IsSplit() && op.Type.IsCategorized()
 	}
 	// a part whose split has no other part in ops is written as a plain operation
 	parts := make(map[int64]int)

@@ -63,7 +63,7 @@ templ Layout(v Page, toTop bool, toasts templ.Component) {
 							@navLink("/operations", v.Nav == "operations", T(ctx, "Operations"))
 							@navLink("/accounts", v.Nav == "accounts", T(ctx, "Accounts"))
 							@navLink("/plans", v.Nav == "plans", T(ctx, "Plans"))
-							<button type="button" class="button small ghost" data-privacy-toggle aria-pressed="false" aria-label={ T(ctx, "Hide amounts") }>
+							<button type="button" data-privacy-toggle aria-pressed="false" aria-label={ T(ctx, "Hide amounts") }>
 								<svg data-icon="eye" width="18" height="18" aria-hidden="true"><use href="/static/img/icons.svg#eye"></use></svg>
 								<svg data-icon="eye-off" width="18" height="18" aria-hidden="true"><use href="/static/img/icons.svg#eye-off"></use></svg>
 							</button>
@@ -116,6 +116,7 @@ templ DialogHeader(id, title, back string) {
 templ navLink(href string, current bool, label string) {
 	<a
 		href={ href }
+		data-label={ label }
 		if current {
 			aria-current="page"
 		}

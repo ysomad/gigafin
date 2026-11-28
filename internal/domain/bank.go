@@ -86,8 +86,8 @@ type BankConnection struct {
 	LastError string
 }
 
-// Connected reports whether the bank accepts the session of the connection.
-func (c BankConnection) Connected() bool {
+// IsConnected reports whether the bank accepts the session of the connection.
+func (c BankConnection) IsConnected() bool {
 	return c.Status == BankConnected
 }
 
@@ -125,25 +125,25 @@ type BankAccount struct {
 	TransfersTo int64
 }
 
-// Linked reports whether the bank account is synced with an account.
-func (t BankAccount) Linked() bool {
+// IsLinked reports whether the bank account is synced with an account.
+func (t BankAccount) IsLinked() bool {
 	return t.AccountID != 0
 }
 
 // LinkedBankAccount returns the bank account of ts the account id syncs with, false
 // when it syncs with none.
 func LinkedBankAccount(ts []BankAccount, id int64) (BankAccount, bool) {
-	i := slices.IndexFunc(ts, func(t BankAccount) bool { return t.Linked() && t.AccountID == id })
+	i := slices.IndexFunc(ts, func(t BankAccount) bool { return t.IsLinked() && t.AccountID == id })
 	if i < 0 {
 		return BankAccount{}, false
 	}
 	return ts[i], true
 }
 
-// Mismatch reports whether a is the linked account and its balance differs from the
+// IsMismatched reports whether a is the linked account and its balance differs from the
 // bank's.
-func (t BankAccount) Mismatch(a Account) bool {
-	return t.Linked() && t.AccountID == a.ID && !t.Balance.Equal(a.Balance)
+func (t BankAccount) IsMismatched(a Account) bool {
+	return t.IsLinked() && t.AccountID == a.ID && !t.Balance.Equal(a.Balance)
 }
 
 // BankSync is the outcome of syncing one bank or several.

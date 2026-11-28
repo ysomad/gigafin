@@ -461,9 +461,9 @@ func TestPagesAndFlows(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	assert.Contains(t, body, "gf_")
 	assert.Contains(t, body, "be shown again")
-	assert.Contains(t, body, "this browser", "current session listed")
-	assert.Contains(t, body, `<td>read</td><td class="nowrap">never</td><td class="nowrap">never</td>`,
-		"never used, never expires")
+	assert.Contains(t, body, "this device", "current session listed")
+	assert.Contains(t, body, `API key · read</small></td><td><div class="nowrap">never</div>`, "never used")
+	assert.Contains(t, body, `Expires <span class="nowrap">never</span>`, "never expires")
 }
 
 func TestChangePassword(t *testing.T) {
@@ -845,7 +845,7 @@ func TestBackup(t *testing.T) {
 
 		status, body := b.get("/settings")
 		require.Equal(t, http.StatusOK, status)
-		assert.Contains(t, body, "Download backup")
+		assert.Contains(t, body, ">Download</button>")
 
 		status, body = b.postFrom("/settings/backup", "/settings",
 			url.Values{"password": {""}, "passphrase": {""}})

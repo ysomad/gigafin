@@ -988,7 +988,7 @@ func opFields(v kit.Page, d opForm) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		if d.Type.Categorized() {
+		if d.Type.IsCategorized() {
 			e := v.Errors.Get("category")
 			templ_7745c5c3_Var45 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -1434,7 +1434,7 @@ func opButtons(d opForm) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if editing && d.Type.Categorized() {
+		if editing && d.Type.IsCategorized() {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "<a class=\"button outline\" href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

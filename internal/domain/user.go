@@ -37,8 +37,8 @@ type Session struct {
 	Current bool
 }
 
-// Live reports whether s has not expired at now.
-func (s Session) Live(now time.Time) bool {
+// IsLive reports whether s has not expired at now.
+func (s Session) IsLive(now time.Time) bool {
 	return now.Before(s.ExpiresAt)
 }
 
@@ -249,19 +249,19 @@ type APIKey struct {
 	CreatedAt  time.Time
 }
 
-// Live reports whether k is usable at now: not revoked and not expired.
-func (k APIKey) Live(now time.Time) bool {
-	return !k.Revoked && !k.ExpiredAt(now)
+// IsLive reports whether k is usable at now: not revoked and not expired.
+func (k APIKey) IsLive(now time.Time) bool {
+	return !k.Revoked && !k.IsExpired(now)
 }
 
-// ExpiredAt reports whether k has an expiry that passed at now.
-func (k APIKey) ExpiredAt(now time.Time) bool {
+// IsExpired reports whether k has an expiry that passed at now.
+func (k APIKey) IsExpired(now time.Time) bool {
 	return !k.ExpiresAt.IsZero() && !now.Before(k.ExpiresAt)
 }
 
-// Touch reports whether using k at now should be stored as its last use, so a
+// ShouldTouch reports whether using k at now should be stored as its last use, so a
 // request does not write on every call.
-func (k APIKey) Touch(now time.Time) bool {
+func (k APIKey) ShouldTouch(now time.Time) bool {
 	// how stale the stored last use may get
 	const refresh = time.Hour
 	return now.Sub(k.LastUsedAt) >= refresh

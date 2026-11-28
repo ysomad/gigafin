@@ -45,9 +45,9 @@ type Category struct {
 	Children []Category
 }
 
-// Pickable reports whether the category may be picked in a form: it is not archived,
+// IsPickable reports whether the category may be picked in a form: it is not archived,
 // or it is one of selected, picked before it was.
-func (c Category) Pickable(selected ...int64) bool {
+func (c Category) IsPickable(selected ...int64) bool {
 	return !c.Archived || slices.Contains(selected, c.ID)
 }
 

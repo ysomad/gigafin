@@ -123,9 +123,9 @@ const (
 	_accountCashLoan = "CashLoan"
 )
 
-// tracked reports whether the account can sync with a gigafin account: it is not
+// isTracked reports whether the account can sync with a gigafin account: it is not
 // hidden and has a currency, unlike an installment plan.
-func (a account) tracked() bool {
+func (a account) isTracked() bool {
 	return !a.Hidden && strings.TrimSpace(a.Name) != "" && money.ValidCurrency(strings.ToUpper(a.Currency.Name))
 }
 
@@ -189,8 +189,8 @@ func (o operation) at() time.Time {
 	return time.UnixMilli(o.OperationTime.Milliseconds)
 }
 
-// pending reports whether the operation is a hold not yet debited.
-func (o operation) pending() bool {
+// isPending reports whether the operation is a hold not yet debited.
+func (o operation) isPending() bool {
 	return o.OperationID.Source == _opSourceAuth && o.DebitingTime == nil
 }
 

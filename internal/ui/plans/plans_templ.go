@@ -637,7 +637,7 @@ func planProgress(row domain.PlanRow, inc bool, symbol string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		switch {
-		case row.Over() && inc:
+		case row.IsOver() && inc:
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "above plan"))
 			if templ_7745c5c3_Err != nil {
@@ -647,7 +647,7 @@ func planProgress(row domain.PlanRow, inc bool, symbol string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		case row.Over():
+		case row.IsOver():
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "over"))
 			if templ_7745c5c3_Err != nil {

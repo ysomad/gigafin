@@ -41,9 +41,9 @@ const (
 	SkipTransferAmounts    SkipReason = "transfer amounts differ"
 )
 
-// Instants reports whether the times of the source are instants, such as those a bank
+// HasInstants reports whether the times of the source are instants, such as those a bank
 // API sends, rather than the wall clock of the user.
-func (s ImportSource) Instants() bool {
+func (s ImportSource) HasInstants() bool {
 	switch s {
 	case ImportSourceTBank:
 		return true
@@ -148,7 +148,7 @@ func (r Record) Hash(src ImportSource, n int) string {
 	// the wall clock of the user is hashed as it is, so a change of the user time zone
 	// does not change the hashes
 	at := r.Time.Format(time.DateTime)
-	if src.Instants() {
+	if src.HasInstants() {
 		at = r.Time.UTC().Format(time.RFC3339)
 	}
 	parts := []string{
@@ -195,8 +195,8 @@ type Import struct {
 	CreatedAt time.Time
 }
 
-// Staged reports whether the import is staged: reviewed, not yet committed.
-func (i Import) Staged() bool {
+// IsStaged reports whether the import is staged: reviewed, not yet committed.
+func (i Import) IsStaged() bool {
 	return i.Status == ImportStaged
 }
 
@@ -367,9 +367,9 @@ type ImportMapping struct {
 	NoCategories bool
 }
 
-// uncategorized reports whether rows of the bank category name get no category: all
+// isUncategorized reports whether rows of the bank category name get no category: all
 // rows with NoCategories, else rows without a bank category.
-func (m ImportMapping) uncategorized(name string) bool {
+func (m ImportMapping) isUncategorized(name string) bool {
 	return m.NoCategories || name == ""
 }
 
@@ -421,8 +421,8 @@ func (p Preview) Suggest(accounts []Account, tree []Category) Preview {
 	return p
 }
 
-// AccountsMapped reports whether every account is mapped.
-func (p Preview) AccountsMapped() bool {
+// HasAccountsMapped reports whether every account is mapped.
+func (p Preview) HasAccountsMapped() bool {
 	for _, a := range p.Accounts {
 		if a.AccountID == 0 {
 			return false
@@ -431,8 +431,8 @@ func (p Preview) AccountsMapped() bool {
 	return true
 }
 
-// CategoriesMapped reports whether every category is mapped.
-func (p Preview) CategoriesMapped() bool {
+// HasCategoriesMapped reports whether every category is mapped.
+func (p Preview) HasCategoriesMapped() bool {
 	for _, c := range p.Categories {
 		if c.CategoryID == 0 {
 			return false
@@ -441,14 +441,14 @@ func (p Preview) CategoriesMapped() bool {
 	return true
 }
 
-// Ready reports whether every account and category is mapped.
-func (p Preview) Ready() bool {
-	return p.AccountsMapped() && p.CategoriesMapped()
+// IsReady reports whether every account and category is mapped.
+func (p Preview) IsReady() bool {
+	return p.HasAccountsMapped() && p.HasCategoriesMapped()
 }
 
-// CheckReady fails with errors.ErrConflict unless the preview is Ready.
+// CheckReady fails with errors.ErrConflict unless the preview IsReady.
 func (p Preview) CheckReady() error {
-	if !p.Ready() {
+	if !p.IsReady() {
 		return NewError(errors.ErrConflict, _importNotReady)
 	}
 	return nil
@@ -494,7 +494,7 @@ func NewPreview(im Import, rows []ImportRow, m ImportMapping, rules []AccountKin
 			p.Accounts[i].Rows++
 		}
 
-		if r.PairID != 0 || r.Row.IsTransfer() || m.uncategorized(r.Row.Category) {
+		if r.PairID != 0 || r.Row.IsTransfer() || m.isUncategorized(r.Row.Category) {
 			continue
 		}
 		ck := CategoryKey(r.Row.Kind(), r.Row.Category)
@@ -617,7 +617,7 @@ func rowOperation(r ImportRow, pair *ImportRow, m ImportMapping, loc *time.Locat
 	if r.Row.Kind() == KindIncome {
 		in.Type = OpIncome
 	}
-	if m.uncategorized(r.Row.Category) {
+	if m.isUncategorized(r.Row.Category) {
 		return in, nil
 	}
 	cat, ok := m.Categories[CategoryKey(r.Row.Kind(), r.Row.Category)]
@@ -641,8 +641,8 @@ type AccountChoice struct {
 	NewCreditLimit money.Amount
 }
 
-// New reports whether the choice creates a new account, mapping to no existing one.
-func (c AccountChoice) New() bool {
+// IsNew reports whether the choice creates a new account, mapping to no existing one.
+func (c AccountChoice) IsNew() bool {
 	return c.AccountID == 0
 }
 

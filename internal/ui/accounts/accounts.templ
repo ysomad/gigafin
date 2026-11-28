@@ -26,7 +26,7 @@ templ accountsPage(v kit.Page, d accountsData) {
 									@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 								}
 								{ a.Name }
-								if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+								if t, ok := d.Banks[a.ID]; ok && t.IsMismatched(a) {
 									@kit.BankBadge(t, a)
 								}
 							</div>
@@ -48,7 +48,7 @@ templ accountsPage(v kit.Page, d accountsData) {
 									@kit.BankLogo(t.Bank, kit.T(ctx, t.Bank.Name())+" · "+t.Name)
 								}
 								{ a.Name }
-								if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+								if t, ok := d.Banks[a.ID]; ok && t.IsMismatched(a) {
 									@kit.BankBadge(t, a)
 								}
 							</div>
@@ -106,7 +106,7 @@ templ accountPage(v kit.Page, d accountData) {
 				}
 			</div>
 			<div class="hstack">
-				if d.Linked.Mismatch(a) {
+				if d.Linked.IsMismatched(a) {
 					@kit.BankBadge(d.Linked, a)
 				}
 				<h2 aria-label={ kit.T(ctx, "Balance") }><span data-amount>{ kit.Money(ctx, a.Balance, a.Currency) } <span class="text-light">{ money.CurrencySymbol(a.Currency) }</span></span></h2>

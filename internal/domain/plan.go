@@ -97,9 +97,9 @@ func (r PlanRow) Left() money.Amount {
 	return r.Plan.Sub(r.Spent)
 }
 
-// Over reports whether spent is past the plan: an expense overspent, an income above
+// IsOver reports whether spent is past the plan: an expense overspent, an income above
 // its plan.
-func (r PlanRow) Over() bool {
+func (r PlanRow) IsOver() bool {
 	return r.Spent.Cmp(r.Plan) > 0
 }
 

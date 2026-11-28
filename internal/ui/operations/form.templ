@@ -194,7 +194,7 @@ templ opFields(v kit.Page, d opForm) {
 				</select>
 			}
 		}
-		if d.Type.Categorized() {
+		if d.Type.IsCategorized() {
 			{{ e := v.Errors.Get("category") }}
 			@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
 				@kit.Select("category", kit.CategoryOptions(ctx, d.Categories, []int64{d.CategoryID}, false), strconv.FormatInt(d.CategoryID, 10), kit.Invalid(e, errID("category")))
@@ -263,7 +263,7 @@ templ opButtons(d opForm) {
 			<button type="submit" form="op-delete" class="outline" data-variant="danger" aria-label={ kit.T(ctx, "Delete") } title={ kit.T(ctx, "Delete") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#trash"></use></svg></button>
 		}
 		<div class="hstack">
-			if editing && d.Type.Categorized() {
+			if editing && d.Type.IsCategorized() {
 				<a
 					class="button outline"
 					href={ fmt.Sprintf("/operations/%d/split", d.ID) }

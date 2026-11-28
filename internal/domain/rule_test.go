@@ -484,7 +484,7 @@ func TestRuleFilterMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, tt.give.Match(rule, names))
+			assert.Equal(t, tt.want, tt.give.Matches(rule, names))
 		})
 	}
 }
@@ -493,7 +493,7 @@ func TestRuleFilterCountAndValidate(t *testing.T) {
 	t.Parallel()
 
 	f := domain.RuleFilter{Query: "x"}
-	assert.True(t, f.Filtered())
+	assert.True(t, f.IsFiltered())
 	assert.Zero(t, f.Count(), "the query is not counted")
 	f = domain.RuleFilter{Stage: domain.RuleStagePost, CategoryIDs: []int64{1, 2}}
 	assert.Equal(t, 2, f.Count())

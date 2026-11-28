@@ -230,7 +230,7 @@ func SyncNotice(ctx context.Context, res domain.BankSync) string {
 		for i, b := range res.NeedsLogin {
 			names[i] = T(ctx, b.Name())
 		}
-		return T(ctx, "%s asks to sign in again to keep syncing", strings.Join(names, ", "))
+		return T(ctx, "%s: session expired", strings.Join(names, ", "))
 	case res.Operations > 0:
 		return T(ctx, "Synced operations: %d", res.Operations)
 	default:

@@ -315,7 +315,7 @@ func (r *Operations) List(
 		AmountMax:     fp.AmountMax,
 		Lim:           int64(limit),
 	}
-	if f.Sort.Ascending() {
+	if f.Sort.IsAscending() {
 		params.Ascending = 1
 	}
 	if f.Sort.ByAmount() {

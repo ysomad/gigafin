@@ -69,9 +69,9 @@ func TestSessionLive(t *testing.T) {
 
 	exp := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	s := domain.Session{ExpiresAt: exp}
-	assert.True(t, s.Live(exp.Add(-time.Second)))
-	assert.False(t, s.Live(exp), "expired at the expiry instant")
-	assert.False(t, s.Live(exp.Add(time.Second)))
+	assert.True(t, s.IsLive(exp.Add(-time.Second)))
+	assert.False(t, s.IsLive(exp), "expired at the expiry instant")
+	assert.False(t, s.IsLive(exp.Add(time.Second)))
 }
 
 func TestParseKeyTTL(t *testing.T) {
@@ -95,19 +95,19 @@ func TestAPIKeyLive(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
-	assert.True(t, domain.APIKey{}.Live(now), "never expires")
-	assert.True(t, domain.APIKey{ExpiresAt: now.Add(time.Second)}.Live(now))
-	assert.False(t, domain.APIKey{ExpiresAt: now}.Live(now), "expired")
-	assert.False(t, domain.APIKey{Revoked: true}.Live(now), "revoked")
+	assert.True(t, domain.APIKey{}.IsLive(now), "never expires")
+	assert.True(t, domain.APIKey{ExpiresAt: now.Add(time.Second)}.IsLive(now))
+	assert.False(t, domain.APIKey{ExpiresAt: now}.IsLive(now), "expired")
+	assert.False(t, domain.APIKey{Revoked: true}.IsLive(now), "revoked")
 }
 
 func TestAPIKeyTouch(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
-	assert.True(t, domain.APIKey{}.Touch(now), "never used")
-	assert.False(t, domain.APIKey{LastUsedAt: now.Add(-time.Minute)}.Touch(now))
-	assert.True(t, domain.APIKey{LastUsedAt: now.Add(-time.Hour)}.Touch(now))
+	assert.True(t, domain.APIKey{}.ShouldTouch(now), "never used")
+	assert.False(t, domain.APIKey{LastUsedAt: now.Add(-time.Minute)}.ShouldTouch(now))
+	assert.True(t, domain.APIKey{LastUsedAt: now.Add(-time.Hour)}.ShouldTouch(now))
 }
 
 func TestRoleCan(t *testing.T) {

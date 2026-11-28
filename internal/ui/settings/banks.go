@@ -48,7 +48,7 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *banksData) err
 	}
 	d.Choices, d.Suggested = make(map[int64][]domain.Account), make(map[int64]int64)
 	for _, t := range d.Accounts {
-		if t.Linked() {
+		if t.IsLinked() {
 			continue
 		}
 		for _, a := range accounts {
@@ -187,7 +187,7 @@ func bankPicks(r *http.Request, bank domain.Bank, bankAccounts []domain.BankAcco
 	chosen := make(map[int64]bool)
 	for _, t := range bankAccounts {
 		id := strconv.FormatInt(t.ID, 10)
-		if t.Bank != bank || t.Linked() {
+		if t.Bank != bank || t.IsLinked() {
 			continue
 		}
 		var accountID int64
@@ -231,7 +231,7 @@ func (h *Handler) banksAutoSync(w http.ResponseWriter, r *http.Request, user dom
 	current, urlErr := url.Parse(r.Header.Get("HX-Current-URL"))
 	switch {
 	case len(res.NeedsLogin) > 0 && (urlErr != nil || current.Path != "/settings"):
-		return h.app.Fragment(w, r, http.StatusOK, bankLoginAlert(kit.SyncNotice(ctx, res)))
+		return h.app.Fragment(w, r, http.StatusOK, bankLoginAlert(res.NeedsLogin, kit.SyncNotice(ctx, res)))
 	case res.Operations > 0:
 		if err != nil {
 			h.app.SetAlert(w, kit.SyncNotice(ctx, res))

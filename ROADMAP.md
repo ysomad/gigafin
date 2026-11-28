@@ -58,8 +58,10 @@
 - [x] privacy mode
 - [x] reactive updates
 - [x] linter: sloglint, line is 120
+- [x] refactor helpers (move short helpers into domain if needed)
+- [x] better settings ui/ux for mobile
+- [ ] offline pwa
 - [ ] remove useless slop comments
-- [ ] refactor helpers (move short helpers into domain if needed)
 - [ ] refactor tests
 - [ ] first release
 - [ ] sber sync

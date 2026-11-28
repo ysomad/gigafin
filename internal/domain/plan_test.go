@@ -152,7 +152,7 @@ func TestPlanRowOver(t *testing.T) {
 	t.Parallel()
 
 	row := domain.PlanRow{Plan: money.FromInt(100), Spent: money.FromInt(100), HasPlan: true}
-	assert.False(t, row.Over(), "at the plan")
+	assert.False(t, row.IsOver(), "at the plan")
 	row.Spent = money.MustParse("100.01")
-	assert.True(t, row.Over())
+	assert.True(t, row.IsOver())
 }

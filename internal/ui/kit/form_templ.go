@@ -607,7 +607,7 @@ func CategoryOptions(ctx context.Context, tree []domain.Category, selected []int
 		if grouped {
 			group = KindLabel(ctx, parent.Kind)
 		}
-		shown := archived || parent.Pickable(selected...)
+		shown := archived || parent.IsPickable(selected...)
 		if shown {
 			options = append(options, SelectOption{
 				Value: strconv.FormatInt(parent.ID, 10),
@@ -616,7 +616,7 @@ func CategoryOptions(ctx context.Context, tree []domain.Category, selected []int
 			})
 		}
 		for _, c := range parent.Children {
-			if archived || c.Pickable(selected...) {
+			if archived || c.IsPickable(selected...) {
 				o := SelectOption{
 					Value: strconv.FormatInt(c.ID, 10),
 					Label: domain.FullName(parent.Name, c.Name),

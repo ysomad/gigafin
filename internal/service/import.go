@@ -480,7 +480,7 @@ func mapAccount(
 ) error {
 	var accountID int64
 	switch {
-	case !c.New():
+	case !c.IsNew():
 		a, err := r.Accounts.Get(ctx, userID, c.AccountID)
 		if err != nil {
 			return fmt.Errorf("%s: %w", c.Name, err)

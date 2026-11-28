@@ -14,20 +14,34 @@ header[data-topnav] {
   box-sizing: border-box;
   height: var(--nav-height);
 }
-/* Its links are muted text, the current page's in the text color. */
-header[data-topnav] :where(nav > div > a) {
+/* Its links and the privacy toggle are muted text, the current page's in the text color. */
+header[data-topnav] :where(nav > div > :is(a, button)) {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: var(--space-1) var(--space-3);
   color: var(--muted-foreground);
   font-size: var(--text-7);
+  font-weight: inherit;
+  background: none;
+  border: none;
+  transform: none;
   transition: color var(--transition-fast);
   &:hover,
   &[aria-current] {
     color: var(--foreground);
   }
   &[aria-current] {
+    font-weight: var(--font-semibold);
+  }
+  /* a hidden semibold copy of the label keeps the width, so the current link does not
+     move the others */
+  &[data-label]::after {
+    content: attr(data-label);
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
     font-weight: var(--font-semibold);
   }
 }
@@ -118,6 +132,16 @@ td.nowrap {
   /* the scroll-to-top button stacks above it, a button high */
   body:has(.fab) .to-top {
     bottom: calc(4.5rem + 3rem + var(--space-4) + env(safe-area-inset-bottom));
+  }
+  /* the button of a one-row form goes under its inputs, not beside them, so without
+     the empty caption lining it up with them */
+  .form-compact label[aria-hidden="true"] {
+    display: none;
+  }
+  /* a narrow field, such as a select of a few options, takes half the width, so two
+     sit in a row */
+  .row > [data-field].col-2 {
+    --span: 2;
   }
   /* the floating button adds the item instead */
   .new-button {
@@ -301,6 +325,22 @@ fieldset.group {
   min-inline-size: 0;
   > input {
     min-width: 0;
+  }
+}
+
+/* iOS sizes a date input by its value, not as the other inputs: an empty one comes out
+   lower than them and, drawn natively, wider than its column, its value centered. Only
+   iOS (-webkit-touch-callout) loses the native look, desktop keeps its calendar icon. */
+input[type="date"] {
+  min-width: 0;
+  min-height: calc(1lh + var(--space-4) + 2px);
+  &::-webkit-date-and-time-value {
+    text-align: start;
+  }
+}
+@supports (-webkit-touch-callout: none) {
+  input[type="date"] {
+    appearance: none;
   }
 }
 

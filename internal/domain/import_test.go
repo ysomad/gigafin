@@ -116,7 +116,7 @@ func TestCommitRows(t *testing.T) {
 	// a row without a bank category needs no mapping and gets no category
 	rows[2].Row.Category = ""
 	p := domain.NewPreview(domain.Import{}, rows, m, nil)
-	assert.True(t, p.Ready())
+	assert.True(t, p.IsReady())
 	require.Len(t, p.Categories, 1, "only the category of the other row")
 	assert.Equal(t, "Food", p.Categories[0].Name)
 	commits, err = domain.CommitRows(rows, nil, m, time.UTC)
@@ -126,7 +126,7 @@ func TestCommitRows(t *testing.T) {
 	// no categories leaves out even the mapped ones
 	m.NoCategories = true
 	rows[2].Row.Category = "Unmapped"
-	assert.True(t, domain.NewPreview(domain.Import{}, rows, m, nil).Ready())
+	assert.True(t, domain.NewPreview(domain.Import{}, rows, m, nil).IsReady())
 	rows[2].Row.Category = "Food"
 	commits, err = domain.CommitRows(rows, nil, m, time.UTC)
 	require.NoError(t, err)
@@ -150,14 +150,14 @@ func TestPreviewMapped(t *testing.T) {
 		Accounts:   []domain.AccountNeed{{AccountID: 1}},
 		Categories: []domain.CategoryNeed{{Name: "Food"}, {CategoryID: 2}},
 	}
-	assert.True(t, p.AccountsMapped())
-	assert.False(t, p.CategoriesMapped())
-	assert.False(t, p.Ready())
+	assert.True(t, p.HasAccountsMapped())
+	assert.False(t, p.HasCategoriesMapped())
+	assert.False(t, p.IsReady())
 
 	p.Categories[0].CategoryID = 3
-	assert.True(t, p.CategoriesMapped())
-	assert.True(t, p.Ready())
-	assert.True(t, domain.Preview{}.Ready(), "nothing to map")
+	assert.True(t, p.HasCategoriesMapped())
+	assert.True(t, p.IsReady())
+	assert.True(t, domain.Preview{}.IsReady(), "nothing to map")
 }
 
 func TestImportCheckDiscard(t *testing.T) {
@@ -359,7 +359,7 @@ func TestBuildPreviewAccountPerCurrency(t *testing.T) {
 	}}
 	p := domain.NewPreview(domain.Import{}, rows, m, nil)
 	require.Len(t, p.Accounts, 4)
-	assert.True(t, p.Ready())
+	assert.True(t, p.IsReady())
 
 	commits, err := domain.CommitRows(rows, nil, m, time.UTC)
 	require.NoError(t, err)

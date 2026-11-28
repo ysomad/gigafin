@@ -46,11 +46,11 @@ func TestBankAccountMismatch(t *testing.T) {
 
 	a := domain.Account{ID: 7, Balance: money.MustParse("25596")}
 	tb := domain.BankAccount{AccountID: 7, Balance: money.MustParse("25596.00")}
-	assert.False(t, tb.Mismatch(a))
+	assert.False(t, tb.IsMismatched(a))
 	tb.Balance = money.MustParse("17255")
-	assert.True(t, tb.Mismatch(a))
-	assert.False(t, domain.BankAccount{Balance: tb.Balance}.Mismatch(a), "not linked")
-	assert.False(t, domain.BankAccount{AccountID: 8, Balance: tb.Balance}.Mismatch(a), "linked to another")
+	assert.True(t, tb.IsMismatched(a))
+	assert.False(t, domain.BankAccount{Balance: tb.Balance}.IsMismatched(a), "not linked")
+	assert.False(t, domain.BankAccount{AccountID: 8, Balance: tb.Balance}.IsMismatched(a), "linked to another")
 }
 
 func TestLinkedBankAccount(t *testing.T) {

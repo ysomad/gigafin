@@ -114,9 +114,9 @@ templ planProgress(row domain.PlanRow, inc bool, symbol string) {
 			<span data-amount>{ kit.Money(ctx, left.Abs(), row.Currency) }</span>
 			<span class="text-light">
 				switch  {
-					case row.Over() && inc:
+					case row.IsOver() && inc:
 						{ kit.T(ctx, "above plan") }
-					case row.Over():
+					case row.IsOver():
 						{ kit.T(ctx, "over") }
 					case inc:
 						{ kit.T(ctx, "to go") }

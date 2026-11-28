@@ -113,8 +113,14 @@ templ passwordCard(v kit.Page, oob bool) {
 			@kit.Field("col-3", kit.T(ctx, "New password"), e, "new-password-error", nil) {
 				<input type="password" name="password" autocomplete="new-password" { kit.Invalid(e, "new-password-error")... }/>
 			}
-			@kit.SubmitColumn("col-3", "", kit.T(ctx, "Change password"))
-			<label data-field class="col-12"><input type="checkbox" role="switch" name="revoke_api_keys"/> { kit.T(ctx, "Revoke API keys") }</label>
+			// revoking the API keys is a switch beside the button
+			<div class="col-6 vstack gap-1">
+				<label aria-hidden="true">&nbsp;</label>
+				<div class="hstack">
+					<button type="submit">{ kit.T(ctx, "Change") }</button>
+					<label data-field class="nowrap"><input type="checkbox" role="switch" name="revoke_api_keys"/> { kit.T(ctx, "Revoke API keys") }</label>
+				</div>
+			</div>
 		</form>
 	</article>
 }
@@ -366,30 +372,34 @@ templ accessCard(v kit.Page, d pageData, oob bool) {
 		}
 		<div class="table">
 			<table>
-				<thead><tr><th>{ kit.T(ctx, "Type") }</th><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Scope") }</th><th>{ kit.T(ctx, "Last used") }</th><th>{ kit.T(ctx, "Expires") }</th><th></th></tr></thead>
+				<thead><tr><th>{ kit.T(ctx, "Name") }</th><th>{ kit.T(ctx, "Last used") }</th><th></th></tr></thead>
 				<tbody>
 					for _, s := range d.Sessions {
 						<tr>
-							<td>{ kit.T(ctx, "Session") }</td>
+							// the type and the scope under the name, the expiry under the last use
 							<td>
 								{{ ua := useragent.Parse(s.UserAgent) }}
-								switch  {
-									case ua.Browser != "" && ua.OS != "":
-										{ kit.T(ctx, "%s on %s", ua.Browser, ua.OS) }
-									case ua.Browser != "":
-										{ ua.Browser }
-									case ua.OS != "":
-										{ ua.OS }
-									default:
-										{ s.UserAgent }
-								}
+								<div>
+									switch  {
+										case ua.Browser != "" && ua.OS != "":
+											{ ua.Browser } ({ ua.OS })
+										case ua.Browser != "":
+											{ ua.Browser }
+										case ua.OS != "":
+											{ ua.OS }
+										default:
+											{ s.UserAgent }
+									}
+								</div>
+								<small class="text-light">{ kit.T(ctx, "Session") } · { kit.T(ctx, "full") }</small>
 							</td>
-							<td>{ kit.T(ctx, "full") }</td>
-							<td class="nowrap">{ kit.Datetime(ctx, s.LastUsedAt, v.User) }</td>
-							<td class="nowrap">{ kit.Datetime(ctx, s.ExpiresAt, v.User) }</td>
+							<td>
+								<div class="nowrap">{ kit.Datetime(ctx, s.LastUsedAt, v.User) }</div>
+								<small class="text-light">{ kit.T(ctx, "Expires") } <span class="nowrap">{ kit.Datetime(ctx, s.ExpiresAt, v.User) }</span></small>
+							</td>
 							<td>
 								if s.Current {
-									<span class="badge" data-variant="success">{ kit.T(ctx, "this browser") }</span>
+									<span class="badge" data-variant="success">{ kit.T(ctx, "this device") }</span>
 								} else {
 									{{ action := fmt.Sprintf("/settings/sessions/%d/revoke", s.ID) }}
 									<form method="post" action={ action } hx-post={ action } hx-swap="none" hx-confirm={ kit.T(ctx, "Sign out this session?") }>
@@ -401,22 +411,28 @@ templ accessCard(v kit.Page, d pageData, oob bool) {
 					}
 					for _, k := range d.Keys {
 						<tr>
-							<td>{ kit.T(ctx, "API key") }</td>
-							<td>{ k.Name } <code>gf_{ k.Prefix }_…</code></td>
-							<td>{ kit.T(ctx, string(k.Scope)) }</td>
-							<td class="nowrap">
-								if k.LastUsedAt.IsZero() {
-									{ kit.T(ctx, "never") }
-								} else {
-									{ kit.Datetime(ctx, k.LastUsedAt, v.User) }
-								}
+							<td>
+								<div>{ k.Name } <code>gf_{ k.Prefix }_…</code></div>
+								<small class="text-light">{ kit.T(ctx, "API key") } · { kit.T(ctx, string(k.Scope)) }</small>
 							</td>
-							<td class="nowrap">
-								if k.ExpiresAt.IsZero() {
-									{ kit.T(ctx, "never") }
-								} else {
-									{ kit.Datetime(ctx, k.ExpiresAt, v.User) }
-								}
+							<td>
+								<div class="nowrap">
+									if k.LastUsedAt.IsZero() {
+										{ kit.T(ctx, "never") }
+									} else {
+										{ kit.Datetime(ctx, k.LastUsedAt, v.User) }
+									}
+								</div>
+								<small class="text-light">
+									{ kit.T(ctx, "Expires") }
+									<span class="nowrap">
+										if k.ExpiresAt.IsZero() {
+											{ kit.T(ctx, "never") }
+										} else {
+											{ kit.Datetime(ctx, k.ExpiresAt, v.User) }
+										}
+									</span>
+								</small>
 							</td>
 							<td>
 								if k.Expired {

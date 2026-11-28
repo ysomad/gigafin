@@ -855,12 +855,12 @@ func steps(step string, rates bool, p *domain.Preview) templ.Component {
 			}
 		} else if p != nil {
 			base := fmt.Sprintf("/imports/%d", p.Import.ID)
-			staged := p.Import.Staged()
-			templ_7745c5c3_Err = stepTab(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", kit.T(ctx, "Accounts")).Render(ctx, templ_7745c5c3_Buffer)
+			staged := p.Import.IsStaged()
+			templ_7745c5c3_Err = stepTab(staged, step == "accounts", base+"/accounts", p.HasAccountsMapped(), "3.", kit.T(ctx, "Accounts")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = stepTab(staged, step == "categories", base+"/categories", p.CategoriesMapped(), "4.", kit.T(ctx, "Categories")).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = stepTab(staged, step == "categories", base+"/categories", p.HasCategoriesMapped(), "4.", kit.T(ctx, "Categories")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -54,7 +54,7 @@ templ page(v kit.Page, d pageData) {
 					@kit.Field("col-3", kit.T(ctx, "Backup passphrase"), e, "backup-passphrase-error", nil) {
 						<input type="password" name="passphrase" autocomplete="new-password" { kit.Invalid(e, "backup-passphrase-error")... }/>
 					}
-					@kit.SubmitColumn("col-3", "", kit.T(ctx, "Download backup"))
+					@kit.SubmitColumn("col-3", "", kit.T(ctx, "Download"))
 				</form>
 			</article>
 		}

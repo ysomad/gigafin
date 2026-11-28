@@ -666,7 +666,7 @@ func (s *Auth) SessionUser(ctx context.Context, tok string) (domain.User, error)
 	if err != nil {
 		return domain.User{}, err
 	}
-	if !sess.Live(now) {
+	if !sess.IsLive(now) {
 		return domain.User{}, errors.ErrUnauthorized
 	}
 
@@ -706,7 +706,7 @@ func (s *Auth) ListSessions(ctx context.Context, userID int64, token string) ([]
 	now := s.clock.Now()
 	live := make([]domain.Session, 0, len(all))
 	for _, sess := range all {
-		if !sess.Live(now) {
+		if !sess.IsLive(now) {
 			continue
 		}
 		sess.Current = sess.ID == current
@@ -798,7 +798,7 @@ func (s *Auth) ListAPIKeys(ctx context.Context, userID int64) ([]domain.APIKey, 
 	}
 	now := s.clock.Now()
 	for i, k := range keys {
-		keys[i].Expired = k.ExpiredAt(now)
+		keys[i].Expired = k.IsExpired(now)
 	}
 	return keys, nil
 }
@@ -843,7 +843,7 @@ func (s *Auth) AuthenticateAPIKey(ctx context.Context, tok string, want domain.S
 		return domain.APIKey{}, errors.ErrUnauthorized
 	}
 
-	if !k.Key.Live(now) {
+	if !k.Key.IsLive(now) {
 		s.log.WarnContext(ctx, "api key rejected",
 			slog.String("reason", "revoked or expired"),
 			slog.String("key_prefix", prefix),
@@ -871,7 +871,7 @@ func (s *Auth) AuthenticateAPIKey(ctx context.Context, tok string, want domain.S
 		)
 	}
 
-	if k.Key.Touch(now) {
+	if k.Key.ShouldTouch(now) {
 		if err := s.store.Write().APIKeys.Touch(ctx, k.Key.ID, now); err != nil {
 			return domain.APIKey{}, err
 		}

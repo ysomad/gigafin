@@ -16,7 +16,7 @@ func bankData(accs []account, ops []operation, loc *time.Location) domain.BankDa
 	data := domain.BankData{Records: make(map[string][]domain.Record)}
 	byID := make(map[string]domain.BankAccount, len(accs))
 	for _, a := range accs {
-		if !a.tracked() {
+		if !a.isTracked() {
 			continue
 		}
 		t := domain.BankAccount{
@@ -38,7 +38,7 @@ func bankData(accs []account, ops []operation, loc *time.Location) domain.BankDa
 		if !ok || op.Status != _opStatusOK || op.value().IsZero() {
 			continue
 		}
-		if op.pending() {
+		if op.isPending() {
 			t.Balance = t.Balance.Sub(op.value())
 			byID[op.Account] = t
 			continue

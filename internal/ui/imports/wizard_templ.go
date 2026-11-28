@@ -37,7 +37,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		preview := d.Preview
 		base := fmt.Sprintf("/imports/%d", preview.Import.ID)
-		staged := preview.Import.Staged()
+		staged := preview.Import.IsStaged()
 		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -327,7 +327,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					if !preview.Ready() {
+					if !preview.IsReady() {
 						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " disabled")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
@@ -340,7 +340,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "Import %d rows", preview.Import.RowsNew))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 61, Col: 115}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 61, Col: 117}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -404,7 +404,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if staged && !preview.AccountsMapped() {
+				if staged && !preview.HasAccountsMapped() {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<p role=\"alert\" data-variant=\"warning\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -453,7 +453,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if staged && !preview.CategoriesMapped() {
+				if staged && !preview.HasCategoriesMapped() {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<p role=\"alert\" data-variant=\"warning\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -1669,7 +1669,7 @@ func rows(p domain.Preview, base string, user *domain.User) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			case row.PairID != 0 && p.Import.Staged():
+			case row.PairID != 0 && p.Import.IsStaged():
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "<form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

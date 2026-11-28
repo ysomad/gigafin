@@ -207,8 +207,8 @@ type RuleFilter struct {
 	AccountID int64
 }
 
-// Filtered reports whether any field is set.
-func (f RuleFilter) Filtered() bool {
+// IsFiltered reports whether any field is set.
+func (f RuleFilter) IsFiltered() bool {
 	return f.Query != "" || f.Count() > 0
 }
 
@@ -242,9 +242,9 @@ func (f RuleFilter) Validate() error {
 	return nil
 }
 
-// Match reports whether r passes f. names are the names of categories by id, which
+// Matches reports whether r passes f. names are the names of categories by id, which
 // Query also looks in.
-func (f RuleFilter) Match(r Rule, names map[int64]string) bool {
+func (f RuleFilter) Matches(r Rule, names map[int64]string) bool {
 	switch {
 	case f.Stage != "" && r.Stage != f.Stage,
 		f.Origin != "" && r.Origin != f.Origin,
@@ -472,31 +472,31 @@ func (c condition) score() int {
 	}
 }
 
-func (c condition) match(in OperationInput) bool {
+func (c condition) matches(in OperationInput) bool {
 	switch c.Field {
 	case RuleFieldAmount:
-		return c.matchAmount(in.Amount)
+		return c.matchesAmount(in.Amount)
 	case RuleFieldAccount:
-		return c.matchID(in.AccountID)
+		return c.matchesID(in.AccountID)
 	case RuleFieldCategory:
 		// an operation without a category, such as a transfer, is not "not X" either
-		return in.CategoryID != 0 && c.matchID(in.CategoryID)
+		return in.CategoryID != 0 && c.matchesID(in.CategoryID)
 	case RuleFieldType:
-		return c.matchText(string(in.Type), string(in.Type))
+		return c.matchesText(string(in.Type), string(in.Type))
 	case RuleFieldSourcePayee:
-		return c.matchText(in.SourcePayee, foldText(in.SourcePayee))
+		return c.matchesText(in.SourcePayee, foldText(in.SourcePayee))
 	case RuleFieldPayee:
-		return c.matchText(in.Payee, foldText(in.Payee))
+		return c.matchesText(in.Payee, foldText(in.Payee))
 	case RuleFieldNote:
-		return c.matchText(in.Note, foldText(in.Note))
+		return c.matchesText(in.Note, foldText(in.Note))
 	case RuleFieldMCC:
-		return c.matchText(in.MCC, foldText(in.MCC))
+		return c.matchesText(in.MCC, foldText(in.MCC))
 	}
 	return false
 }
 
-// matchText tests a text field, raw for regular expressions and folded otherwise.
-func (c condition) matchText(raw, folded string) bool {
+// matchesText tests a text field, raw for regular expressions and folded otherwise.
+func (c condition) matchesText(raw, folded string) bool {
 	switch c.Op {
 	case CondIs, CondOneOf:
 		return slices.Contains(c.text, folded)
@@ -513,7 +513,7 @@ func (c condition) matchText(raw, folded string) bool {
 	}
 }
 
-func (c condition) matchID(id int64) bool {
+func (c condition) matchesID(id int64) bool {
 	switch c.Op {
 	case CondIs, CondOneOf:
 		return slices.Contains(c.ids, id)
@@ -524,7 +524,7 @@ func (c condition) matchID(id int64) bool {
 	}
 }
 
-func (c condition) matchAmount(a money.Amount) bool {
+func (c condition) matchesAmount(a money.Amount) bool {
 	v := c.amounts[0]
 	switch c.Op {
 	case CondIs:
@@ -612,7 +612,7 @@ func (rs RuleSet) Apply(in OperationInput) (OperationInput, bool) {
 	in.Tags = slices.Clone(in.Tags)
 	changed := false
 	for _, r := range rs.rules {
-		if !r.match(in) {
+		if !r.matches(in) {
 			continue
 		}
 		for _, a := range r.rule.Actions {
@@ -625,14 +625,14 @@ func (rs RuleSet) Apply(in OperationInput) (OperationInput, bool) {
 // Matches reports whether the rule with id is in the set and matches in.
 func (rs RuleSet) Matches(id int64, in OperationInput) bool {
 	i := slices.IndexFunc(rs.rules, func(r compiledRule) bool { return r.rule.ID == id })
-	return i >= 0 && rs.rules[i].match(in)
+	return i >= 0 && rs.rules[i].matches(in)
 }
 
-func (r compiledRule) match(in OperationInput) bool {
+func (r compiledRule) matches(in OperationInput) bool {
 	if r.rule.Match == RuleMatchAny {
-		return slices.ContainsFunc(r.conds, func(c condition) bool { return c.match(in) })
+		return slices.ContainsFunc(r.conds, func(c condition) bool { return c.matches(in) })
 	}
-	return len(r.conds) > 0 && !slices.ContainsFunc(r.conds, func(c condition) bool { return !c.match(in) })
+	return len(r.conds) > 0 && !slices.ContainsFunc(r.conds, func(c condition) bool { return !c.matches(in) })
 }
 
 // apply does the action a to in and reports whether in changed.
@@ -792,7 +792,7 @@ func LearnCategories(ops []Operation, rules []Rule, cats map[int64]Category) []R
 	for _, k := range payees {
 		history := byPayee[k]
 		i := slices.IndexFunc(history, func(op Operation) bool {
-			return op.Type.Categorized() && !op.IsSplit() && op.CategoryID != 0
+			return op.Type.IsCategorized() && !op.IsSplit() && op.CategoryID != 0
 		})
 		if i < 0 {
 			continue
@@ -816,7 +816,7 @@ func payeeCategory(history []Operation, changed Operation) (int64, bool) {
 	}
 	var latest []Operation
 	for _, op := range history {
-		if op.Type.Categorized() && !op.IsSplit() && op.CategoryID != 0 {
+		if op.Type.IsCategorized() && !op.IsSplit() && op.CategoryID != 0 {
 			latest = append(latest, op)
 		}
 		if len(latest) == window {

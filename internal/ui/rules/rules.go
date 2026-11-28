@@ -56,7 +56,7 @@ func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User
 		return err
 	}
 	total := len(rules)
-	if f.Filtered() {
+	if f.IsFiltered() {
 		if total, err = h.app.Svc.Rules.Count(r.Context(), user.ID); err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (h *Handler) rules(w http.ResponseWriter, r *http.Request, user domain.User
 		return err
 	}
 	d := rulesData{
-		Learned: -1, Filter: f, Filtered: f.Filtered(), FilterCount: f.Count(), Category: category,
+		Learned: -1, Filter: f, Filtered: f.IsFiltered(), FilterCount: f.Count(), Category: category,
 		Shown: len(rules), Total: total, Categories: tree, Accounts: accounts,
 	}
 	if n, err := strconv.Atoi(r.URL.Query().Get("learned")); err == nil && n >= 0 {

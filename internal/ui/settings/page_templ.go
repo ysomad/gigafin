@@ -330,7 +330,7 @@ func page(v kit.Page, d pageData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = kit.SubmitColumn("col-3", "", kit.T(ctx, "Download backup")).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = kit.SubmitColumn("col-3", "", kit.T(ctx, "Download")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

@@ -42,8 +42,8 @@ func ParseAccountKind(s string) (AccountKind, error) {
 	return k, nil
 }
 
-// Liability reports whether the account holds debt.
-func (k AccountKind) Liability() bool {
+// IsLiability reports whether the account holds debt.
+func (k AccountKind) IsLiability() bool {
 	return k == AccountCredit || k == AccountLoan
 }
 
@@ -65,9 +65,9 @@ type Account struct {
 	Balance     money.Amount
 }
 
-// Pickable reports whether the account may be picked in a form: it is not archived,
+// IsPickable reports whether the account may be picked in a form: it is not archived,
 // or it is one of selected, picked before it was.
-func (a Account) Pickable(selected ...int64) bool {
+func (a Account) IsPickable(selected ...int64) bool {
 	return !a.Archived || slices.Contains(selected, a.ID)
 }
 
@@ -185,7 +185,7 @@ func Totals(accounts []Account) []Total {
 		}
 		t := byCur[a.Currency]
 		t.Currency = a.Currency
-		if a.Kind.Liability() {
+		if a.Kind.IsLiability() {
 			t.Liabilities = t.Liabilities.Add(a.Owed())
 		} else {
 			t.Assets = t.Assets.Add(a.Balance)

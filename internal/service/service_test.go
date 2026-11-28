@@ -1121,13 +1121,13 @@ func TestAccountKinds(t *testing.T) {
 	debit, err := svc.Accounts.Create(ctx, uid, domain.AccountInput{Name: "Debit", Currency: "RUB"})
 	require.NoError(t, err)
 	assert.Equal(t, domain.AccountDebit, debit.Kind, "debit by default")
-	assert.False(t, debit.Kind.Liability())
+	assert.False(t, debit.Kind.IsLiability())
 
 	card, err := svc.Accounts.Create(ctx, uid, domain.AccountInput{
 		Name: "Credit", Currency: "RUB", Kind: domain.AccountCredit, CreditLimit: dec("50000"),
 	})
 	require.NoError(t, err)
-	assert.True(t, card.Kind.Liability())
+	assert.True(t, card.Kind.IsLiability())
 	_, err = svc.Accounts.SetBalance(ctx, uid, card.ID, dec("-1200.50"), day(t, "2026-10-01"))
 	require.NoError(t, err)
 	card, err = svc.Accounts.Get(ctx, uid, card.ID)

@@ -127,7 +127,7 @@ func accountsPage(v kit.Page, d accountsData) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+					if t, ok := d.Banks[a.ID]; ok && t.IsMismatched(a) {
 						templ_7745c5c3_Err = kit.BankBadge(t, a).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
@@ -245,7 +245,7 @@ func accountsPage(v kit.Page, d accountsData) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					if t, ok := d.Banks[a.ID]; ok && t.Mismatch(a) {
+					if t, ok := d.Banks[a.ID]; ok && t.IsMismatched(a) {
 						templ_7745c5c3_Err = kit.BankBadge(t, a).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
@@ -561,7 +561,7 @@ func accountPage(v kit.Page, d accountData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if d.Linked.Mismatch(a) {
+			if d.Linked.IsMismatched(a) {
 				templ_7745c5c3_Err = kit.BankBadge(d.Linked, a).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

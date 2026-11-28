@@ -136,10 +136,10 @@ templ steps(step string, rates bool, p *domain.Preview) {
 			} else if p != nil {
 				{{
 					base := fmt.Sprintf("/imports/%d", p.Import.ID)
-					staged := p.Import.Staged()
+					staged := p.Import.IsStaged()
 				}}
-				@stepTab(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", kit.T(ctx, "Accounts"))
-				@stepTab(staged, step == "categories", base+"/categories", p.CategoriesMapped(), "4.", kit.T(ctx, "Categories"))
+				@stepTab(staged, step == "accounts", base+"/accounts", p.HasAccountsMapped(), "3.", kit.T(ctx, "Accounts"))
+				@stepTab(staged, step == "categories", base+"/categories", p.HasCategoriesMapped(), "4.", kit.T(ctx, "Categories"))
 				<a role="tab" aria-selected={ strconv.FormatBool(step == "preview") } href={ base + "/preview" }>
 					if staged {
 						5.

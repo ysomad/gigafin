@@ -143,7 +143,7 @@ func (h *Handler) importPage(w http.ResponseWriter, r *http.Request, user domain
 	}
 
 	base := "/imports/" + r.PathValue("id")
-	staged := p.Import.Staged()
+	staged := p.Import.IsStaged()
 	d := wizardData{Step: r.PathValue("step"), Preview: p}
 
 	switch d.Step {
@@ -152,9 +152,9 @@ func (h *Handler) importPage(w http.ResponseWriter, r *http.Request, user domain
 		switch {
 		case !staged:
 			kit.Redirect(w, r, base+"/preview")
-		case !p.AccountsMapped():
+		case !p.HasAccountsMapped():
 			kit.Redirect(w, r, base+"/accounts")
-		case !p.CategoriesMapped():
+		case !p.HasCategoriesMapped():
 			kit.Redirect(w, r, base+"/categories")
 		default:
 			kit.Redirect(w, r, base+"/preview")
@@ -217,7 +217,7 @@ func (h *Handler) saveAccounts(w http.ResponseWriter, r *http.Request, user doma
 	for i, name := range form.Names {
 		c := domain.AccountChoice{Name: name, Currency: form.Currencies[i], AccountID: form.IDs[i]}
 
-		if c.New() {
+		if c.IsNew() {
 			c.NewName = form.NewNames[i]
 			c.NewKind = domain.AccountKind(form.NewKinds[i])
 			s := strings.TrimSpace(form.NewLimits[i])

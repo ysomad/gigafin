@@ -243,7 +243,7 @@ func TestBanksLinkAndSync(t *testing.T) {
 	assert.Equal(t, f.black.ID, black.AccountID)
 	a, err := f.svc.Accounts.Get(ctx, f.userID, f.black.ID)
 	require.NoError(t, err)
-	assert.True(t, black.Mismatch(a))
+	assert.True(t, black.IsMismatched(a))
 
 	// a link is for good, one to one
 	_, err = f.link(t, f.black.ID, "1001")

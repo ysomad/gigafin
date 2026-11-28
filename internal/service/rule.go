@@ -78,7 +78,7 @@ func (s *Rules) List(ctx context.Context, userID int64, f domain.RuleFilter) ([]
 	}
 	r := s.store.Read()
 	rules, err := r.Rules.List(ctx, userID)
-	if err != nil || !f.Filtered() {
+	if err != nil || !f.IsFiltered() {
 		return rules, err
 	}
 	cats, err := r.Categories.List(ctx, userID)
@@ -88,7 +88,7 @@ func (s *Rules) List(ctx context.Context, userID int64, f domain.RuleFilter) ([]
 	names := domain.CategoryNames(domain.NewTree(cats))
 	var out []domain.Rule
 	for _, rule := range rules {
-		if f.Match(rule, names) {
+		if f.Matches(rule, names) {
 			out = append(out, rule)
 		}
 	}

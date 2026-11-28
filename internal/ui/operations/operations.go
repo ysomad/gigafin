@@ -87,7 +87,7 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 	d := opList{
 		Days:        days,
 		Filter:      f,
-		Filtered:    f.Filtered(),
+		Filtered:    f.IsFiltered(),
 		FilterCount: f.Count(),
 		Accounts:    accounts,
 		AccByID:     domain.AccountsByID(accounts),
@@ -145,7 +145,7 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 		if !slices.Contains(enabled, conn.Bank) {
 			continue
 		}
-		if conn.Connected() {
+		if conn.IsConnected() {
 			d.BankSync = true
 		}
 	}
@@ -158,7 +158,7 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 		if slices.Contains(enabled, t.Bank) && t.SyncedUntil.After(d.BankSyncAt) {
 			d.BankSyncAt = t.SyncedUntil
 		}
-		if t.Mismatch(d.AccByID[t.AccountID]) {
+		if t.IsMismatched(d.AccByID[t.AccountID]) {
 			d.Mismatched = append(d.Mismatched, t)
 		}
 	}
@@ -186,7 +186,7 @@ func (h *Handler) fillForm(r *http.Request, user domain.User, f *opForm) error {
 		return err
 	}
 	for _, a := range accounts {
-		if a.Pickable(f.AccountID, f.ToAccountID) {
+		if a.IsPickable(f.AccountID, f.ToAccountID) {
 			f.Accounts = append(f.Accounts, a)
 		}
 	}
@@ -525,7 +525,7 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 	}
 	f.ID = id
 	// a new operation may be left uncategorized, a saved one is not
-	if f.Type.Categorized() && in.CategoryID == 0 {
+	if f.Type.IsCategorized() && in.CategoryID == 0 {
 		errs["category"] = domain.NewError(errors.ErrInvalid, "required")
 	}
 	if len(errs) > 0 {

@@ -55,7 +55,7 @@ func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.U
 	}
 	d := accountsData{Banks: make(map[int64]domain.BankAccount, len(bankAccounts))}
 	for _, t := range bankAccounts {
-		if t.Linked() {
+		if t.IsLinked() {
 			d.Banks[t.AccountID] = t
 		}
 	}
@@ -63,7 +63,7 @@ func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.U
 		switch {
 		case a.Archived:
 			d.Archived = append(d.Archived, a)
-		case a.Kind.Liability():
+		case a.Kind.IsLiability():
 			d.Liabilities = append(d.Liabilities, a)
 		default:
 			d.Assets = append(d.Assets, a)

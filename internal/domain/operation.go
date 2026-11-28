@@ -40,9 +40,9 @@ func (t OpType) Kind() (Kind, bool) {
 	return "", false
 }
 
-// Categorized reports whether an operation of type t, an expense or income, has a
+// IsCategorized reports whether an operation of type t, an expense or income, has a
 // category.
-func (t OpType) Categorized() bool {
+func (t OpType) IsCategorized() bool {
 	_, ok := t.Kind()
 	return ok
 }
@@ -339,7 +339,7 @@ type SplitPart struct {
 // its ID when op is not a part of a split yet.
 func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([]Operation, error) {
 	const maxParts = 50
-	if !op.Type.Categorized() {
+	if !op.Type.IsCategorized() {
 		return nil, NewError(errors.ErrInvalid, "type: only expenses and income can be split")
 	}
 	if len(parts) < 2 {
@@ -491,8 +491,8 @@ func OpSorts() []OpSort {
 // ByAmount reports whether s orders by absolute amount first, else by date.
 func (s OpSort) ByAmount() bool { return s == SortLargestFirst || s == SortSmallestFirst }
 
-// Ascending reports whether s lists the least first.
-func (s OpSort) Ascending() bool { return s == SortOldestFirst || s == SortSmallestFirst }
+// IsAscending reports whether s lists the least first.
+func (s OpSort) IsAscending() bool { return s == SortOldestFirst || s == SortSmallestFirst }
 
 // Filter selects operations. Zero fields match everything.
 type Filter struct {
@@ -513,12 +513,12 @@ type Filter struct {
 	AmountMax money.NullAmount
 	// Tags are tag names, matched exactly; an operation matches any of them.
 	Tags []string
-	// Sort orders the listed operations. It selects none, so Filtered and Count skip it.
+	// Sort orders the listed operations. It selects none, so IsFiltered and Count skip it.
 	Sort OpSort
 }
 
-// Filtered reports whether any field is set.
-func (f Filter) Filtered() bool {
+// IsFiltered reports whether any field is set.
+func (f Filter) IsFiltered() bool {
 	return f.AccountID != 0 || len(f.CategoryIDs) > 0 || f.Uncategorized || f.Type != "" || !f.DateFrom.IsZero() ||
 		!f.DateTo.IsZero() || f.Query != "" || f.AmountMin.Valid || f.AmountMax.Valid || len(f.Tags) > 0
 }
@@ -578,7 +578,7 @@ func (c CashFlow) Net() money.Amount {
 func CashFlows(sums []TypeSum) []CashFlow {
 	var out []CashFlow
 	for _, s := range sums {
-		if !s.Type.Categorized() {
+		if !s.Type.IsCategorized() {
 			continue
 		}
 		i := slices.IndexFunc(out, func(c CashFlow) bool { return c.Currency == s.Currency })

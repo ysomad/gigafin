@@ -175,7 +175,7 @@ func bankAccounts(
 		if t.Bank != bank {
 			continue
 		}
-		if a, ok := m.Accounts[domain.AccountKey(t.Name, t.Currency)]; ok && !t.Linked() {
+		if a, ok := m.Accounts[domain.AccountKey(t.Name, t.Currency)]; ok && !t.IsLinked() {
 			t.TransfersTo = a.ID
 		}
 		accounts = append(accounts, t)
@@ -387,7 +387,7 @@ func linkAccount(
 		return 0, domain.NewError(errors.ErrInvalid, "bank account: choose from the list")
 	}
 	t := accounts[i]
-	if t.Linked() {
+	if t.IsLinked() {
 		return 0, domain.NewError(errors.ErrConflict, "bank account: already synced with another account")
 	}
 	start := _syncAll
@@ -463,7 +463,7 @@ func (s *Banks) Sync(
 	}
 	starts := make(map[string]time.Time)
 	for _, t := range accounts {
-		if t.Bank != bank || !t.Linked() {
+		if t.Bank != bank || !t.IsLinked() {
 			continue
 		}
 		// never synced, as when the sync of Link failed: from where Link meant to start
@@ -503,7 +503,7 @@ func (s *Banks) syncLinked(
 		return res, err
 	}
 	for _, t := range accounts {
-		if t.Bank != conn.Bank || !t.Linked() || !starts[t.ExternalID].Equal(_syncAll) {
+		if t.Bank != conn.Bank || !t.IsLinked() || !starts[t.ExternalID].Equal(_syncAll) {
 			continue
 		}
 		sum := sums[t.AccountID]
@@ -672,7 +672,7 @@ func syncRecords(
 					sum.first = r.Time
 				}
 				sums[t.AccountID] = sum
-			case !synced && !t.Linked() && t.TransfersTo != 0:
+			case !synced && !t.IsLinked() && t.TransfersTo != 0:
 				others = append(others, r)
 			}
 		}
@@ -711,7 +711,7 @@ func (s *Banks) saveAccounts(
 			return err
 		}
 		for _, t := range all {
-			if t.Bank != bank || !t.Linked() {
+			if t.Bank != bank || !t.IsLinked() {
 				continue
 			}
 			if err := r.Imports.MapAccount(ctx, userID, bank.ImportSource(), t.Name, t.Currency, t.AccountID); err != nil {

@@ -66,7 +66,7 @@ func TestImportFlow(t *testing.T) {
 
 	p, err := e.imp.Preview(ctx, e.userID, im.ID)
 	require.NoError(t, err)
-	assert.False(t, p.Ready())
+	assert.False(t, p.IsReady())
 	require.Len(t, p.Accounts, 2)
 	assert.Equal(t, domain.AccountDebit, p.Accounts[0].Kind)
 	assert.Equal(t, domain.AccountLoan, p.Accounts[1].Kind, "guessed from the name")
@@ -100,7 +100,7 @@ func TestImportFlow(t *testing.T) {
 
 	p, err = e.imp.Preview(ctx, e.userID, im.ID)
 	require.NoError(t, err)
-	require.True(t, p.Ready())
+	require.True(t, p.IsReady())
 
 	n, err := e.imp.Commit(ctx, e.userID, im.ID, time.FixedZone("UTC+7", 7*60*60))
 	require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestImportFlow(t *testing.T) {
 	assert.Equal(t, int64(1), again.RowsNew)
 	p, err = e.imp.Preview(ctx, e.userID, again.ID)
 	require.NoError(t, err)
-	assert.True(t, p.Ready())
+	assert.True(t, p.IsReady())
 
 	// undo the first import: its operations go away and its rows become importable again
 	deleted, err := e.imp.Undo(ctx, e.userID, im.ID)
