@@ -275,6 +275,11 @@ func (s *Operations) Totals(ctx context.Context, userID int64, f domain.Filter) 
 	return domain.CashFlows(sums), nil
 }
 
+// SplitParts returns the parts of the split of originID, in the order they were created.
+func (s *Operations) SplitParts(ctx context.Context, userID, originID int64) ([]domain.Operation, error) {
+	return s.store.Read().Operations.ByOrigin(ctx, userID, originID)
+}
+
 // Tags returns the names of the user's tags, sorted.
 func (s *Operations) Tags(ctx context.Context, userID int64) ([]string, error) {
 	return s.store.Read().Operations.Tags(ctx, userID)

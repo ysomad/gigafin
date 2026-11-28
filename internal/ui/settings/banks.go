@@ -48,12 +48,11 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *banksData) err
 	}
 	d.Choices, d.Suggested = make(map[int64][]domain.Account), make(map[int64]int64)
 	for _, t := range d.Accounts {
-		if t.AccountID != 0 {
+		if t.Linked() {
 			continue
 		}
 		for _, a := range accounts {
-			if a.Archived || a.Currency != t.Currency ||
-				slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.AccountID == a.ID }) {
+			if _, linked := domain.LinkedBankAccount(d.Accounts, a.ID); a.Archived || a.Currency != t.Currency || linked {
 				continue
 			}
 			d.Choices[t.ID] = append(d.Choices[t.ID], a)
@@ -188,7 +187,7 @@ func bankPicks(r *http.Request, bank domain.Bank, bankAccounts []domain.BankAcco
 	chosen := make(map[int64]bool)
 	for _, t := range bankAccounts {
 		id := strconv.FormatInt(t.ID, 10)
-		if t.Bank != bank || t.AccountID != 0 {
+		if t.Bank != bank || t.Linked() {
 			continue
 		}
 		var accountID int64

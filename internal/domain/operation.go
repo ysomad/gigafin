@@ -40,6 +40,28 @@ func (t OpType) Kind() (Kind, bool) {
 	return "", false
 }
 
+// Categorized reports whether an operation of type t, an expense or income, has a
+// category.
+func (t OpType) Categorized() bool {
+	_, ok := t.Kind()
+	return ok
+}
+
+// CheckAmount checks the amount a of an operation of type t: the balance change of an
+// adjustment, signed, is not zero, the amount of the others is positive.
+func (t OpType) CheckAmount(a money.Amount) error {
+	if t == OpAdjustment {
+		if a.IsZero() {
+			return NewError(errors.ErrInvalid, "must not be zero")
+		}
+		return nil
+	}
+	if !a.IsPositive() {
+		return NewError(errors.ErrInvalid, "must be positive")
+	}
+	return nil
+}
+
 // ParseOpType validates an operation type string.
 func ParseOpType(s string) (OpType, error) {
 	t := OpType(s)
@@ -102,6 +124,15 @@ func (o Operation) IsSplit() bool {
 // operation the split was made from.
 func (o Operation) IsSplitOrigin() bool {
 	return o.OriginID != 0 && o.ID == o.OriginID
+}
+
+// SourceDelta returns the change the operation makes to the balance of its account:
+// negative for money out, an expense or a transfer, signed for an adjustment.
+func (o Operation) SourceDelta() money.Amount {
+	if o.Type == OpExpense || o.Type == OpTransfer {
+		return o.Amount.Neg()
+	}
+	return o.Amount
 }
 
 // Kind returns the category kind of an expense or income.
@@ -195,6 +226,9 @@ func NewOperation(in OperationInput, acc Account, to *Account, cat *Category, kn
 	if op.Tags, err = newTags(in.Tags, known); err != nil {
 		return Operation{}, err
 	}
+	if err := typ.CheckAmount(in.Amount); err != nil {
+		return Operation{}, NewError(err, "amount")
+	}
 	if _, err := in.Amount.ToMinor(acc.Currency); err != nil {
 		return Operation{}, NewError(errors.ErrInvalid, "amount: not a valid amount in %s", acc.Currency)
 	}
@@ -205,9 +239,6 @@ func NewOperation(in OperationInput, acc Account, to *Account, cat *Category, kn
 	case OpAdjustment:
 		if in.CategoryID != 0 {
 			return Operation{}, NewError(errors.ErrInvalid, "category: adjustments have no category")
-		}
-		if in.Amount.IsZero() {
-			return Operation{}, NewError(errors.ErrInvalid, "amount: must not be zero")
 		}
 	case OpExpense, OpIncome:
 		err = op.setCategory(in, cat)
@@ -264,9 +295,6 @@ func (o *Operation) setTransfer(in OperationInput, to *Account) error {
 	if in.CategoryID != 0 {
 		return NewError(errors.ErrInvalid, "category: transfers have no category")
 	}
-	if !in.Amount.IsPositive() {
-		return NewError(errors.ErrInvalid, "amount: must be positive")
-	}
 	if in.ToAccountID == o.AccountID {
 		return NewError(errors.ErrInvalid, "destination account: must differ from the source account")
 	}
@@ -283,9 +311,6 @@ func (o *Operation) setTransfer(in OperationInput, to *Account) error {
 }
 
 func (o *Operation) setCategory(in OperationInput, cat *Category) error {
-	if !in.Amount.IsPositive() {
-		return NewError(errors.ErrInvalid, "amount: must be positive")
-	}
 	if in.CategoryID == 0 {
 		return nil
 	}
@@ -314,7 +339,7 @@ type SplitPart struct {
 // its ID when op is not a part of a split yet.
 func SplitOperation(op Operation, parts []SplitPart, cats map[int64]Category) ([]Operation, error) {
 	const maxParts = 50
-	if op.Type != OpExpense && op.Type != OpIncome {
+	if !op.Type.Categorized() {
 		return nil, NewError(errors.ErrInvalid, "type: only expenses and income can be split")
 	}
 	if len(parts) < 2 {
@@ -553,7 +578,7 @@ func (c CashFlow) Net() money.Amount {
 func CashFlows(sums []TypeSum) []CashFlow {
 	var out []CashFlow
 	for _, s := range sums {
-		if s.Type != OpIncome && s.Type != OpExpense {
+		if !s.Type.Categorized() {
 			continue
 		}
 		i := slices.IndexFunc(out, func(c CashFlow) bool { return c.Currency == s.Currency })

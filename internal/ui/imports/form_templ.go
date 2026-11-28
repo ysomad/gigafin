@@ -855,7 +855,7 @@ func steps(step string, rates bool, p *domain.Preview) templ.Component {
 			}
 		} else if p != nil {
 			base := fmt.Sprintf("/imports/%d", p.Import.ID)
-			staged := p.Import.Status == domain.ImportStaged
+			staged := p.Import.Staged()
 			templ_7745c5c3_Err = stepTab(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", kit.T(ctx, "Accounts")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

@@ -305,7 +305,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(kit.KindLabel(ctx, g.Kind))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 48, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 48, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -328,7 +328,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/categories/%d", parent.ID)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 56, Col: 59}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 56, Col: 60}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 					if templ_7745c5c3_Err != nil {
@@ -341,7 +341,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(parent.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 56, Col: 75}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 56, Col: 76}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 					if templ_7745c5c3_Err != nil {
@@ -369,7 +369,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 						var templ_7745c5c3_Var19 string
 						templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(parent.Name)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 48}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 49}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 						if templ_7745c5c3_Err != nil {
@@ -382,7 +382,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 						var templ_7745c5c3_Var20 string
 						templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("/categories/%d", c.ID)).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 107}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 						if templ_7745c5c3_Err != nil {
@@ -395,7 +395,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 						var templ_7745c5c3_Var21 string
 						templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 118}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 65, Col: 119}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 						if templ_7745c5c3_Err != nil {
@@ -430,7 +430,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "No categories match."))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 78, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 78, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -448,7 +448,7 @@ func categoriesPage(v kit.Page, d listData) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "No categories yet."))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 80, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `categories/categories.templ`, Line: 80, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -660,7 +660,7 @@ func categoryPage(v kit.Page, d categoryData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if c.ParentID != 0 {
+			if !c.IsParent() {
 				templ_7745c5c3_Var34 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
+
 	"github.com/ysomad/gigafin/internal/domain"
 	"github.com/ysomad/gigafin/internal/i18n"
 )
@@ -28,6 +30,9 @@ type Page struct {
 	// loaded in full rather than by htmx, and the sync of a bank is on: the page then
 	// syncs the banks.
 	BankSync bool
+	// Dialog is the content of the dialog of the layout, open as the page loads, such as
+	// the form of an operation on its own page; nil for none.
+	Dialog templ.Component
 }
 
 // Failure is a failed form post a page is rendered for: Err is FieldsError of its

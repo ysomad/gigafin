@@ -77,7 +77,7 @@ func NewTrends(sums []MonthSum, from, to timex.Month) []Trend {
 	byCur := make(map[string]Trend)
 	for _, s := range sums {
 		i, ok := index[s.Month.String()]
-		if !ok || (s.Type != OpIncome && s.Type != OpExpense) {
+		if !ok || !s.Type.Categorized() {
 			continue
 		}
 		t, ok := byCur[s.Currency]

@@ -121,7 +121,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		name := kit.T(ctx, b.Bank.Name())
 		base := "/settings/banks/" + string(b.Bank)
-		connected := b.Conn.Status == domain.BankConnected && b.Step == ""
+		connected := b.Conn.Connected() && b.Step == ""
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<section class=\"form-compact\"><div class=\"hstack justify-between\"><div class=\"hstack\"><h4>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -231,7 +231,7 @@ func bankSection(v kit.Page, d banksData, b bankData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && t.AccountID == 0 }) {
+			if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && !t.Linked() }) {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<button type=\"submit\" form=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

@@ -175,7 +175,7 @@ func bankAccounts(
 		if t.Bank != bank {
 			continue
 		}
-		if a, ok := m.Accounts[domain.AccountKey(t.Name, t.Currency)]; ok && t.AccountID == 0 {
+		if a, ok := m.Accounts[domain.AccountKey(t.Name, t.Currency)]; ok && !t.Linked() {
 			t.TransfersTo = a.ID
 		}
 		accounts = append(accounts, t)
@@ -313,7 +313,7 @@ func (s *Banks) Link(
 	if err != nil {
 		return domain.BankSync{}, err
 	}
-	if conn.Status == domain.BankLoginRequired {
+	if conn.NeedsLogin() {
 		return domain.BankSync{NeedsLogin: []domain.Bank{bank}}, nil
 	}
 	now := s.clock.Now()
@@ -387,10 +387,11 @@ func linkAccount(
 		return 0, domain.NewError(errors.ErrInvalid, "bank account: choose from the list")
 	}
 	t := accounts[i]
-	if t.AccountID != 0 {
+	if t.Linked() {
 		return 0, domain.NewError(errors.ErrConflict, "bank account: already synced with another account")
 	}
 	start := _syncAll
+	_, taken := domain.LinkedBankAccount(accounts, l.AccountID)
 	switch {
 	case l.AccountID == 0:
 		a, err := domain.NewAccount(domain.AccountInput{
@@ -403,7 +404,7 @@ func linkAccount(
 			return 0, err
 		}
 		l.AccountID, created = a.ID, a.ID
-	case slices.ContainsFunc(accounts, func(a domain.BankAccount) bool { return a.AccountID == l.AccountID }):
+	case taken:
 		return 0, domain.NewError(errors.ErrConflict, "the account syncs with a bank account already")
 	default:
 		var err error
@@ -449,7 +450,7 @@ func (s *Banks) Sync(
 	if err != nil {
 		return domain.BankSync{}, err
 	}
-	if conn.Status == domain.BankLoginRequired {
+	if conn.NeedsLogin() {
 		return domain.BankSync{NeedsLogin: []domain.Bank{bank}}, nil
 	}
 	now := s.clock.Now()
@@ -462,7 +463,7 @@ func (s *Banks) Sync(
 	}
 	starts := make(map[string]time.Time)
 	for _, t := range accounts {
-		if t.Bank != bank || t.AccountID == 0 {
+		if t.Bank != bank || !t.Linked() {
 			continue
 		}
 		// never synced, as when the sync of Link failed: from where Link meant to start
@@ -502,7 +503,7 @@ func (s *Banks) syncLinked(
 		return res, err
 	}
 	for _, t := range accounts {
-		if t.Bank != conn.Bank || t.AccountID == 0 || !starts[t.ExternalID].Equal(_syncAll) {
+		if t.Bank != conn.Bank || !t.Linked() || !starts[t.ExternalID].Equal(_syncAll) {
 			continue
 		}
 		sum := sums[t.AccountID]
@@ -671,7 +672,7 @@ func syncRecords(
 					sum.first = r.Time
 				}
 				sums[t.AccountID] = sum
-			case !synced && t.AccountID == 0 && t.TransfersTo != 0:
+			case !synced && !t.Linked() && t.TransfersTo != 0:
 				others = append(others, r)
 			}
 		}
@@ -710,7 +711,7 @@ func (s *Banks) saveAccounts(
 			return err
 		}
 		for _, t := range all {
-			if t.Bank != bank || t.AccountID == 0 {
+			if t.Bank != bank || !t.Linked() {
 				continue
 			}
 			if err := r.Imports.MapAccount(ctx, userID, bank.ImportSource(), t.Name, t.Currency, t.AccountID); err != nil {
@@ -718,14 +719,14 @@ func (s *Banks) saveAccounts(
 			}
 			// the bank knows the limit of a credit card, also of an account linked after
 			// it was created or of a limit changed since
-			if t.Kind != domain.AccountCredit {
+			if !t.Kind.IsCredit() {
 				continue
 			}
 			a, err := r.Accounts.Get(ctx, userID, t.AccountID)
 			if err != nil {
 				return err
 			}
-			if a.Kind == domain.AccountCredit && a.CreditLimit.Equal(t.CreditLimit) {
+			if a.Kind.IsCredit() && a.CreditLimit.Equal(t.CreditLimit) {
 				continue
 			}
 			edited, err := a.Edit(domain.AccountInput{Name: a.Name, Kind: domain.AccountCredit, CreditLimit: t.CreditLimit})

@@ -147,3 +147,12 @@ func TestPlanTotals(t *testing.T) {
 	assert.Equal(t, "USD", got[1].Currency)
 	assert.True(t, money.FromInt(10).Equal(got[1].Plan))
 }
+
+func TestPlanRowOver(t *testing.T) {
+	t.Parallel()
+
+	row := domain.PlanRow{Plan: money.FromInt(100), Spent: money.FromInt(100), HasPlan: true}
+	assert.False(t, row.Over(), "at the plan")
+	row.Spent = money.MustParse("100.01")
+	assert.True(t, row.Over())
+}

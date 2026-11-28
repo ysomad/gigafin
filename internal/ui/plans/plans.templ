@@ -15,7 +15,7 @@ templ plansPage(v kit.Page, d plansData) {
 	@kit.Layout(v, false, nil) {
 		<div class="hstack justify-between mb-4">
 			<div class="hstack">
-				@kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan"))
+				@kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan"), nil)
 				@fillButton(d.Month, false)
 			</div>
 			@kit.MonthNav("/plans", d.Month, d.Months, d.Prev, d.Next)
@@ -114,9 +114,9 @@ templ planProgress(row domain.PlanRow, inc bool, symbol string) {
 			<span data-amount>{ kit.Money(ctx, left.Abs(), row.Currency) }</span>
 			<span class="text-light">
 				switch  {
-					case left.IsNegative() && inc:
+					case row.Over() && inc:
 						{ kit.T(ctx, "above plan") }
-					case left.IsNegative():
+					case row.Over():
 						{ kit.T(ctx, "over") }
 					case inc:
 						{ kit.T(ctx, "to go") }

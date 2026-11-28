@@ -96,11 +96,12 @@ templ Filter(action, query, placeholder string, count int, reset string) {
 	</div>
 }
 
-// NewButton is the button of a list toolbar adding the item labeled label at href. On
-// phones a button floating under the thumb replaces it.
-templ NewButton(href, label string) {
-	<a class="button new-button" href={ href }>+ { label }</a>
-	<a class="button outline fab" href={ href } aria-label={ label }>+</a>
+// NewButton is the button of a list toolbar adding the item labeled label at href, with
+// attrs, such as to get the form into a dialog. On phones a button floating under the
+// thumb replaces it.
+templ NewButton(href, label string, attrs templ.Attributes) {
+	<a class="button new-button" href={ href } { attrs... }>+ { label }</a>
+	<a class="button outline fab" href={ href } aria-label={ label } { attrs... }>+</a>
 }
 
 // SearchButton opens the dialog of SearchDialog.
@@ -144,10 +145,10 @@ templ ResetButton(reset string) {
 	</span>
 }
 
-// FilterButton opens the dialog of FilterDialog, showing how many filters, count, are
-// set when any is.
+// FilterButton opens the dialog of FilterDialog, non-modal so the nav stays usable,
+// showing how many filters, count, are set when any is.
 templ FilterButton(count int) {
-	<button type="button" class="outline" commandfor="filter-dialog" command="show-modal" aria-label={ T(ctx, "Filter") }>
+	<button type="button" class="outline" commandfor="filter-dialog" command="--show" aria-label={ T(ctx, "Filter") }>
 		<svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#funnel"></use></svg>
 		if count > 0 {
 			<span class="filter-count">{ count }</span>
@@ -159,13 +160,17 @@ templ FilterButton(count int) {
 // action, with the fields of children. FilterButton opens it.
 templ FilterDialog(action string) {
 	<form id="filter-form" method="get" action={ action }>
-		<dialog id="filter-dialog" class="p-4 form-compact" aria-label={ T(ctx, "Filter") } closedby="any" autofocus>
-			<div class="row">
-				{ children... }
+		<dialog id="filter-dialog" aria-label={ T(ctx, "Filter") } closedby="any" autofocus>
+			@DialogHeader("filter-dialog", T(ctx, "Filter"), "")
+			<div class="form-compact">
+				<div class="row">
+					{ children... }
+				</div>
 			</div>
-			<footer class="hstack justify-end mt-4">
-				<button type="button" class="outline" commandfor="filter-dialog" command="close">{ T(ctx, "Close") }</button>
-				<button type="submit">{ T(ctx, "Apply") }</button>
+			<footer>
+				<div class="hstack justify-end w-100">
+					<button type="submit">{ T(ctx, "Apply") }</button>
+				</div>
 			</footer>
 		</dialog>
 	</form>
@@ -173,7 +178,7 @@ templ FilterDialog(action string) {
 
 // NoOperations is the text of a page that would list operations when the user has none.
 templ NoOperations() {
-	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>
+	<p class="text-light">{ T(ctx, "No operations yet.") } <a href="/operations/new?type=expense" hx-get="/operations/new?type=expense" hx-target="#op-dialog" hx-swap="innerHTML">{ T(ctx, "Add one") }</a> { T(ctx, "or") } <a href="/imports/new">{ T(ctx, "import") }</a>.</p>
 }
 
 // OpRows are the list items of operations by day, each titled with its net income, or
@@ -198,8 +203,10 @@ templ OpRows(days []DayGroup, catNames map[int64]string, accByID map[int64]domai
 			</li>
 		}
 		for _, op := range day.Ops {
-			<li class="card compact hstack justify-between">
-				<a href={ fmt.Sprintf("/operations/%d/edit", op.ID) }>
+			// data-op counts the rows loaded, which the list reloads through once an
+			// operation edited in the dialog of the layout is saved
+			<li class="card compact hstack justify-between" data-op>
+				<a href={ fmt.Sprintf("/operations/%d/edit", op.ID) } hx-get={ fmt.Sprintf("/operations/%d/edit", op.ID) } hx-target="#op-dialog" hx-swap="innerHTML">
 					<div class="hstack gap-1">
 						{ OpCategory(ctx, op, catNames) }
 						if op.IsSplit() {

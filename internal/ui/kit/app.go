@@ -28,6 +28,10 @@ const (
 	flashCookie   = "gigafin_flash"
 )
 
+// RowsHeader is the number of operation rows a page has loaded, sent when it is reloaded
+// in place, so it lists as many again.
+const RowsHeader = "Gigafin-Rows"
+
 // App is what the handlers of every feature run with.
 type App struct {
 	Svc *service.Services

@@ -11,7 +11,7 @@ import (
 templ accountsPage(v kit.Page, d accountsData) {
 	@kit.Layout(v, false, nil) {
 		<div class="hstack mb-4">
-			<a class="button" href="/accounts/new">+ { kit.T(ctx, "Account") }</a>
+			@kit.NewButton("/accounts/new", kit.T(ctx, "Account"), nil)
 		</div>
 		if len(d.Assets) == 0 && len(d.Liabilities) == 0 && len(d.Archived) == 0 {
 			<p class="text-light">{ kit.T(ctx, "No accounts yet.") }</p>
@@ -147,7 +147,7 @@ templ accountPage(v kit.Page, d accountData) {
 				@kit.Field("col-3", kit.T(ctx, "Name"), e, "name-error", nil) {
 					<input name="name" value={ f.Name } { kit.Invalid(e, "name-error")... }/>
 				}
-				if a.Kind == domain.AccountCredit {
+				if a.Kind.IsCredit() {
 					{{ e = v.Errors.Get("credit_limit") }}
 					@kit.Field("col-3", kit.T(ctx, "Credit limit"), e, "credit-limit-error", nil) {
 						<input name="credit_limit" inputmode="decimal" value={ kit.AmountInput(ctx, f.CreditLimit) } { kit.Invalid(e, "credit-limit-error")... }/>
@@ -216,7 +216,7 @@ templ kindSelect(kinds []domain.AccountKind, selected, err string) {
 // creditLimitField is the credit limit of an account of kind, hidden and disabled
 // unless a credit card.
 templ creditLimitField(class, kind, value, err string) {
-	{{ credit := kind == string(domain.AccountCredit) }}
+	{{ credit := domain.AccountKind(kind).IsCredit() }}
 	@kit.Field(class, kit.T(ctx, "Credit limit"), err, "credit-limit-error", templ.Attributes{"data-credit-limit": true, "hidden": !credit}) {
 		<input name="credit_limit" inputmode="decimal" value={ kit.AmountInput(ctx, value) } disabled?={ !credit } { kit.Invalid(err, "credit-limit-error")... }/>
 	}

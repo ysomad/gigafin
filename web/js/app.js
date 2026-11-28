@@ -36,6 +36,53 @@ for (const type of ['input', 'change']) {
   });
 }
 
+// The history-cache extension restores pages from sessionStorage on back and forward,
+// so after a request that changes data, such as archiving an account or editing an
+// operation, drop the cached pages to load them anew. Such a request answers with
+// HX-Location, and htmx saves the page it leaves, still showing the old data, before
+// following it, so that save is skipped too, until the new page is swapped in.
+let historyStale = false;
+document.addEventListener('htmx:after:request', e => {
+  if (e.detail.ctx.request.method === 'GET') return;
+  historyStale = true;
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith('htmx-history-')) sessionStorage.removeItem(key);
+    }
+  } catch {}
+});
+document.addEventListener('htmx:history:cache:before:save', e => {
+  if (historyStale) e.preventDefault();
+});
+document.addEventListener('htmx:after:swap', () => {
+  historyStale = false;
+});
+
+// The form of an operation of a list, or of a new one, is swapped into the dialog of the
+// layout, which then opens, non-modal so the nav stays usable, see app.css. Saving or deleting it posts the rows the page has loaded, which the
+// page is reloaded through in place, not counting the parts of a split the dialog lists.
+document.addEventListener('htmx:after:settle', e => {
+  if (e.target.id === 'op-dialog' && !e.target.open) e.target.show();
+});
+// A button of command="--show" opens the dialog it is for non-modal, so the nav stays
+// usable, see app.css; there is no built-in command for that.
+document.addEventListener('command', e => {
+  if (e.command === '--show') e.target.show();
+}, true);
+// Escape, or a click outside, in a step of the dialog returns to the step before it, as
+// its close button does.
+document.addEventListener('cancel', e => {
+  const back = e.target.querySelector?.(':scope > header [data-dialog-back]');
+  if (!back) return;
+  e.preventDefault();
+  back.click();
+}, true);
+document.addEventListener('htmx:config:request', e => {
+  const ctx = e.detail.ctx;
+  if (ctx.request.method === 'GET' || !ctx.sourceElement.closest?.('#op-dialog')) return;
+  ctx.request.body.set('rows', String(document.querySelectorAll('[data-op]:not(#op-dialog *)').length));
+});
+
 // A [data-copy] button copies its value and shows a check icon for a moment.
 document.addEventListener('click', async e => {
   const button = e.target.closest('[data-copy]');
@@ -57,33 +104,6 @@ document.addEventListener('htmx:response:error', e => {
   ctx.swap = 'none';
   ot.toast(ctx.text, '', { variant: 'danger' });
 });
-
-// The category filter lists only the categories of the picked type, and is hidden for
-// types without categories. Categories of another kind are unpicked.
-function filterCategories(typeSelect) {
-  const field = typeSelect.form.querySelector('[data-category-field]');
-  const type = typeSelect.value;
-  const options = [...field.querySelectorAll('[role=option][data-kind]')];
-  for (const o of options) {
-    const off = type !== '' && o.dataset.kind !== type;
-    o.toggleAttribute('data-off', off);
-    const box = o.querySelector('input');
-    if (off && box.checked) {
-      box.checked = false;
-      box.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  }
-  field.hidden = type !== '' && options.every(o => o.hasAttribute('data-off'));
-  for (const input of field.querySelectorAll('input')) input.disabled = field.hidden;
-}
-document.addEventListener('change', e => {
-  if (e.target.matches('[data-category-type]')) filterCategories(e.target);
-});
-function filterAllCategories(root) {
-  for (const select of root.querySelectorAll('[data-category-type]')) filterCategories(select);
-}
-document.addEventListener('DOMContentLoaded', () => filterAllCategories(document));
-document.addEventListener('htmx:after:settle', e => filterAllCategories(e.target));
 
 // In the split form the first part, the operation itself, keeps what the other parts
 // leave of the total, so typing a part's amount takes it from the first one. It counts

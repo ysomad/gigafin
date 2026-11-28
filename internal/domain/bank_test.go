@@ -52,3 +52,16 @@ func TestBankAccountMismatch(t *testing.T) {
 	assert.False(t, domain.BankAccount{Balance: tb.Balance}.Mismatch(a), "not linked")
 	assert.False(t, domain.BankAccount{AccountID: 8, Balance: tb.Balance}.Mismatch(a), "linked to another")
 }
+
+func TestLinkedBankAccount(t *testing.T) {
+	t.Parallel()
+
+	ts := []domain.BankAccount{{ID: 1}, {ID: 2, AccountID: 7}}
+	got, ok := domain.LinkedBankAccount(ts, 7)
+	assert.True(t, ok)
+	assert.Equal(t, int64(2), got.ID)
+	_, ok = domain.LinkedBankAccount(ts, 8)
+	assert.False(t, ok)
+	_, ok = domain.LinkedBankAccount(ts, 0)
+	assert.False(t, ok, "an unlinked bank account syncs with no account")
+}

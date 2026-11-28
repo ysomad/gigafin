@@ -136,7 +136,7 @@ templ steps(step string, rates bool, p *domain.Preview) {
 			} else if p != nil {
 				{{
 					base := fmt.Sprintf("/imports/%d", p.Import.ID)
-					staged := p.Import.Status == domain.ImportStaged
+					staged := p.Import.Staged()
 				}}
 				@stepTab(staged, step == "accounts", base+"/accounts", p.AccountsMapped(), "3.", kit.T(ctx, "Accounts"))
 				@stepTab(staged, step == "categories", base+"/categories", p.CategoriesMapped(), "4.", kit.T(ctx, "Categories"))

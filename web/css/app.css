@@ -5,6 +5,33 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* The nav is --nav-height high, which modal dialogs and their backdrop leave clear, so
+   it stays in view under them. */
+:root {
+  --nav-height: 3rem;
+}
+header[data-topnav] {
+  box-sizing: border-box;
+  height: var(--nav-height);
+}
+/* Its links are muted text, the current page's in the text color. */
+header[data-topnav] :where(nav > div > a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-7);
+  transition: color var(--transition-fast);
+  &:hover,
+  &[aria-current] {
+    color: var(--foreground);
+  }
+  &[aria-current] {
+    font-weight: var(--font-semibold);
+  }
+}
+
 /* Field and form messages from the server start lowercase, as they follow the field in
    toasts. */
 :is([data-field] .error, .error[role="alert"])::first-letter {
@@ -55,6 +82,10 @@ td.nowrap {
 /* On phones the top nav becomes a bottom tab bar without the brand, above the home
    indicator of the installed app. */
 @media (max-width: 768px) {
+  /* a tab, 44px, between the paddings and the border of the bar */
+  :root {
+    --nav-height: calc(3.875rem + env(safe-area-inset-bottom));
+  }
   body {
     padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
@@ -72,6 +103,12 @@ td.nowrap {
     z-index: 4;
     display: inline-flex;
   }
+  /* floating buttons are 48px, a fingertip */
+  :is(.fab, .to-top) {
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+  }
   /* outlined floating buttons stand out from the rows under them, which show through
      faintly */
   :is(.fab, .to-top).outline {
@@ -80,11 +117,16 @@ td.nowrap {
   }
   /* the scroll-to-top button stacks above it, a button high */
   body:has(.fab) .to-top {
-    bottom: calc(4.5rem + 2.5rem + var(--space-4) + env(safe-area-inset-bottom));
+    bottom: calc(4.5rem + 3rem + var(--space-4) + env(safe-area-inset-bottom));
   }
   /* the floating button adds the item instead */
   .new-button {
     display: none;
+  }
+  /* cells sit closer, so the columns of a table such as the expenses by category fit
+     the width of a phone */
+  :is(th, td) {
+    padding-inline: var(--space-1);
   }
   /* iOS zooms into a focused field whose text is under 16px, as Oat's is */
   :is(input, select, textarea) {
@@ -108,14 +150,16 @@ td.nowrap {
     .brand {
       display: none;
     }
-    /* tabs are narrower than Oat's small buttons, so all fit the width of a phone */
+    /* tabs share the width of a phone, without the padding of Oat's small buttons so
+       all fit, and are 44px high, a fingertip */
     nav > div {
       width: 100%;
       flex-wrap: nowrap;
-      justify-content: space-around;
       gap: 0;
       > * {
-        padding-inline: var(--space-1);
+        flex: 1 1 auto;
+        min-height: 2.75rem;
+        padding-inline: 0;
       }
     }
   }
@@ -130,6 +174,102 @@ td.nowrap {
    around the whole dialog. */
 dialog[autofocus]:focus-visible {
   outline: none;
+}
+
+/* Dialogs, but popovers such as the search, open non-modal, so the nav stays in view and
+   usable: a dialog and the shade behind it start under the nav, and a click on the shade
+   closes the dialog, as its closedby="any" does for any click outside it. The page under
+   it does not scroll, nor does scrolling the dialog to its end carry on to the page, as
+   phones do. */
+html:has(dialog[open]:not([popover])) {
+  overflow: hidden;
+}
+body:has(dialog[open]:not([popover]))::after {
+  content: "";
+  position: fixed;
+  inset: var(--nav-height) 0 0 0;
+  z-index: calc(var(--z-modal) - 1);
+  background-color: light-dark(rgb(0 0 0 / 0.4), rgb(0 0 0 / 0.8));
+}
+dialog {
+  overscroll-behavior: contain;
+}
+
+/* The body of a dialog sits closer to its header and footer than Oat sets it, so a form
+   fits on a phone. They keep the gap themselves, so a body scrolling under them doesn't
+   touch them; its own padding is room for the focus rings of its fields. */
+dialog > header {
+  padding-block-end: var(--space-3);
+}
+dialog > div,
+dialog > form > div {
+  padding-block: var(--space-1);
+}
+dialog > footer,
+dialog > form > footer {
+  padding-block-start: var(--space-3);
+}
+
+/* A dialog keeps its header and footer in view, its body scrolling between once it
+   outgrows the dialog. The footer follows the body, not the bottom of a full screen one. */
+dialog[open]:not([popover]) {
+  inset-block-start: var(--nav-height);
+  display: flex;
+  flex-direction: column;
+  > form:has(> footer) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  > div,
+  > form > div {
+    min-height: 0;
+  }
+}
+/* On phones a dialog takes the whole screen but the tab bar, and the split everywhere,
+   as it grows with its parts; clear of the status bar of the installed app. */
+dialog[open]:has(#form-split) {
+  width: 100%;
+  max-width: none;
+  height: calc(100dvh - var(--nav-height));
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  /* Oat's shadow would fall on the nav */
+  box-shadow: none;
+  padding-block: env(safe-area-inset-top) 0;
+}
+@media (max-width: 768px) {
+  /* over the tab bar at the bottom */
+  body:has(dialog[open]:not([popover]))::after {
+    inset: 0 0 var(--nav-height) 0;
+  }
+  dialog[open]:not([popover]) {
+    inset: 0 0 var(--nav-height) 0;
+    width: 100%;
+    max-width: none;
+    height: calc(100dvh - var(--nav-height));
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding-block: env(safe-area-inset-top) 0;
+  }
+  /* a part of a split: its category beside the button removing it, over its amount and
+     note side by side */
+  .split > .row {
+    > :nth-child(2),
+    > :nth-child(3) {
+      --span: 2;
+      order: 1;
+    }
+    &:has([data-split-remove]) > :first-child {
+      --span: 3;
+    }
+    > :has([data-split-remove]) {
+      --span: 1;
+    }
+  }
 }
 
 /* The count of set filters on the filter button is no higher than its icon, so the

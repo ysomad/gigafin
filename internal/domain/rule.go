@@ -660,8 +660,8 @@ func (rs RuleSet) apply(in *OperationInput, a Action) bool {
 			return false
 		}
 		cat, ok := rs.cats[id]
-		if !ok || cat.Archived || !slices.Contains([]OpType{OpExpense, OpIncome}, in.Type) ||
-			cat.Kind != (Operation{Type: in.Type}).Kind() || in.CategoryID == id {
+		kind, categorized := in.Type.Kind()
+		if !ok || cat.Archived || !categorized || cat.Kind != kind || in.CategoryID == id {
 			return false
 		}
 		in.CategoryID = id
@@ -792,7 +792,7 @@ func LearnCategories(ops []Operation, rules []Rule, cats map[int64]Category) []R
 	for _, k := range payees {
 		history := byPayee[k]
 		i := slices.IndexFunc(history, func(op Operation) bool {
-			return (op.Type == OpExpense || op.Type == OpIncome) && !op.IsSplit() && op.CategoryID != 0
+			return op.Type.Categorized() && !op.IsSplit() && op.CategoryID != 0
 		})
 		if i < 0 {
 			continue
@@ -816,7 +816,7 @@ func payeeCategory(history []Operation, changed Operation) (int64, bool) {
 	}
 	var latest []Operation
 	for _, op := range history {
-		if (op.Type == OpExpense || op.Type == OpIncome) && !op.IsSplit() && op.CategoryID != 0 {
+		if op.Type.Categorized() && !op.IsSplit() && op.CategoryID != 0 {
 			latest = append(latest, op)
 		}
 		if len(latest) == window {

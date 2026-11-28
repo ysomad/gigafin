@@ -47,6 +47,11 @@ func (k AccountKind) Liability() bool {
 	return k == AccountCredit || k == AccountLoan
 }
 
+// IsCredit reports whether the account is a credit card, the kind with a credit limit.
+func (k AccountKind) IsCredit() bool {
+	return k == AccountCredit
+}
+
 // Account is a money account in a single currency. Balance is signed for every kind:
 // a credit card owing 500 has balance -500.
 type Account struct {
@@ -58,6 +63,12 @@ type Account struct {
 	CreditLimit money.Amount
 	Archived    bool
 	Balance     money.Amount
+}
+
+// Pickable reports whether the account may be picked in a form: it is not archived,
+// or it is one of selected, picked before it was.
+func (a Account) Pickable(selected ...int64) bool {
+	return !a.Archived || slices.Contains(selected, a.ID)
 }
 
 // Owed returns the debt of a liability account, positive when money is owed.
@@ -101,7 +112,7 @@ func NewAccount(in AccountInput) (Account, error) {
 		return Account{}, err
 	}
 	a := Account{Name: name, Currency: currency, Kind: kind}
-	if in.CreditLimit.IsZero() || kind != AccountCredit {
+	if in.CreditLimit.IsZero() || !kind.IsCredit() {
 		return a, nil
 	}
 	if !in.CreditLimit.IsPositive() {

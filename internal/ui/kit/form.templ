@@ -43,7 +43,7 @@ templ FieldError(err, errID string) {
 // FormError is the message msg about a whole form, in grid column col, if any.
 templ FormError(msg, col string) {
 	if msg != "" {
-		<p class={ templ.KV(col, col != ""), "error" } role="alert">{ msg }</p>
+		<p class={ templ.KV(col, col != ""), "error" } role="alert" data-variant="error">{ msg }</p>
 	}
 }
 
@@ -78,19 +78,6 @@ templ LinkButton(href, variant, label string) {
 	<a class="button outline" href={ href } data-variant={ variant }>{ label }</a>
 }
 
-// SegmentLink is a link of a group of links to the variants of a page, filled when
-// current.
-templ SegmentLink(href string, current bool, label string) {
-	<a
-		class={ "button", templ.KV("outline", !current) }
-		if current {
-			aria-current="page"
-		}
-		href={ href }
-		data-variant="secondary"
-	>{ label }</a>
-}
-
 // CurrencySelect picks one of currencies.
 templ CurrencySelect(currencies []string, selected, err string) {
 	<select name="currency" { Invalid(err, "currency-error")... }>
@@ -109,8 +96,6 @@ type SelectOption struct {
 	Text string
 	// Group is the caption put before the first option of each group.
 	Group string
-	// Kind is the category kind of the option, for the type filter of operations.
-	Kind string
 	// Child is indented under the option before it that is not a child.
 	Child bool
 	// Empty is picked when the input of Select is emptied, such as "All".
@@ -129,22 +114,20 @@ func CategoryOptions(ctx context.Context, tree []domain.Category, selected []int
 		if grouped {
 			group = KindLabel(ctx, parent.Kind)
 		}
-		shown := archived || !parent.Archived || slices.Contains(selected, parent.ID)
+		shown := archived || parent.Pickable(selected...)
 		if shown {
 			options = append(options, SelectOption{
 				Value: strconv.FormatInt(parent.ID, 10),
 				Label: parent.Name,
 				Group: group,
-				Kind:  string(parent.Kind),
 			})
 		}
 		for _, c := range parent.Children {
-			if archived || !c.Archived || slices.Contains(selected, c.ID) {
+			if archived || c.Pickable(selected...) {
 				o := SelectOption{
 					Value: strconv.FormatInt(c.ID, 10),
 					Label: domain.FullName(parent.Name, c.Name),
 					Group: group,
-					Kind:  string(parent.Kind),
 				}
 				if shown {
 					o.Text, o.Child = c.Name, true
@@ -188,9 +171,6 @@ templ Select(name string, options []SelectOption, selected string, attrs templ.A
 					role="option"
 					data-value={ o.Value }
 					data-label={ o.Label }
-					if o.Kind != "" {
-						data-kind={ o.Kind }
-					}
 					data-child?={ o.Child }
 					data-empty?={ o.Empty }
 				>{ cmp.Or(o.Text, o.Label) }</li>
@@ -231,9 +211,6 @@ templ MultiSelect(name string, options []SelectOption, selected []string, placeh
 					role="option"
 					data-value={ o.Value }
 					data-label={ o.Label }
-					if o.Kind != "" {
-						data-kind={ o.Kind }
-					}
 					data-child?={ o.Child }
 				>
 					<input type="checkbox" name={ name } value={ o.Value } checked?={ slices.Contains(selected, o.Value) } tabindex="-1"/> { cmp.Or(o.Text, o.Label) }

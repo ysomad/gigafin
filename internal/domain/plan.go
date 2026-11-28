@@ -97,6 +97,12 @@ func (r PlanRow) Left() money.Amount {
 	return r.Plan.Sub(r.Spent)
 }
 
+// Over reports whether spent is past the plan: an expense overspent, an income above
+// its plan.
+func (r PlanRow) Over() bool {
+	return r.Spent.Cmp(r.Plan) > 0
+}
+
 // Percent returns spent as a share of plan, 0..100+, or 0 without a plan.
 func (r PlanRow) Percent() int64 {
 	if !r.HasPlan {

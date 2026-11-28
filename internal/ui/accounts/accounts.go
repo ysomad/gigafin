@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -54,7 +55,7 @@ func (h *Handler) accounts(w http.ResponseWriter, r *http.Request, user domain.U
 	}
 	d := accountsData{Banks: make(map[int64]domain.BankAccount, len(bankAccounts))}
 	for _, t := range bankAccounts {
-		if t.AccountID != 0 {
+		if t.Linked() {
 			d.Banks[t.AccountID] = t
 		}
 	}
@@ -111,7 +112,7 @@ func accountInput(d accountForm, create bool) (domain.AccountInput, kit.FieldsEr
 	if create && !money.ValidCurrency(in.Currency) {
 		errs["currency"] = domain.NewError(errors.ErrInvalid, "choose from the list")
 	}
-	if d.CreditLimit == "" || create && in.Kind != domain.AccountCredit {
+	if d.CreditLimit == "" || create && !in.Kind.IsCredit() {
 		return in, errs
 	}
 	var err error
@@ -171,9 +172,7 @@ func (h *Handler) renderAccount(
 	if err != nil {
 		return err
 	}
-	if i := slices.IndexFunc(bankAccounts, func(t domain.BankAccount) bool { return t.AccountID == a.ID }); i >= 0 {
-		d.Linked = bankAccounts[i]
-	}
+	d.Linked, _ = domain.LinkedBankAccount(bankAccounts, a.ID)
 	if fail.Form != "edit" {
 		d.Edit = accountForm{Name: a.Name}
 		if !a.CreditLimit.IsZero() {
@@ -185,7 +184,9 @@ func (h *Handler) renderAccount(
 	}
 	// the first page of the operations; the operations list serves the next ones
 	f := domain.Filter{AccountID: a.ID}
-	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.NewParams(pagination.Cursor{}, 20))
+	// a page reloaded in place keeps the rows it had loaded
+	n, _ := strconv.Atoi(r.Header.Get(kit.RowsHeader)) //nolint:errcheck // 0 when not reloaded
+	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, f, pagination.NewParams(pagination.Cursor{}, max(20, n)))
 	if err != nil {
 		return err
 	}

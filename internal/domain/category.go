@@ -45,6 +45,18 @@ type Category struct {
 	Children []Category
 }
 
+// Pickable reports whether the category may be picked in a form: it is not archived,
+// or it is one of selected, picked before it was.
+func (c Category) Pickable(selected ...int64) bool {
+	return !c.Archived || slices.Contains(selected, c.ID)
+}
+
+// IsParent reports whether the category is a cat1, one other categories may be
+// nested in.
+func (c Category) IsParent() bool {
+	return c.ParentID == 0
+}
+
 // FullName returns "cat1 / cat2" for a cat2 and the name for a cat1.
 func FullName(parent, child string) string {
 	if child == "" {
@@ -62,7 +74,7 @@ func NewCategory(parent *Category, kind Kind, name string) (Category, error) {
 	}
 	c := Category{Name: name, Kind: kind}
 	if parent != nil {
-		if parent.ParentID != 0 {
+		if !parent.IsParent() {
 			return Category{}, NewError(errors.ErrInvalid, "parent: categories can be nested only one level deep")
 		}
 		c.ParentID, c.Kind = parent.ID, parent.Kind
@@ -83,13 +95,13 @@ func (c Category) Edit(name string, parent *Category) (Category, error) {
 	if parent == nil {
 		return c, nil
 	}
-	if c.ParentID == 0 {
+	if c.IsParent() {
 		return Category{}, NewError(
 			errors.ErrInvalid,
 			"only a category inside another category can be moved",
 		)
 	}
-	if parent.ParentID != 0 || parent.Kind != c.Kind {
+	if !parent.IsParent() || parent.Kind != c.Kind {
 		return Category{}, NewError(
 			errors.ErrInvalid,
 			"parent must be an %s category that is not inside another category",
@@ -119,13 +131,13 @@ func (c Category) CheckDelete(children, ops, rules int64) error {
 func NewTree(cats []Category) []Category {
 	children := make(map[int64][]Category)
 	for _, c := range cats {
-		if c.ParentID != 0 {
+		if !c.IsParent() {
 			children[c.ParentID] = append(children[c.ParentID], c)
 		}
 	}
 	var roots []Category
 	for _, c := range cats {
-		if c.ParentID == 0 {
+		if c.IsParent() {
 			c.Children = children[c.ID]
 			roots = append(roots, c)
 		}
@@ -172,7 +184,7 @@ func CategoryShortNames(tree []Category) map[int64]string {
 // ParentChoices returns the cat1 a cat2 c can move under, without their children, and
 // the name of its current parent. Both are empty for a cat1.
 func ParentChoices(tree []Category, c Category) ([]Category, string) {
-	if c.ParentID == 0 {
+	if c.IsParent() {
 		return nil, ""
 	}
 	cats := ByKind(tree, c.Kind)

@@ -133,7 +133,7 @@ func TestLoginRequired(t *testing.T) {
 
 	status, body = b.post("/login", url.Values{"login": {"alice"}, "password": {"wrong"}})
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, `<p class="error" role="alert">invalid login or password</p>`,
+	assert.Contains(t, body, `<p class="error" role="alert" data-variant="error">invalid login or password</p>`,
 		"a business error is shown on its form")
 	assert.NotContains(t, body, `class="toast"`)
 
@@ -143,7 +143,7 @@ func TestLoginRequired(t *testing.T) {
 		status, body = b.get(path)
 		assert.Equal(t, http.StatusOK, status, path)
 		assert.Contains(t, body, "No operations yet.", path)
-		assert.Contains(t, body, `href="/operations/new?type=expense">Add one</a>`, path)
+		assert.Contains(t, body, `hx-target="#op-dialog" hx-swap="innerHTML">Add one</a>`, path)
 		assert.Contains(t, body, `href="/imports/new">import</a>`, path)
 	}
 }
@@ -265,7 +265,8 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(
 		t,
 		body,
-		`<p class="error" role="alert">category: category &#34;Salary&#34; is not an expense category</p>`,
+		`<p class="error" role="alert" data-variant="error">`+
+			`category: category &#34;Salary&#34; is not an expense category</p>`,
 		"a business error is shown on its form",
 	)
 	assert.NotContains(t, body, `class="toast"`, "an error shown on its form is not a toast")
@@ -303,7 +304,7 @@ func TestPagesAndFlows(t *testing.T) {
 	assert.Contains(
 		t,
 		body,
-		`<p class="error" role="alert">parts add up to 101.00, not 150.25</p>`,
+		`<p class="error" role="alert" data-variant="error">parts add up to 101.00, not 150.25</p>`,
 		"an error of no input is shown on the form",
 	)
 	assert.Contains(t, body, `value="100"`, "rows are kept")
@@ -451,7 +452,7 @@ func TestPagesAndFlows(t *testing.T) {
 	status, body = b.postFrom("/settings/api-keys", "/settings",
 		url.Values{"name": {"script"}, "scope": {"read"}, "expires": {"30"}, "password": {"wrong"}})
 	require.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, `<p class="col-12 error" role="alert">wrong password</p>`,
+	assert.Contains(t, body, `<p class="col-12 error" role="alert" data-variant="error">wrong password</p>`,
 		"key needs the current password, a business error of the form")
 	assert.NotContains(t, body, "not shown again")
 
@@ -799,7 +800,7 @@ func TestDeleteAllData(t *testing.T) {
 
 	status, body = b.postFrom("/settings/delete-data", "/settings", url.Values{"password": {"wrong"}})
 	require.Equal(t, http.StatusUnprocessableEntity, status)
-	assert.Contains(t, body, `<p class="col-12 error" role="alert">wrong password</p>`)
+	assert.Contains(t, body, `<p class="col-12 error" role="alert" data-variant="error">wrong password</p>`)
 	accounts, err := f.Accounts.List(t.Context(), userID)
 	require.NoError(t, err)
 	assert.Len(t, accounts, 1, "nothing deleted on a wrong password")

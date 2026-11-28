@@ -18,8 +18,7 @@
   }
 
   // filter shows the options whose label contains query, with the parent of a shown
-  // child and the group of a shown option. Options left out by kind, [data-off], stay
-  // hidden.
+  // child and the group of a shown option.
   function filter(list, query) {
     query = query.trim().toLocaleLowerCase();
     let group;
@@ -31,7 +30,7 @@
         li.hidden = true;
         continue;
       }
-      li.hidden = li.hasAttribute('data-off') || !li.dataset.label.toLocaleLowerCase().includes(query);
+      li.hidden = !li.dataset.label.toLocaleLowerCase().includes(query);
       if (!li.hasAttribute('data-child')) {
         parent = li;
       } else if (!li.hidden && parent) {

@@ -642,7 +642,7 @@ func toCategory(c domain.Category) ogen.Category {
 		Name:       c.Name,
 		IsArchived: c.Archived,
 	}
-	if c.ParentID != 0 {
+	if !c.IsParent() {
 		out.ParentID = ogen.NewOptInt64(c.ParentID)
 	}
 	out.Children = make([]ogen.Category, len(c.Children))

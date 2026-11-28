@@ -37,7 +37,7 @@ func wizardPage(v kit.Page, d wizardData) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		preview := d.Preview
 		base := fmt.Sprintf("/imports/%d", preview.Import.ID)
-		staged := preview.Import.Status == domain.ImportStaged
+		staged := preview.Import.Staged()
 		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -913,7 +913,7 @@ func accountsStep(d wizardData, base string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if a.Kind != domain.AccountCredit {
+			if !a.Kind.IsCredit() {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, " hidden")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -926,7 +926,7 @@ func accountsStep(d wizardData, base string) templ.Component {
 			var templ_7745c5c3_Var52 string
 			templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(kit.T(ctx, "optional")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 130, Col: 157}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 130, Col: 145}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 			if templ_7745c5c3_Err != nil {
@@ -939,7 +939,7 @@ func accountsStep(d wizardData, base string) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(kit.T(ctx, "Credit limit")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 130, Col: 199}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `imports/wizard.templ`, Line: 130, Col: 187}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 			if templ_7745c5c3_Err != nil {
@@ -1669,7 +1669,7 @@ func rows(p domain.Preview, base string, user *domain.User) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			case row.PairID != 0 && p.Import.Status == domain.ImportStaged:
+			case row.PairID != 0 && p.Import.Staged():
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "<form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

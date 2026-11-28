@@ -292,3 +292,38 @@ func TestCashFlows(t *testing.T) {
 	assert.Equal(t, "60", flows[0].Net().String())
 	assert.Equal(t, "-3", flows[1].Net().String())
 }
+
+func TestOpTypeCheckAmount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		typ    domain.OpType
+		amount string
+		ok     bool
+	}{
+		{domain.OpExpense, "10", true},
+		{domain.OpExpense, "0", false},
+		{domain.OpIncome, "-10", false},
+		{domain.OpTransfer, "0", false},
+		{domain.OpAdjustment, "-10", true},
+		{domain.OpAdjustment, "0", false},
+	}
+	for _, tt := range tests {
+		err := tt.typ.CheckAmount(money.MustParse(tt.amount))
+		if tt.ok {
+			assert.NoError(t, err, "%s %s", tt.typ, tt.amount)
+		} else {
+			assert.ErrorIs(t, err, errors.ErrInvalid, "%s %s", tt.typ, tt.amount)
+		}
+	}
+}
+
+func TestOperationSourceDelta(t *testing.T) {
+	t.Parallel()
+
+	ten := money.FromInt(10)
+	assert.Equal(t, "-10", domain.Operation{Type: domain.OpExpense, Amount: ten}.SourceDelta().String())
+	assert.Equal(t, "-10", domain.Operation{Type: domain.OpTransfer, Amount: ten}.SourceDelta().String())
+	assert.Equal(t, "10", domain.Operation{Type: domain.OpIncome, Amount: ten}.SourceDelta().String())
+	assert.Equal(t, "-10", domain.Operation{Type: domain.OpAdjustment, Amount: ten.Neg()}.SourceDelta().String())
+}

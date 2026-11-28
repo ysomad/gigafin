@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -178,7 +179,11 @@ func (h *Handler) renderCategory(
 	// the first page of the operations; the operations list serves the next ones
 	ctx := r.Context()
 	filter := domain.Filter{CategoryIDs: []int64{c.ID}}
-	ops, next, err := h.app.Svc.Operations.List(ctx, user.ID, filter, pagination.NewParams(pagination.Cursor{}, 20))
+	// a page reloaded in place keeps the rows it had loaded
+	n, _ := strconv.Atoi(r.Header.Get(kit.RowsHeader)) //nolint:errcheck // 0 when not reloaded
+	ops, next, err := h.app.Svc.Operations.List(
+		ctx, user.ID, filter, pagination.NewParams(pagination.Cursor{}, max(20, n)),
+	)
 	if err != nil {
 		return err
 	}

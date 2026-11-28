@@ -143,7 +143,7 @@ func (h *Handler) importPage(w http.ResponseWriter, r *http.Request, user domain
 	}
 
 	base := "/imports/" + r.PathValue("id")
-	staged := p.Import.Status == domain.ImportStaged
+	staged := p.Import.Staged()
 	d := wizardData{Step: r.PathValue("step"), Preview: p}
 
 	switch d.Step {
@@ -217,11 +217,11 @@ func (h *Handler) saveAccounts(w http.ResponseWriter, r *http.Request, user doma
 	for i, name := range form.Names {
 		c := domain.AccountChoice{Name: name, Currency: form.Currencies[i], AccountID: form.IDs[i]}
 
-		if c.AccountID == 0 {
+		if c.New() {
 			c.NewName = form.NewNames[i]
 			c.NewKind = domain.AccountKind(form.NewKinds[i])
 			s := strings.TrimSpace(form.NewLimits[i])
-			if s != "" && c.NewKind == domain.AccountCredit {
+			if s != "" && c.NewKind.IsCredit() {
 				if c.NewCreditLimit, err = money.Parse(s); err != nil {
 					return domain.NewError(errors.ErrInvalid, "%s: credit limit: enter a number", name)
 				}

@@ -173,7 +173,7 @@ func parseGigaFinRow(get func(column string) string, loc *time.Location) (domain
 // back as expense or income without a category.
 func WriteGigaFin(w io.Writer, ops []domain.Operation, accounts, categories map[int64]string) error {
 	split := func(op domain.Operation) bool {
-		return op.OriginID != 0 && (op.Type == domain.OpExpense || op.Type == domain.OpIncome)
+		return op.IsSplit() && op.Type.Categorized()
 	}
 	// a part whose split has no other part in ops is written as a plain operation
 	parts := make(map[int64]int)
@@ -193,13 +193,8 @@ func WriteGigaFin(w io.Writer, ops []domain.Operation, accounts, categories map[
 		if split(op) && parts[op.OriginID] > 1 {
 			id = strconv.FormatInt(op.OriginID, 10)
 		}
-		// money out is negative; adjustments carry their sign
-		amount := op.Amount
-		if op.Type == domain.OpExpense || op.Type == domain.OpTransfer {
-			amount = amount.Neg()
-		}
 		err := cw.Write([]string{
-			timex.FormatDate(op.Date), op.Time, accounts[op.AccountID], amount.Fixed(op.Currency),
+			timex.FormatDate(op.Date), op.Time, accounts[op.AccountID], op.SourceDelta().Fixed(op.Currency),
 			op.Currency, categories[op.CategoryID], op.Payee, op.Note, accounts[op.ToAccountID], op.MCC, id,
 			strings.Join(op.Tags, ","),
 		})

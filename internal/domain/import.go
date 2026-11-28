@@ -195,6 +195,11 @@ type Import struct {
 	CreatedAt time.Time
 }
 
+// Staged reports whether the import is staged: reviewed, not yet committed.
+func (i Import) Staged() bool {
+	return i.Status == ImportStaged
+}
+
 // CheckStatus fails with errors.ErrConflict unless the import is in want.
 func (i Import) CheckStatus(want ImportStatus) error {
 	if i.Status != want {
@@ -634,6 +639,11 @@ type AccountChoice struct {
 	NewKind AccountKind
 	// NewCreditLimit is the limit of a new credit account, zero when not set.
 	NewCreditLimit money.Amount
+}
+
+// New reports whether the choice creates a new account, mapping to no existing one.
+func (c AccountChoice) New() bool {
+	return c.AccountID == 0
 }
 
 // CheckAccount validates mapping the bank account to a.

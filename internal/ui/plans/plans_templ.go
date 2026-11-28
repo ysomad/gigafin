@@ -53,7 +53,7 @@ func plansPage(v kit.Page, d plansData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan")).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = kit.NewButton("/plans/new?month="+d.Month.String(), kit.T(ctx, "Plan"), nil).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -637,7 +637,7 @@ func planProgress(row domain.PlanRow, inc bool, symbol string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		switch {
-		case left.IsNegative() && inc:
+		case row.Over() && inc:
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "above plan"))
 			if templ_7745c5c3_Err != nil {
@@ -647,7 +647,7 @@ func planProgress(row domain.PlanRow, inc bool, symbol string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		case left.IsNegative():
+		case row.Over():
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(kit.T(ctx, "over"))
 			if templ_7745c5c3_Err != nil {

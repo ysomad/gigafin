@@ -9,169 +9,131 @@ import (
 	"github.com/ysomad/gigafin/internal/ui/kit"
 )
 
+// formPage is the page of an operation: its form in the dialog of the layout, open, as
+// it is opened from a list.
 templ formPage(v kit.Page, d opForm) {
+	{{ v.Dialog = opForms(v, d) }}
+	@kit.Layout(v, false, nil)
+}
+
+// formDialog is the form of an operation swapped into the dialog of the layout, and its
+// toasts.
+templ formDialog(v kit.Page, d opForm) {
+	@opForms(v, d)
+	@kit.Toasts(v, true, nil)
+}
+
+// opForms are the header and forms of the operation of d in the dialog of the layout,
+// posted by htmx into it. Saving or deleting reloads the page the dialog is on through
+// the rows it has loaded, which app.js posts.
+templ opForms(v kit.Page, d opForm) {
 	{{
 		typ := string(d.Type)
 		editing := d.ID != 0
-		// errID is the id of the message about input name; the new operation page has
-		// a form per type
-		errID := func(name string) string { return name + "-error-" + typ }
-	}}
-	@kit.Layout(v, false, nil) {
-		<h1>
-			if editing {
-				{ kit.T(ctx, "Edit %s", kit.T(ctx, typ)) }
-			} else {
-				{ kit.T(ctx, "New %s", kit.T(ctx, typ)) }
-			}
-		</h1>
-		if editing && d.ImportID != 0 {
-			<p class="text-light mb-4">{ kit.T(ctx, "Imported in") } <a href={ fmt.Sprintf("/imports/%d", d.ImportID) }>{ kit.T(ctx, "import #%d", d.ImportID) }</a></p>
-		}
-		if !editing {
-			<div class="hstack mb-4">
-				@kit.SegmentLink("/operations/new?type=expense", d.Type == domain.OpExpense, "− "+kit.T(ctx, "Expense"))
-				@kit.SegmentLink("/operations/new?type=income", d.Type == domain.OpIncome, "+ "+kit.T(ctx, "Income"))
-				@kit.SegmentLink("/operations/new?type=transfer", d.Type == domain.OpTransfer, "⇄ "+kit.T(ctx, "Transfer"))
-			</div>
-		}
-		<form
-			if editing {
-				id="form-operation"
-			} else {
-				id={ "op-form-" + typ }
-				hx-post="/operations"
-				hx-select={ "#op-form-" + typ }
-				hx-select-oob="#toasts"
-				hx-target="this"
-				hx-swap="outerHTML ignoreTitle:true"
-			}
-			class="form-compact"
-			method="post"
-			if editing {
-				action={ fmt.Sprintf("/operations/%d", d.ID) }
-			} else {
-				action="/operations"
-			}
-		>
-			@kit.FormError(v.Errors.Form("operation"), "")
-			<input type="hidden" name="type" value={ typ }/>
-			if d.ImportID != 0 {
-				<input type="hidden" name="import_id" value={ d.ImportID }/>
-			}
-			if d.OriginID != 0 {
-				<input type="hidden" name="origin_id" value={ d.OriginID }/>
-			}
-			if editing {
-				<input type="hidden" name="back" value={ d.Back }/>
-			}
-			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Operation details") }>
-				// amount first, focused on a new operation, so a phone opens its keypad at once
-				{{ e := v.Errors.Get("amount") }}
-				@kit.Field("col-12", kit.T(ctx, "Amount"), e, errID("amount"), nil) {
-					<input name="amount" inputmode="decimal" autocomplete="off" autofocus?={ !editing } value={ kit.AmountInput(ctx, d.Amount) } { kit.Invalid(e, errID("amount"))... }/>
-				}
-				{{ e = v.Errors.Get("account") }}
-				{{ accountLabel := kit.T(ctx, "Account") }}
-				if d.Type == domain.OpTransfer {
-					{{ accountLabel = kit.T(ctx, "From") }}
-				}
-				@kit.Field("col-6", accountLabel, e, errID("account"), nil) {
-					<select name="account" { kit.Invalid(e, errID("account"))... }>
-						@accountOptions(d.Accounts, d.AccountID, editing)
-					</select>
-				}
-				if d.Type == domain.OpTransfer {
-					{{ e := v.Errors.Get("to_account") }}
-					@kit.Field("col-6", kit.T(ctx, "To"), e, errID("to-account"), nil) {
-						<select name="to_account" { kit.Invalid(e, errID("to-account"))... }>
-							<option value="">—</option>
-							@accountOptions(d.Accounts, d.ToAccountID, editing)
-						</select>
-					}
-				}
-				if d.Type == domain.OpExpense || d.Type == domain.OpIncome {
-					{{ e := v.Errors.Get("category") }}
-					@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
-						@kit.Select("category", kit.CategoryOptions(ctx, d.Categories, []int64{d.CategoryID}, false), strconv.FormatInt(d.CategoryID, 10), kit.Invalid(e, errID("category")))
-					}
-				}
-			</fieldset>
-			<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Date and payee") }>
-				{{ e = v.Errors.Get("date") }}
-				<div
-					data-field
-					class="col-12"
-					if e != "" {
-						aria-invalid="true"
-					}
-				>
-					<label for={ "date-" + typ }>{ kit.T(ctx, "Date") }</label>
-					<fieldset class="group">
-						<input
-							type="date"
-							id={ "date-" + typ }
-							name="date"
-							value={ d.Date }
-							if e != "" {
-								aria-describedby={ errID("date") }
-							}
-						/>
-						<input type="time" name="time" value={ d.Time } aria-label={ kit.T(ctx, "Time") }/>
-					</fieldset>
-					@kit.FieldError(e, errID("date"))
-				</div>
-				{{ e = v.Errors.Get("payee") }}
-				@kit.Field("col-12", kit.T(ctx, "Payee"), e, errID("payee"), nil) {
-					<input
-						name="payee"
-						value={ d.Payee }
-						autocomplete="off"
-						{ kit.Invalid(e, errID("payee"))... }
-						if !editing {
-							hx-post="/operations/fill"
-							hx-trigger="change"
-							hx-select={ "#op-form-" + typ }
-							hx-target="closest form"
-							hx-swap="outerHTML ignoreTitle:true"
-						}
-					/>
-				}
-			</fieldset>
-			if d.SourcePayee != "" && d.SourcePayee != d.Payee {
-				<p class="text-light">{ kit.T(ctx, "Bank payee") }: { d.SourcePayee }</p>
-			}
-			{{ e = v.Errors.Get("note") }}
-			@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
-				<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
-			}
-			{{ e = v.Errors.Get("tags") }}
-			@kit.Field("", kit.T(ctx, "Tags"), e, errID("tags"), nil) {
-				@kit.TagInput("tags", d.Tags, d.AllTags, kit.T(ctx, "Enter or comma"), kit.Invalid(e, errID("tags")))
-			}
-			<div class="hstack justify-between">
-				<div class="hstack">
-					<button type="submit">{ kit.T(ctx, "Save") }</button>
-					if editing && (d.Type == domain.OpExpense || d.Type == domain.OpIncome) {
-						<a class="button outline" href={ fmt.Sprintf("/operations/%d/split", d.ID) } data-variant="secondary" aria-label={ kit.T(ctx, "Split") } title={ kit.T(ctx, "Split") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#split"></use></svg></a>
-					}
-					if editing && d.OriginID != 0 {
-						<button type="submit" form="op-unsplit" class="outline" data-variant="secondary" aria-label={ kit.T(ctx, "Undo split") } title={ kit.T(ctx, "Undo split") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#merge"></use></svg></button>
-					}
-				</div>
-				if editing {
-					<button type="submit" form="op-delete" class="outline" data-variant="danger" aria-label={ kit.T(ctx, "Delete") } title={ kit.T(ctx, "Delete") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#trash"></use></svg></button>
-				}
-			</div>
-		</form>
+		action := "/operations"
+		title := kit.T(ctx, "New %s", kit.T(ctx, typ))
 		if editing {
-			<form id="op-delete" method="post" action={ fmt.Sprintf("/operations/%d/delete", d.ID) } hx-confirm={ kit.T(ctx, "Delete this operation?") }>
-				<input type="hidden" name="back" value={ d.Back }/>
-			</form>
+			action = fmt.Sprintf("/operations/%d", d.ID)
+			title = kit.T(ctx, "Edit %s", kit.T(ctx, typ))
 		}
-		if editing && d.OriginID != 0 {
-			<form id="op-unsplit" method="post" action={ fmt.Sprintf("/operations/%d/unsplit", d.ID) } hx-confirm={ kit.T(ctx, "Merge all parts of the split back into one operation?") }></form>
+	}}
+	@kit.DialogHeader("op-dialog", title, "") {
+		if d.ImportID != 0 {
+			<p>{ kit.T(ctx, "From|import") } <a href={ fmt.Sprintf("/imports/%d", d.ImportID) }>{ kit.T(ctx, "import #%d", d.ImportID) }</a></p>
 		}
+	}
+	if !editing {
+		// switching the type keeps what was typed, but the category of another kind and
+		// the destination of a transfer
+		{{ typed := "#op-form-" + typ + " :is([name=amount], [name=account], [name=date], [name=time], [name=payee], [name=note], [name=tags], [name=back])" }}
+		<div class="hstack mb-4">
+			for _, t := range []struct {
+				typ   domain.OpType
+				label string
+			}{
+				{domain.OpExpense, "− " + kit.T(ctx, "Expense")},
+				{domain.OpIncome, "+ " + kit.T(ctx, "Income")},
+				{domain.OpTransfer, "⇄ " + kit.T(ctx, "Transfer")},
+			} {
+				{{ href := "/operations/new?type=" + string(t.typ) }}
+				<a
+					class={ "button", templ.KV("outline", t.typ != d.Type) }
+					if t.typ == d.Type {
+						aria-current="page"
+					}
+					href={ href }
+					hx-get={ href }
+					hx-include={ typed }
+					hx-target="#op-dialog"
+					hx-swap="innerHTML"
+					data-variant="secondary"
+				>{ t.label }</a>
+			}
+		</div>
+	}
+	<form
+		if editing {
+			id="form-operation"
+		} else {
+			id={ "op-form-" + typ }
+		}
+		method="post"
+		action={ action }
+		hx-post={ action }
+		hx-target="#op-dialog"
+		hx-swap="innerHTML"
+		hx-disable="findAll button"
+	>
+		// Oat lays out a dialog as a header, a body scrolling between, and a footer
+		<div class="form-compact">
+			@opFields(v, d)
+			@splitParts(d)
+		</div>
+		<footer>
+			@opButtons(d)
+		</footer>
+	</form>
+	if editing {
+		<form
+			id="op-delete"
+			method="post"
+			action={ fmt.Sprintf("/operations/%d/delete", d.ID) }
+			hx-post={ fmt.Sprintf("/operations/%d/delete", d.ID) }
+			hx-target="#op-dialog"
+			hx-swap="innerHTML"
+			hx-confirm={ kit.T(ctx, "Delete this operation?") }
+			hx-disable="#form-operation button"
+		>
+			<input type="hidden" name="back" value={ d.Back }/>
+		</form>
+	}
+	if editing && d.OriginID != 0 {
+		<form
+			id="op-unsplit"
+			method="post"
+			action={ fmt.Sprintf("/operations/%d/unsplit", d.ID) }
+			hx-post={ fmt.Sprintf("/operations/%d/unsplit", d.ID) }
+			hx-target="#op-dialog"
+			hx-swap="innerHTML"
+			hx-confirm={ kit.T(ctx, "Merge all parts of the split back into one operation?") }
+			hx-disable="#form-operation button"
+		>
+			<input type="hidden" name="back" value={ d.Back }/>
+		</form>
+	}
+}
+
+// splitParts lists the other parts of the split the operation of d is a part of, as
+// the operations of a list, edited in the dialog.
+templ splitParts(d opForm) {
+	if len(d.SplitParts) > 0 {
+		<div>
+			<p class="text-light mb-2">{ kit.T(ctx, "Split with") }</p>
+			<ul class="unstyled vstack gap-1">
+				// one day, the date of the operation above, so no day title
+				@kit.OpRows([]kit.DayGroup{{Date: d.SplitParts[0].Date, Ops: d.SplitParts, Continued: true}}, d.CatNames, d.AccByID, "")
+			</ul>
+		</div>
 	}
 }
 
@@ -185,4 +147,138 @@ templ accountOptions(accounts []domain.Account, selected int64, editing bool) {
 			<option value={ a.ID } selected?={ a.ID == selected }>{ a.Name } ({ kit.Money(ctx, a.Balance, a.Currency) } { money.CurrencySymbol(a.Currency) })</option>
 		}
 	}
+}
+
+// opFields are the inputs of the operation form of d.
+templ opFields(v kit.Page, d opForm) {
+	{{
+		typ := string(d.Type)
+		editing := d.ID != 0
+		// errID is the id of the message about input name; the new operation page has
+		// a form per type
+		errID := func(name string) string { return name + "-error-" + typ }
+	}}
+	@kit.FormError(v.Errors.Form("operation"), "")
+	<input type="hidden" name="type" value={ typ }/>
+	if d.ImportID != 0 {
+		<input type="hidden" name="import_id" value={ d.ImportID }/>
+	}
+	if d.OriginID != 0 {
+		<input type="hidden" name="origin_id" value={ d.OriginID }/>
+	}
+	if d.Back != "" {
+		<input type="hidden" name="back" value={ d.Back }/>
+	}
+	<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Operation details") }>
+		// amount first, focused on a new operation, so a phone opens its keypad at once
+		{{ e := v.Errors.Get("amount") }}
+		@kit.Field("col-12", kit.T(ctx, "Amount"), e, errID("amount"), nil) {
+			<input name="amount" inputmode="decimal" autocomplete="off" autofocus?={ !editing } value={ kit.AmountInput(ctx, d.Amount) } { kit.Invalid(e, errID("amount"))... }/>
+		}
+		{{ e = v.Errors.Get("account") }}
+		{{ accountLabel := kit.T(ctx, "Account") }}
+		if d.Type == domain.OpTransfer {
+			{{ accountLabel = kit.T(ctx, "From") }}
+		}
+		@kit.Field("col-6", accountLabel, e, errID("account"), nil) {
+			<select name="account" { kit.Invalid(e, errID("account"))... }>
+				@accountOptions(d.Accounts, d.AccountID, editing)
+			</select>
+		}
+		if d.Type == domain.OpTransfer {
+			{{ e := v.Errors.Get("to_account") }}
+			@kit.Field("col-6", kit.T(ctx, "To"), e, errID("to-account"), nil) {
+				<select name="to_account" { kit.Invalid(e, errID("to-account"))... }>
+					<option value="">—</option>
+					@accountOptions(d.Accounts, d.ToAccountID, editing)
+				</select>
+			}
+		}
+		if d.Type.Categorized() {
+			{{ e := v.Errors.Get("category") }}
+			@kit.Field("col-6", kit.T(ctx, "Category"), e, errID("category"), nil) {
+				@kit.Select("category", kit.CategoryOptions(ctx, d.Categories, []int64{d.CategoryID}, false), strconv.FormatInt(d.CategoryID, 10), kit.Invalid(e, errID("category")))
+			}
+		}
+	</fieldset>
+	<fieldset class="row mb-4" aria-label={ kit.T(ctx, "Date and payee") }>
+		{{ e = v.Errors.Get("date") }}
+		<div
+			data-field
+			class="col-12"
+			if e != "" {
+				aria-invalid="true"
+			}
+		>
+			<label for={ "date-" + typ }>{ kit.T(ctx, "Date") }</label>
+			<fieldset class="group">
+				<input
+					type="date"
+					id={ "date-" + typ }
+					name="date"
+					value={ d.Date }
+					if e != "" {
+						aria-describedby={ errID("date") }
+					}
+				/>
+				<input type="time" name="time" value={ d.Time } aria-label={ kit.T(ctx, "Time") }/>
+			</fieldset>
+			@kit.FieldError(e, errID("date"))
+		</div>
+		{{ e = v.Errors.Get("payee") }}
+		@kit.Field("col-12", kit.T(ctx, "Payee"), e, errID("payee"), nil) {
+			<input
+				name="payee"
+				value={ d.Payee }
+				autocomplete="off"
+				{ kit.Invalid(e, errID("payee"))... }
+				if !editing {
+					hx-post="/operations/fill"
+					hx-trigger="change"
+					hx-target="#op-dialog"
+					hx-swap="innerHTML"
+				}
+			/>
+		}
+	</fieldset>
+	if d.SourcePayee != "" && d.SourcePayee != d.Payee {
+		<p class="text-light">{ kit.T(ctx, "Bank payee") }: { d.SourcePayee }</p>
+	}
+	{{ e = v.Errors.Get("note") }}
+	@kit.Field("", kit.T(ctx, "Note"), e, errID("note"), nil) {
+		<input name="note" value={ d.Note } { kit.Invalid(e, errID("note"))... }/>
+	}
+	{{ e = v.Errors.Get("tags") }}
+	@kit.Field("", kit.T(ctx, "Tags"), e, errID("tags"), nil) {
+		@kit.TagInput("tags", d.Tags, d.AllTags, kit.T(ctx, "Enter or comma"), kit.Invalid(e, errID("tags")))
+	}
+}
+
+// opButtons are the buttons of the operation form of d.
+templ opButtons(d opForm) {
+	{{ editing := d.ID != 0 }}
+	// save at the right, under the thumb on phones, delete away from it at the left
+	<div class={ "hstack w-100", templ.KV("justify-between", editing), templ.KV("justify-end", !editing) }>
+		if editing {
+			<button type="submit" form="op-delete" class="outline" data-variant="danger" aria-label={ kit.T(ctx, "Delete") } title={ kit.T(ctx, "Delete") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#trash"></use></svg></button>
+		}
+		<div class="hstack">
+			if editing && d.Type.Categorized() {
+				<a
+					class="button outline"
+					href={ fmt.Sprintf("/operations/%d/split", d.ID) }
+					hx-get={ fmt.Sprintf("/operations/%d/split", d.ID) }
+					hx-target="#op-dialog"
+					hx-swap="innerHTML"
+					data-variant="secondary"
+					aria-label={ kit.T(ctx, "Split") }
+					title={ kit.T(ctx, "Split") }
+				><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#split"></use></svg></a>
+			}
+			if editing && d.OriginID != 0 {
+				<button type="submit" form="op-unsplit" class="outline" data-variant="secondary" aria-label={ kit.T(ctx, "Undo split") } title={ kit.T(ctx, "Undo split") }><svg width="16" height="1lh" aria-hidden="true"><use href="/static/img/icons.svg#merge"></use></svg></button>
+			}
+			<button type="submit">{ kit.T(ctx, "Save") }</button>
+		</div>
+	</div>
 }

@@ -112,6 +112,14 @@ linters:
       max-complexity: 20
     lll:
       line-length: 120
+    sloglint:
+      no-mixed-args: true
+      attr-only: true
+      no-global: all
+      context: all
+      static-msg: true
+      msg-style: lowercased
+      key-naming-case: snake
   exclusions:
     rules:
       - path: _test\.go

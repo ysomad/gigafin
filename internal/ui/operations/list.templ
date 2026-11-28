@@ -14,7 +14,8 @@ templ listPage(v kit.Page, d opList) {
 	@kit.Layout(v, len(d.Days) > 0, nil) {
 		<div class="hstack justify-between mb-4">
 			<div class="hstack">
-				@kit.NewButton("/operations/new", kit.T(ctx, "Operation"))
+				// a new operation is entered in the dialog of the layout, as one of the list is edited
+				@kit.NewButton("/operations/new", kit.T(ctx, "Operation"), templ.Attributes{"hx-get": "/operations/new", "hx-target": "#op-dialog", "hx-swap": "innerHTML"})
 				<ot-dropdown>
 					<button type="button" class="outline" popovertarget="op-actions" aria-label={ kit.T(ctx, "More actions") }><svg width="16" height="16" aria-hidden="true"><use href="/static/img/icons.svg#ellipsis"></use></svg></button>
 					<menu popover id="op-actions">
@@ -162,39 +163,47 @@ templ filterFields(d opList) {
 		</select>
 	}
 	@kit.Field("col-6", kit.T(ctx, "Type"), "", "", nil) {
-		<select name="type" data-category-type>
+		// the categories are of the picked type, so the field is got anew with it
+		<select name="type" hx-get="/operations" hx-include="closest form" hx-select="#category-filter" hx-target="#category-filter" hx-swap="outerHTML">
 			<option value="">{ kit.T(ctx, "All") }</option>
 			for _, typ := range domain.OpTypes() {
 				<option value={ string(typ) } selected?={ typ == d.Filter.Type }>{ kit.T(ctx, string(typ)) }</option>
 			}
 		</select>
 	}
-	// a root category also matches its nested ones
+	// the categories of the picked type, none for a type without categories; a root
+	// category also matches its nested ones
+	{{
+		kind, categorized := d.Filter.Type.Kind()
+		categories := d.Categories
+		if categorized {
+			categories = domain.ByKind(categories, kind)
+		}
+	}}
 	// not a kit.Field: the checkboxes in a label would lay it out as one of theirs
-	<div data-field class="col-12" data-category-field>
-		<label for="filter-category">{ kit.T(ctx, "Categories") }</label>
-		{{
-			selected := d.Filter.CategoryIDs
-			if d.Filter.Uncategorized {
-				selected = append([]int64{kit.NoCategory}, selected...)
-			}
-		}}
-		{{
-			var picked []string
-			for _, id := range selected {
-				picked = append(picked, strconv.FormatInt(id, 10))
-			}
-		}}
-		@kit.MultiSelect(
-			"cat",
-			append(
-				[]kit.SelectOption{{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")}},
-				kit.CategoryOptions(ctx, d.Categories, nil, true)...,
-			),
-			picked,
-			kit.T(ctx, "All"),
-			templ.Attributes{"id": "filter-category"},
-		)
+	<div id="category-filter" data-field class="col-12" hidden?={ d.Filter.Type != "" && !categorized }>
+		if d.Filter.Type == "" || categorized {
+			<label for="filter-category">{ kit.T(ctx, "Categories") }</label>
+			{{
+				var picked []string
+				if d.Filter.Uncategorized {
+					picked = append(picked, strconv.FormatInt(kit.NoCategory, 10))
+				}
+				for _, id := range d.Filter.CategoryIDs {
+					picked = append(picked, strconv.FormatInt(id, 10))
+				}
+			}}
+			@kit.MultiSelect(
+				"cat",
+				append(
+					[]kit.SelectOption{{Value: strconv.FormatInt(kit.NoCategory, 10), Label: kit.T(ctx, "No category")}},
+					kit.CategoryOptions(ctx, categories, nil, true)...,
+				),
+				picked,
+				kit.T(ctx, "All"),
+				templ.Attributes{"id": "filter-category"},
+			)
+		}
 	</div>
 	<div data-field class="col-12">
 		<label for="filter-from">{ kit.T(ctx, "Date") }</label>

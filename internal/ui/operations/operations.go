@@ -2,6 +2,7 @@ package operations
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -57,7 +58,9 @@ func (h *Handler) operations(w http.ResponseWriter, r *http.Request, user domain
 			return domain.NewError(errors.ErrInvalid, "invalid page link")
 		}
 	}
-	p := pagination.NewParams(after, 20)
+	// a list reloaded in place keeps the rows it had loaded
+	n, _ := strconv.Atoi(r.Header.Get(kit.RowsHeader)) //nolint:errcheck // 0 when not reloaded
+	p := pagination.NewParams(after, max(20, n))
 	ops, next, err := h.app.Svc.Operations.List(r.Context(), user.ID, f, p)
 	if err != nil {
 		return err
@@ -142,7 +145,7 @@ func (h *Handler) loadBanks(r *http.Request, user domain.User, d *opList) error 
 		if !slices.Contains(enabled, conn.Bank) {
 			continue
 		}
-		if conn.Status == domain.BankConnected {
+		if conn.Connected() {
 			d.BankSync = true
 		}
 	}
@@ -183,7 +186,7 @@ func (h *Handler) fillForm(r *http.Request, user domain.User, f *opForm) error {
 		return err
 	}
 	for _, a := range accounts {
-		if !a.Archived || a.ID == f.AccountID || a.ID == f.ToAccountID {
+		if a.Pickable(f.AccountID, f.ToAccountID) {
 			f.Accounts = append(f.Accounts, a)
 		}
 	}
@@ -196,6 +199,14 @@ func (h *Handler) fillForm(r *http.Request, user domain.User, f *opForm) error {
 			return err
 		}
 		f.Categories = domain.ByKind(tree, kind)
+		if f.ID != 0 && f.OriginID != 0 {
+			parts, err := h.app.Svc.Operations.SplitParts(r.Context(), user.ID, f.OriginID)
+			if err != nil {
+				return err
+			}
+			f.SplitParts = slices.DeleteFunc(parts, func(p domain.Operation) bool { return p.ID == f.ID })
+			f.CatNames, f.AccByID = domain.CategoryShortNames(tree), domain.AccountsByID(accounts)
+		}
 	}
 	return nil
 }
@@ -210,17 +221,37 @@ func (h *Handler) renderForm(
 	if f.ID != 0 {
 		title = "Edit " + string(f.Type)
 	}
-	return kit.Render(h.app, w, r, status, formPage, kit.Page{User: &user, Nav: "operations", Title: title}, f,
+	page := formPage
+	// an operation opened from a list, or added there, is in the dialog of the layout,
+	// which htmx requests the form for alone
+	if strings.HasSuffix(r.Header.Get("HX-Target"), "#op-dialog") {
+		page = formDialog
+	}
+	return kit.Render(h.app, w, r, status, page, kit.Page{User: &user, Nav: "operations", Title: title}, f,
 		kit.Failure{Err: viewErr, Form: "operation"})
 }
 
 func (h *Handler) newOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
-	typ, err := domain.ParseOpType(r.URL.Query().Get("type"))
+	q := r.URL.Query()
+	typ, err := domain.ParseOpType(q.Get("type"))
 	if err != nil {
 		typ = domain.OpExpense
 	}
-	now := time.Now().In(user.Location())
-	f := opForm{Type: typ, Date: timex.FormatDate(now), Time: now.Format("15:04")}
+	// switching the type of the form keeps what was typed, sent in the query
+	var f opForm
+	if err := h.app.Decoder.Decode(&f, q); err != nil {
+		return domain.NewError(errors.ErrInvalid, "invalid form")
+	}
+	f.Type = typ
+	if f.Date == "" {
+		now := time.Now().In(user.Location())
+		f.Date, f.Time = timex.FormatDate(now), now.Format("15:04")
+	}
+	// saving reloads the page the form was opened on, kept as the type is switched
+	if ref, err := url.Parse(r.Referer()); err == nil && f.Back == "" && ref.Host == r.Host &&
+		ref.Path != "/operations/new" {
+		f.Back = ref.RequestURI()
+	}
 	return h.renderForm(w, r, user, http.StatusOK, f, nil)
 }
 
@@ -233,7 +264,7 @@ func (h *Handler) operationSplit(w http.ResponseWriter, r *http.Request, user do
 	if err != nil {
 		return err
 	}
-	return h.app.Fragment(w, r, http.StatusOK, splitRow(domain.ByKind(tree, kind), splitPart{}, false, 0, nil))
+	return h.app.Fragment(w, r, http.StatusOK, splitRow(domain.ByKind(tree, kind), splitPart{}, false, true, 0, nil))
 }
 
 // parseOpForm reads the form into both the raw form, for re-rendering, and the
@@ -272,10 +303,10 @@ func (h *Handler) parseOpForm(r *http.Request) (opForm, domain.OperationInput, k
 		errs["amount"] = domain.NewError(errors.ErrInvalid, "required")
 	case err != nil:
 		errs["amount"] = domain.NewError(errors.ErrInvalid, "enter a number")
-	case f.Type == domain.OpAdjustment && in.Amount.IsZero():
-		errs["amount"] = domain.NewError(errors.ErrInvalid, "must not be zero")
-	case f.Type != domain.OpAdjustment && !in.Amount.IsPositive():
-		errs["amount"] = domain.NewError(errors.ErrInvalid, "must be positive")
+	default:
+		if err := f.Type.CheckAmount(in.Amount); err != nil {
+			errs["amount"] = err
+		}
 	}
 	switch in.Date, err = timex.ParseDate(f.Date); {
 	case f.Date == "":
@@ -324,6 +355,10 @@ func (h *Handler) createOperation(w http.ResponseWriter, r *http.Request, user d
 	}
 	if err != nil {
 		return err
+	}
+	if strings.HasSuffix(r.Header.Get("HX-Target"), "#op-dialog") {
+		h.back(w, r, f.Back)
+		return nil
 	}
 	kit.Redirect(w, r, "/operations")
 	return nil
@@ -395,17 +430,31 @@ func (h *Handler) renderSplit(
 	}
 	amount := op.Amount.Fixed(op.Currency)
 	if len(parts) == 0 {
-		parts = []splitPart{{CategoryID: op.CategoryID, Amount: amount}, {}}
+		parts = []splitPart{{CategoryID: op.CategoryID, Amount: amount}}
 	}
-	return kit.Render(h.app, w, r, status, splitPage, kit.Page{User: &user, Nav: "operations", Title: "Split"},
-		opSplit{
-			Op:         op,
-			CatNames:   domain.CategoryShortNames(tree),
-			AccByID:    domain.AccountsByID(accounts),
-			Amount:     amount,
-			Parts:      parts,
-			Categories: domain.ByKind(tree, kind),
-		}, kit.Failure{Err: splitErr, Form: "split"})
+	// a split needs a second part, kept when the form posted without one
+	if len(parts) == 1 {
+		parts = append(parts, splitPart{})
+	}
+	d := opSplit{
+		Op:         op,
+		CatNames:   domain.CategoryShortNames(tree),
+		AccByID:    domain.AccountsByID(accounts),
+		Amount:     amount,
+		Parts:      parts,
+		Categories: domain.ByKind(tree, kind),
+	}
+	page := splitPage
+	// opened from the edit dialog, the split replaces it there, returning to the page
+	// the dialog is on
+	if r.Header.Get("HX-Request-Type") == "partial" {
+		page = splitDialog
+		if ref, err := url.Parse(r.Referer()); err == nil && ref.Host == r.Host {
+			d.Back = ref.RequestURI()
+		}
+	}
+	return kit.Render(h.app, w, r, status, page, kit.Page{User: &user, Nav: "operations", Title: "Split"}, d,
+		kit.Failure{Err: splitErr, Form: "split"})
 }
 
 func (h *Handler) splitOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
@@ -461,7 +510,7 @@ func (h *Handler) splitOperation(w http.ResponseWriter, r *http.Request, user do
 	if err != nil {
 		return err
 	}
-	kit.Redirect(w, r, "/operations")
+	h.back(w, r, r.PostFormValue("back"))
 	return nil
 }
 
@@ -476,7 +525,7 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 	}
 	f.ID = id
 	// a new operation may be left uncategorized, a saved one is not
-	if (f.Type == domain.OpExpense || f.Type == domain.OpIncome) && in.CategoryID == 0 {
+	if f.Type.Categorized() && in.CategoryID == 0 {
 		errs["category"] = domain.NewError(errors.ErrInvalid, "required")
 	}
 	if len(errs) > 0 {
@@ -489,7 +538,7 @@ func (h *Handler) updateOperation(w http.ResponseWriter, r *http.Request, user d
 	if err != nil {
 		return err
 	}
-	kit.Redirect(w, r, cmp.Or(f.Back, "/operations"))
+	h.back(w, r, f.Back)
 	return nil
 }
 
@@ -504,12 +553,39 @@ func (h *Handler) deleteOperation(w http.ResponseWriter, r *http.Request, user d
 	if err := h.app.Svc.Operations.Delete(r.Context(), user.ID, id); err != nil {
 		return err
 	}
-	kit.Redirect(w, r, cmp.Or(r.PostFormValue("back"), "/operations"))
+	h.back(w, r, r.PostFormValue("back"))
 	return nil
 }
 
+// back returns to the page back, the operations list by default, after an operation is
+// saved or deleted. From the dialog of the layout it reloads the main of the page, which
+// closes the dialog, in place: with the rows the page has loaded, so the operation is
+// shown in its day and the page keeps its scroll.
+func (h *Handler) back(w http.ResponseWriter, r *http.Request, back string) {
+	back = cmp.Or(back, "/operations")
+	if r.Header.Get("HX-Request-Type") != "partial" || !strings.HasPrefix(back, "/") ||
+		strings.HasPrefix(back, "//") || strings.HasPrefix(back, "/\\") {
+		kit.Redirect(w, r, back)
+		return
+	}
+	loc, err := json.Marshal(map[string]any{
+		"path":    back,
+		"target":  "#main",
+		"select":  "#main",
+		"swap":    "outerSync",
+		"push":    "false",
+		"headers": map[string]string{kit.RowsHeader: r.PostFormValue("rows")},
+	})
+	if err != nil {
+		kit.Redirect(w, r, back)
+		return
+	}
+	w.Header().Set("HX-Location", string(loc))
+	w.WriteHeader(http.StatusOK)
+}
+
 // unsplitOperation merges the split operation id is a part of and opens the merged
-// operation.
+// operation, or from the edit dialog returns to the page the dialog is on.
 func (h *Handler) unsplitOperation(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	id, err := kit.PathID(r, "id")
 	if err != nil {
@@ -518,6 +594,10 @@ func (h *Handler) unsplitOperation(w http.ResponseWriter, r *http.Request, user 
 	op, err := h.app.Svc.Operations.Unsplit(r.Context(), user.ID, id)
 	if err != nil {
 		return err
+	}
+	if r.Header.Get("HX-Request-Type") == "partial" {
+		h.back(w, r, r.PostFormValue("back"))
+		return nil
 	}
 	kit.Redirect(w, r, fmt.Sprintf("/operations/%d/edit", op.ID))
 	return nil

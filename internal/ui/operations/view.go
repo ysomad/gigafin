@@ -69,6 +69,11 @@ type opForm struct {
 	Categories []domain.Category
 	// AllTags are the user's tags to pick from.
 	AllTags []string
+	// SplitParts are the other parts of the split the operation is a part of, shown
+	// with CatNames and AccByID.
+	SplitParts []domain.Operation
+	CatNames   map[int64]string
+	AccByID    map[int64]domain.Account
 }
 
 // opSplit is the split page of a saved expense or income: its parts, the operation as
@@ -80,4 +85,7 @@ type opSplit struct {
 	Amount     string
 	Parts      []splitPart
 	Categories []domain.Category
+	// Back is the page the dialog the split is in was opened on, which splitting
+	// reloads, empty on the split page.
+	Back string
 }

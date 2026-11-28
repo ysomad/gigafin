@@ -56,7 +56,8 @@
 - [x] consistent split / rules ui
 - [x] better plans ui/ux
 - [x] privacy mode
-- [ ] archive / unarchive account - back - account state is not shown on page
+- [x] reactive updates
+- [x] linter: sloglint, line is 120
 - [ ] remove useless slop comments
 - [ ] refactor helpers (move short helpers into domain if needed)
 - [ ] refactor tests

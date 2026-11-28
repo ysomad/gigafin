@@ -43,42 +43,42 @@ templ categoriesPage(v kit.Page, d listData) {
 			}
 		</div>
 		<div id="list-results">
-		for _, g := range d.Groups {
-			if len(d.Groups) > 1 {
-				<h2>{ kit.KindLabel(ctx, g.Kind) }</h2>
-			}
-			<div class="table mb-4">
-				<table>
-					<tbody>
-						for _, parent := range g.Categories {
-							<tr>
-								<td>
-									<a href={ fmt.Sprintf("/categories/%d", parent.ID) }>{ parent.Name }</a>
-									if parent.Archived {
-										@kit.ArchivedBadge()
-									}
-								</td>
-							</tr>
-							for _, c := range parent.Children {
+			for _, g := range d.Groups {
+				if len(d.Groups) > 1 {
+					<h2>{ kit.KindLabel(ctx, g.Kind) }</h2>
+				}
+				<div class="table mb-4">
+					<table>
+						<tbody>
+							for _, parent := range g.Categories {
 								<tr>
 									<td>
-										<span class="text-light">{ parent.Name } › </span><a href={ fmt.Sprintf("/categories/%d", c.ID) }>{ c.Name }</a>
-										if c.Archived {
+										<a href={ fmt.Sprintf("/categories/%d", parent.ID) }>{ parent.Name }</a>
+										if parent.Archived {
 											@kit.ArchivedBadge()
 										}
 									</td>
 								</tr>
+								for _, c := range parent.Children {
+									<tr>
+										<td>
+											<span class="text-light">{ parent.Name } › </span><a href={ fmt.Sprintf("/categories/%d", c.ID) }>{ c.Name }</a>
+											if c.Archived {
+												@kit.ArchivedBadge()
+											}
+										</td>
+									</tr>
+								}
 							}
-						}
-					</tbody>
-				</table>
-			</div>
-		}
-		if len(d.Groups) == 0 && filtered {
-			<p class="text-light">{ kit.T(ctx, "No categories match.") }</p>
-		} else if len(d.Groups) == 0 {
-			<p class="text-light">{ kit.T(ctx, "No categories yet.") }</p>
-		}
+						</tbody>
+					</table>
+				</div>
+			}
+			if len(d.Groups) == 0 && filtered {
+				<p class="text-light">{ kit.T(ctx, "No categories match.") }</p>
+			} else if len(d.Groups) == 0 {
+				<p class="text-light">{ kit.T(ctx, "No categories yet.") }</p>
+			}
 		</div>
 	}
 }
@@ -108,7 +108,7 @@ templ categoryPage(v kit.Page, d categoryData) {
 				@kit.Field("col-6", kit.T(ctx, "Name"), e, "name-error", nil) {
 					<input name="name" value={ d.Name } { kit.Invalid(e, "name-error")... }/>
 				}
-				if c.ParentID != 0 {
+				if !c.IsParent() {
 					@kit.Field("col-6", kit.T(ctx, "Inside"), "", "", nil) {
 						<select name="parent">
 							for _, p := range d.Parents {

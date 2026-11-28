@@ -37,7 +37,7 @@ templ banksCard(v kit.Page, d banksData, oob bool) {
 templ bankSection(v kit.Page, d banksData, b bankData) {
 	{{ name := kit.T(ctx, b.Bank.Name()) }}
 	{{ base := "/settings/banks/" + string(b.Bank) }}
-	{{ connected := b.Conn.Status == domain.BankConnected && b.Step == "" }}
+	{{ connected := b.Conn.Connected() && b.Step == "" }}
 	<section class="form-compact">
 		<div class="hstack justify-between">
 			<div class="hstack">
@@ -56,7 +56,7 @@ templ bankSection(v kit.Page, d banksData, b bankData) {
 				{{ link := base + "/link" }}
 				<div class="hstack">
 					// posts the account table of the bank, linking the accounts not synced yet
-					if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && t.AccountID == 0 }) {
+					if slices.ContainsFunc(d.Accounts, func(t domain.BankAccount) bool { return t.Bank == b.Bank && !t.Linked() }) {
 						<button type="submit" form={ "form-" + string(b.Bank) + "-link" } formaction={ link } hx-post={ link } hx-swap="none" hx-disable="this" class="outline small">{ kit.T(ctx, "Sync all accounts") }</button>
 					}
 					<form method="post" action={ base + "/disconnect" } hx-post={ base + "/disconnect" } hx-swap="none" hx-confirm={ kit.T(ctx, "Disconnect %s? Synced operations stay.", name) }>

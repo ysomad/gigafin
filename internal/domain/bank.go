@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -85,6 +86,17 @@ type BankConnection struct {
 	LastError string
 }
 
+// Connected reports whether the bank accepts the session of the connection.
+func (c BankConnection) Connected() bool {
+	return c.Status == BankConnected
+}
+
+// NeedsLogin reports whether the bank no longer accepts the session: the user must
+// sign in again.
+func (c BankConnection) NeedsLogin() bool {
+	return c.Status == BankLoginRequired
+}
+
 // BankAccount is an account at a bank as of the last sign-in or sync, and the account
 // it syncs with. An account syncs with one bank account at most, chosen when the
 // account is created.
@@ -113,10 +125,25 @@ type BankAccount struct {
 	TransfersTo int64
 }
 
+// Linked reports whether the bank account is synced with an account.
+func (t BankAccount) Linked() bool {
+	return t.AccountID != 0
+}
+
+// LinkedBankAccount returns the bank account of ts the account id syncs with, false
+// when it syncs with none.
+func LinkedBankAccount(ts []BankAccount, id int64) (BankAccount, bool) {
+	i := slices.IndexFunc(ts, func(t BankAccount) bool { return t.Linked() && t.AccountID == id })
+	if i < 0 {
+		return BankAccount{}, false
+	}
+	return ts[i], true
+}
+
 // Mismatch reports whether a is the linked account and its balance differs from the
 // bank's.
 func (t BankAccount) Mismatch(a Account) bool {
-	return t.AccountID != 0 && t.AccountID == a.ID && !t.Balance.Equal(a.Balance)
+	return t.Linked() && t.AccountID == a.ID && !t.Balance.Equal(a.Balance)
 }
 
 // BankSync is the outcome of syncing one bank or several.
